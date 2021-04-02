@@ -1,0 +1,32 @@
+Data organization
+ xyDxy
+ xyInfSup:
+ theta:
+ have the samme fitting data organization (to avoid data copy)
+theta[  0:   K-1]: var_x
+theta[  K: 2*K-1]: var_y
+theta[2*K: 3*K-1]: mu_x
+theta[3*K: 4*K-1]: mu_y
+theta[4*K: 5*K-1]: w
+
+
+eta[K,N]: row first ordered
+
+
+* Pad Processing
++ Notations:
+  i, j : indexes for resp. cathode 0 and cathode 1
++ use of the intersection matrix beetween cathode-0 (i) and cathode-1 (j) 
+elements to project on one-pad plane
+Description: matrix of short row ordered (i*M+j, with i describing rows ans j describing columns)
+The final intersection matrix contains 0, ???? 0 index ?
+
+IInterJ and JInterI are compact representations of the intersection matrix to speed the matrix scaning.
+
+* Building the projected pads (projected_xyDxy)
+  First the projected pads are built, the new locations are computed with 
+  the i-order (cath-0 order). When the cath0-charges of the projected pads
+  are computed, it follows the same order than the projected pad 
+  building (i.e. the i-order). But computing cath1-charges does not follow 
+  the same order (j-order associate with cath-1). The aloneJPads and the mapIJToK 
+  are used to get the i-order.

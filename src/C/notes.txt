@@ -1,0 +1,10 @@
+
+* Python-C
+  - inline functions with static in C (in C++ not required)
+  - linking: add other referenced libraries with the good order. Here gslcblas & gsl
+    There wil be loaded when libExternalC will be loaded 
+    > g++ -shared -fPIC -Wl,-soname,libExternalC.so   mathieson.o mathiesonFit.o -o libExternalC.so -lgsl -lgslcblas
+
+* TODO
+  - mathieson test: mathieson mixture
+  - mathiesonFit test: mathieson mixture
