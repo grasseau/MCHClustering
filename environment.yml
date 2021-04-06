@@ -6,4 +6,6 @@ dependencies:
   - gsl=1.16
   - libiconv
   - pkg-config
+  - numpy
+  - matplotlib
 
