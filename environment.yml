@@ -1,0 +1,9 @@
+name: mch-clustering
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - gsl=1.16
+  - libiconv
+  - pkg-config
+

@@ -1,5 +1,0 @@
-[requires]
-gsl/2.6
-
-[generators]
-cmake_find_package_multi
