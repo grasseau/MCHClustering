@@ -95,6 +95,20 @@ def asTheta( w, muX, muY, varX=None, varY=None):
   theta[4*K:5*K] = w
   return theta
 
+def thetaAsWMuVar( theta):
+  K = int(theta.size / 5 )
+  w = np.zeros((K))
+  muX = np.zeros((K))
+  muY = np.zeros((K))
+  varX = np.zeros((K))
+  varY = np.zeros((K))
+  #
+  varX = theta[0*K:1*K]
+  varY = theta[1*K:2*K]
+  muX = theta[2*K:3*K]
+  muY = theta[3*K:4*K]
+  w = theta[4*K:5*K]
+  return (w, muX, muY, varX, varY)
 
 def compute2DPadIntegrals( xInf, xSup, yInf, ySup, chId ):
     N = xInf.size

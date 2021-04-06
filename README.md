@@ -1,5 +1,15 @@
 # MCHClustering
 Clustering and Fitting implemetation
+## Directories
+- C: C++/C source code and the Python interface
+- PyTests: Python scripts to test C++/C Implementation
+- Jupyter: Jupyter notes to test and run
+- Analyses: perform analysis (like compute residuals)
+- Data: MC data and reco Data from AliRoot release and results of python analysis
+- Doc: future documentation
+- Util: utilities (plot, IO, ...)
+- TrashCan: Sandbox of old python scripts
+- Macros: Root macros used to extract MC & reco Data
 
 ## Install
 - cd MCHClustering/src/C

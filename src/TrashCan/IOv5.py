@@ -6,7 +6,6 @@ __date__ = "$Jul 12, 2020 9:56:07 AM$"
 import sys, traceback
 import struct
 import numpy as np
-import pickle 
 
 def readInt4(file, n):
     
@@ -474,18 +473,7 @@ class PreCluster:
       EOF=getEOF(self.file, "reading event", ev)
       ev += 1; 
     return ev
-
-def writePickle( fileName, obj ):
-   file = open( fileName, "wb" )
-   pickle.dump( obj, file )
-   file.close()
-   
-def readPickle( fileName ):
-   file = open( fileName, "rb" )
-   obj = pickle.load( file )
-   file.close()
-   return obj
-
+    
 if __name__ == "__main__":
     print("Hello")
 
