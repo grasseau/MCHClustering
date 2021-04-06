@@ -14,5 +14,7 @@ src/C/mathiesonFit.cpp)
 
 target_link_libraries(ExternalC PUBLIC GSL::gsl)
 
-
+# this is a bad hack : should not put generated file in the source directory !
+file(GENERATE OUTPUT ${CMAKE_SOURCE_DIR}/src/C/PyCWrapper.py 
+INPUT ${CMAKE_SOURCE_DIR}/src/C/PyCWrapper.py.in)
 
