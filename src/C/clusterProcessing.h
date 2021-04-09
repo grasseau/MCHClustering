@@ -2,9 +2,7 @@
 # ifndef  _CLUSTERPROCESSING_H
 # define  _CLUSTERPROCESSING_H
 
-typedef short Saturated_t;
 typedef std::pair< int, const double*> DataBlock_t;
-typedef short Group_t;
 
 extern "C" {
   void setMathiesonVarianceApprox( int chId, double *theta, int K );

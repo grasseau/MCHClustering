@@ -85,6 +85,7 @@ def setupPyCWrapper():
   extCLib.weightedEMLoop.resType = None
   extCLib.weightedEMLoop.argtypes = [ 
                                     array_1d_double,  # xyDxy
+                                    array_1d_short,   # saturated
                                     array_1d_double,  # zObs
                                     array_1d_double,  # theta0
                                     c_int, c_int,     # K, N 
@@ -227,11 +228,11 @@ def generateMixedGaussians2D( xyInfSup, theta):
   CLib.generateMixedGaussians2D( xyInfSup, theta, K, N, z)
   return z
 
-def weightedEMLoop( xyDxy, zObs, thetai, mode, LConvergence, verbose):
+def weightedEMLoop( xyDxy, saturated, zObs, thetai, mode, LConvergence, verbose):
   N = int( xyDxy.size / 4)
   K = int( thetai.size / 5)
   thetaf = np.zeros( K*5 )
-  CLib.weightedEMLoop( xyDxy, zObs, thetai, K, N, mode, LConvergence, verbose, thetaf )
+  CLib.weightedEMLoop( xyDxy, saturated, zObs, thetai, K, N, mode, LConvergence, verbose, thetaf )
   return thetaf
 
 def copyProjectedPads( ):

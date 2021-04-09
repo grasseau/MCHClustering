@@ -180,6 +180,7 @@ def processEvent( preClusters,  ev, mcObj):
   assign = []
   allDMin = []
   for pc in range(0, nbrOfPreClusters):
+  # for pc in range(0, 2):
     thetaf = processPreCluster( preClusters, ev, pc, mcObj, display=False)
     res = matchingWithMC(thetaf, preClusters, ev, pc, mcObj)
     (pc_, match, nbrOfHits, TP, FP,FN, dMin, dxMin, dyMin, tfMatrix, mcHitsInvolved ) = res
@@ -322,6 +323,7 @@ if __name__ == "__main__":
   nEvents = len( recoData.padX )
   emMeasure = []
   for ev in range(0, nEvents):
+  # for ev in range(37, 38):
     emMeasure.append( processEvent( recoData, ev, mcData ) )    
 
   statOnDistances( recoMeasure, mcData, recoData, range(nEvents) )

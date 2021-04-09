@@ -19,7 +19,6 @@ static PadIdx_t* JInterI=0;
 static PadIdx_t* intersectionMatrix=0;
 
 // Maps
-// ??? use of MapKToIJ_t
 static MapKToIJ_t *mapKToIJ=0;
 static PadIdx_t   *mapIJToK=0;
 
@@ -189,6 +188,7 @@ int getIndexByColumns( PadIdx_t *matrix, PadIdx_t N, PadIdx_t M, PadIdx_t *JIdx)
   }
   return k;
 }
+
 // Build the neighbor list
 PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN) {
   const double relEps = (1.0 + 1.0e-7);
@@ -222,8 +222,12 @@ PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN) {
   }
   return neighbors;
 }
-            
-int buildProjectedPads( 
+
+
+void computeAndStoreFirstNeighbors( const double *xyDxy, int N, int allocatedN) {            
+  neighbors = getFirstNeighbors( xyDxy, N, allocatedN);
+}
+    int buildProjectedPads( 
             const double *xy0InfSup, const double *xy1InfSup, 
             PadIdx_t N0, PadIdx_t N1, 
             PadIdx_t *aloneIPads, PadIdx_t *aloneJPads, int includeAlonePads) {
@@ -313,7 +317,14 @@ int buildProjectedPads(
   }
   return k;
 }
-  
+
+void buildProjectedSaturatedPads( const Saturated_t *saturated0, const Saturated_t *saturated1, Saturated_t *saturatedProj) {
+  for( int k=0; k < nbrOfProjPads; k++) {
+    MapKToIJ_t ij = mapKToIJ[k];
+    saturatedProj[k] = saturated0[ij.i] || saturated1[ij.j];
+  }
+}
+
 int projectChargeOnOnePlane( 
         const double *xy0InfSup, const double *ch0, 
         const double *xy1InfSup, const double *ch1, 
@@ -533,7 +544,6 @@ int projectChargeOnOnePlane(
   return nbrOfProjPads;
 }
 
-
 int getConnectedComponentsOfProjPads( short *padGrp ) { 
   // Class from neighbors list of Projected pads, the pads in groups (connected components) 
   // padGrp is set to the group Id of the pad. 
@@ -588,7 +598,109 @@ int getConnectedComponentsOfProjPads( short *padGrp ) {
   return currentGrpId;
 }
 
-int findLocalMaxWithLaplacian( const double *xyDxy, const double *z, int N, int xyDxyAllocated, double *laplacian,  double *theta) {
+int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
+        Group_t *padToGrp,
+        int nGroups,
+        int N, int K, double *laplacian,  double *theta, Group_t *thetaToGrp) {
+  //
+  // ??? WARNING : theta must be allocated to N components (# of pads) 
+  // ??? WARNING : use neigh of proj-pad
+  //
+  // Theta's
+  double *varX  = getVarX(theta, K);
+  double *varY  = getVarY(theta, K);
+  double *muX   = getMuX(theta, K);
+  double *muY   = getMuY(theta, K);
+  double *w     = getW(theta, K);
+
+  const double *X  = getConstX( xyDxy, N);
+  const double *Y  = getConstY( xyDxy, N);
+  const double *DX = getConstDX( xyDxy, N);
+  const double *DY = getConstDY( xyDxy, N);
+  //
+  PadIdx_t *neigh = neighbors;
+  // k is the # of seeds founds
+  int k=0;
+  double zi;
+  int nSupi, nInfi;
+  int nNeighi;
+  // Group sum & max
+  double sumW[nGroups+1];
+  double maxLapl[nGroups+1];
+  int kLocalMax[nGroups+1];
+  for( int g=0; g < nGroups+1; g++) { sumW[g]=0; maxLapl[g]=0; kLocalMax[g]=0;}
+  //
+  int j;
+  for ( int i=0; i< N; i++) {
+    zi = z[i];
+    nSupi = 0;
+    nInfi = 0;
+    nNeighi = 0;
+    for( PadIdx_t *neigh_ptr = getNeighborsOf(neigh, i); *neigh_ptr != -1; neigh_ptr++) {
+      j = *neigh_ptr;
+      if( zi >= z[j] ) nSupi++; else  nInfi++;
+    }
+    nNeighi = nSupi + nInfi;
+    if ( (nNeighi <= 2) && (N > 2) ) {
+      // Low nbr of neighbors but the # Pads must be > 2
+      laplacian[i] = 0;
+    } else {
+      // TODO Test ((double) nSup -Inf) / nNeigh;
+      laplacian[i] = ((double) nSupi) / nNeighi;
+    }
+    Group_t g = padToGrp[i];
+    if (laplacian[i] > maxLapl[g] ) {
+      maxLapl[g] = laplacian[i];
+    }
+    /// printf("???? lapl=%g %d %d %d group=%d maxLapl[g]=%g\n", laplacian[i], nSupi, nInfi, nNeighi, g, maxLapl[g]);
+    // Strong max
+    if ( (laplacian[i] >= 0.99) && (z[i] > 5.0) ) {
+        // save the seed
+        w[k] = z[i];
+        muX[k] = X[i];
+        muY[k] = Y[i];
+        thetaToGrp[k] = g;
+        sumW[g]  += w[k];
+        kLocalMax[g] += 1;
+        k++;
+    }
+  }
+  // If there is no max in a group
+  for (int g=1; g <= nGroups; g++) {
+    if (VERBOSE) printf("findLocalMaxWithLaplacian: group=%d nLocalMax=%d, maxLaplacian=%7.3g\n", g,  kLocalMax[g], maxLapl[g]);
+    if ( kLocalMax[g] == 0 ) {
+      double lMax = maxLapl[g];
+      for ( int i=0; i< N; i++) {
+        if ( (padToGrp[i] == g) && (laplacian[i] == lMax) )  {
+          // save the seed
+          w[k]   = z[i];
+          muX[k] = X[i];
+          muY[k] = Y[i];
+          thetaToGrp[k] = g;
+          sumW[g] += w[k];
+          kLocalMax[g] += 1;
+          k++;
+        }
+      }
+    }
+  }
+  //
+  // w normalization
+  double cst[nGroups];
+  for (int g=1; g <= nGroups; g++) {
+    if ( kLocalMax[g] != 0 ) {
+      cst[g] = 1.0 / sumW[g];
+    } else {
+      cst[g] = 1.0;
+    }
+  }
+  for( int l=0; l < k; l++) w[l] = w[l] * cst[ thetaToGrp[l]];
+  //
+  return k;
+}
+
+// With Groups. Not Used ???
+int findLocalMaxWithLaplacianV0( const double *xyDxy, const double *z, const PadIdx_t *grpIdxToProjIdx, int N, int xyDxyAllocated, double *laplacian,  double *theta) {
   //
   // ??? WARNING : theta must be allocated to N components (# of pads) 
   // ??? WARNING : use neigh of proj-pad
@@ -619,8 +731,12 @@ int findLocalMaxWithLaplacian( const double *xyDxy, const double *z, int N, int 
     nSupi = 0;
     nInfi = 0;
     nNeighi = 0;
-    for( PadIdx_t *neigh_ptr = getNeighborsOf(neigh,i); *neigh_ptr != -1; neigh_ptr++) {
+    int iProj = ( grpIdxToProjIdx != 0) ? grpIdxToProjIdx[i] : i;
+    for( PadIdx_t *neigh_ptr = getNeighborsOf(neigh, iProj); *neigh_ptr != -1; neigh_ptr++) {
       j = *neigh_ptr;
+      if (CHECK && ( j >= N )) { 
+        printf("findLocalMaxWithLaplacian error: i=%d has the j=%d neighbor but j > N=%d \n", iProj, j, N);
+      }
       if( zi >= z[j] ) nSupi++; else  nInfi++;
     }
     nNeighi = nSupi + nInfi;

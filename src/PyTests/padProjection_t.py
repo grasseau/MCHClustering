@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import C.PyCWrapper as PCWrap
-import utilitiesForTests as tUtil
+import Util.dataTools as tUtil
 import Util.plot as uPlt
 """ ???
 def buildPads( nx, ny, xMin, xMax, yMin, yMax ):

@@ -6,7 +6,9 @@ typedef struct {
     PadIdx_t j;
 } MapKToIJ_t;
 
- // 8 neigbours + the center pad itself + separator (-1)
+typedef short Group_t;
+
+// 8 neigbours + the center pad itself + separator (-1)
 static const int MaxNeighbors = 12;
 
 inline static PadIdx_t *getNeighborsOf( PadIdx_t *neigh,  PadIdx_t i) { return &neigh[MaxNeighbors*i]; };
@@ -21,14 +23,26 @@ extern "C" {
   
   PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN);
   
+  // Used when there is 1 cathode
+  // The neighbors list must be computed for the laplacian
+  void computeAndStoreFirstNeighbors( const double *xyDxy, int N, int allocatedN);
+  
   int projectChargeOnOnePlane( 
           const double *xy0InfSup, const double *ch0, 
           const double *xy1InfSup, const double *ch1, 
           PadIdx_t N0, PadIdx_t N1, int includeAlonePads);
   
+  void buildProjectedSaturatedPads( const Saturated_t *saturated0, const Saturated_t *saturated1, Saturated_t *saturatedProj);
+
   int getConnectedComponentsOfProjPads( short *padGrp );
   
-  int findLocalMaxWithLaplacian( const double *xyDxy, const double *z, int N, int xyDxyAllocated, double *laplacian,  double *theta);
+  int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
+        Group_t *padToGrp,
+        int nGroups,
+        int N, int K, double *laplacian,  double *theta, Group_t *thetaToGrp);
+
+  // ??? To remove
+  int findLocalMaxWithLaplacianV0( const double *xyDxy, const double *z, const PadIdx_t *grpIdxToProjIdx, int N, int xyDxyAllocated, double *laplacian,  double *theta);
   
   void assignCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup);
   //

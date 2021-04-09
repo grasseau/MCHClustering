@@ -124,13 +124,13 @@ double computeWeightedLogLikelihood( const double *xyInfSup, const double *theta
   return LogLikelihood;
 }
 
-void EStep( const double *xyInfSup, const double *theta, int K, int N, int verbose, double *eta) {
+void EStep( const double *xyInfSup, const double *theta, int K, int N, int verbose, double *eta, double *zEval) {
 /*
           Compute new eta(i,k), fraction/proba that point i
           belongs to kth gaussian
 */
   double kSum[N];
-  double zEval[N];
+  // ??? To remove : double zEval[N];
   vectorSetZero( eta, K*N );
   vectorSetZero( kSum, N );
   const double *w = getConstW(theta, K);
@@ -261,18 +261,21 @@ void weightedMStep( const double *xyDxy, const double *z, const double *eta, int
   return;
 }
 
-void weightedEMLoop( const double *xyDxy, const double *z, const double *theta0, int K, int N, 
+void weightedEMLoop( const double *xyDxy, const Saturated_t *saturated, const double *zObs, const double *theta0, int K, int N, 
                     int mode, double LConvergence, int verbose, double *theta) {
 
   // Mode of computation
   // TODO make a function
   int m = mode;
   int cstVarMode = m & 0x1;
-  
+  // Saturated
+  // Not selected way ??? int saturatedMode = (m >> 1) & 0x1; 
+  int saturatedMode = vectorSumShort( saturated, N);
   if (verbose >= 2) {
    printf("  wheightedEMLoop : cstVarMode =%d\n", cstVarMode);
+   printf("  wheightedEMLoop : saturatedMode =%d\n", saturatedMode);
   }
-  // vectorPrint("  z", z, N);
+  // vectorPrint("  zObs", zObs, N);
   // vectorPrint("  xydxy", xyDxy, N*4);
   // Define theta
   vectorCopy( theta0, K*5, theta);
@@ -297,14 +300,19 @@ void weightedEMLoop( const double *xyDxy, const double *z, const double *theta0,
   vectorAddVector( y, -1.0, dY, N, getYInf(xyInfSup, N) );
   vectorAddVector( x, +1.0, dX, N, getXSup(xyInfSup, N) );
   vectorAddVector( y, +1.0, dY, N, getYSup(xyInfSup, N) );
-  
+  //
+  // z normalization
+  double zSum = vectorSum( zObs, N);
+  double zObsNorm[N];
+  vectorMultScalar( zObs, 1.0 /zSum, N, zObsNorm );
+  //
   // Initial Likelihood
-  double logL = computeWeightedLogLikelihood( xyInfSup, theta0, z, K, N);
+  double logL = computeWeightedLogLikelihood( xyInfSup, theta0, zObsNorm, K, N);
   if (verbose >= 1) printEMState( -1, logL, 0.0);
-
   //      
   // EM Loop
   //
+  double zEval[N];
   double prevLogL = logL; 
   logL = 1.0 + prevLogL;
   int it = 0;
@@ -317,11 +325,21 @@ void weightedEMLoop( const double *xyDxy, const double *z, const double *theta0,
     // EM Step
     //
     // E-Step
-    EStep( xyInfSup, theta, K, N, verbose, eta);
+    EStep( xyInfSup, theta, K, N, verbose, eta, zEval);
+    //
+    if (saturatedMode) {
+      // Set (or update) saturated pads to the estimate 
+      // values i.e. zEval
+      // Remark 
+      // saturated is a constant array and 
+      // the zObsNorm[ saturated == 0 )] are not modified
+      // and take the zObsNorm Values
+      vectorMaskedUpdate( saturated, zEval, N, zObsNorm);
+    } 
     // M-Step
-    weightedMStep( xyDxy, z, eta, K, N, cstVarMode, theta );
+    weightedMStep( xyDxy, zObsNorm, eta, K, N, cstVarMode, theta );
     // Log-Lilelihood
-    logL = computeWeightedLogLikelihood( xyInfSup, theta, z, K, N);
+    logL = computeWeightedLogLikelihood( xyInfSup, theta, zObsNorm, K, N);
 
     if (verbose >= 2) printTheta( "  EM new theta", theta, K);
     it += 1;

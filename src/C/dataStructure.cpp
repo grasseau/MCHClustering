@@ -120,10 +120,10 @@ void maskedCopyXYdXY( const double *xyDxy,  int nxyDxy, const Mask_t *mask,  int
   double *Ym  = getY ( xyDxyMasked, nxyDxyMasked);
   double *DXm = getDX( xyDxyMasked, nxyDxyMasked);
   double *DYm = getDY( xyDxyMasked, nxyDxyMasked);
-  vectorMaskedCopy( X, mask, nMask, Xm );
-  vectorMaskedCopy( Y, mask, nMask, Ym );
-  vectorMaskedCopy( DX, mask, nMask, DXm );
-  vectorMaskedCopy( DY, mask, nMask, DYm );
+  vectorGather( X, mask, nMask, Xm );
+  vectorGather( Y, mask, nMask, Ym );
+  vectorGather( DX, mask, nMask, DXm );
+  vectorGather( DY, mask, nMask, DYm );
 }
 
 void maskedCopyToXYInfSup( const double *xyDxy, int ndxyDxy,  const Mask_t *mask, int nMask, 
@@ -140,10 +140,10 @@ void maskedCopyToXYInfSup( const double *xyDxy, int ndxyDxy,  const Mask_t *mask
   double *XmSup = getXSup( xyDxyMasked, ndxyDxyMasked);
   double *YmInf = getYInf( xyDxyMasked, ndxyDxyMasked);
   double *YmSup = getYSup( xyDxyMasked, ndxyDxyMasked);
-  vectorMaskedCopy( X,  mask, nMask, Xm );
-  vectorMaskedCopy( Y,  mask, nMask, Ym );
-  vectorMaskedCopy( DX, mask, nMask, DXm );
-  vectorMaskedCopy( DY, mask, nMask, DYm );
+  vectorGather( X,  mask, nMask, Xm );
+  vectorGather( Y,  mask, nMask, Ym );
+  vectorGather( DX, mask, nMask, DXm );
+  vectorGather( DY, mask, nMask, DYm );
   for (int k=0; k < nMask; k++) {
     // To avoid overwritting
     double xInf = Xm[k] - DXm[k];
@@ -156,7 +156,7 @@ void maskedCopyToXYInfSup( const double *xyDxy, int ndxyDxy,  const Mask_t *mask
   }
 }
 
-void maskedCopyTheta( const double *theta,  const Mask_t *mask,  int K, double *maskedTheta, int maskedK) {
+void maskedCopyTheta( const double *theta, int K, const Mask_t *mask, int nMask , double *maskedTheta, int maskedK) {
   const double *w    = getConstW   ( theta, K);
   const double *muX  = getConstMuX ( theta, K);
   const double *muY  = getConstMuY ( theta, K);
@@ -167,11 +167,11 @@ void maskedCopyTheta( const double *theta,  const Mask_t *mask,  int K, double *
   double *muYm  = getMuY ( maskedTheta, maskedK);
   double *varXm = getVarX( maskedTheta, maskedK);
   double *varYm = getVarY( maskedTheta, maskedK);
-  vectorMaskedCopy( w,    mask, K, wm );
-  vectorMaskedCopy( muX,  mask, K, muXm );
-  vectorMaskedCopy( muY,  mask, K, muYm );
-  vectorMaskedCopy( varX, mask, K, varXm );
-  vectorMaskedCopy( varY, mask, K, varYm );
+  vectorGather( w,    mask, nMask, wm );
+  vectorGather( muX,  mask, nMask, muXm );
+  vectorGather( muY,  mask, nMask, muYm );
+  vectorGather( varX, mask, nMask, varXm );
+  vectorGather( varY, mask, nMask, varYm );
 }
     
 void printXYdXY( const char *str, const double *xyDxy, int NMax, int N, const double *val1, const double *val2) {

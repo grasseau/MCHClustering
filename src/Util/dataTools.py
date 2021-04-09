@@ -120,3 +120,48 @@ def compute2DPadIntegrals( xInf, xSup, yInf, ySup, chId ):
     xyInfSup[3*N:4*N] = ySup[:]
     z = PCWrap.compute2DPadIntegrals( xyInfSup, chId )
     return z
+
+def buildPreCluster( w, muX, muY, xyDxDy0, xyDxDy1, chId, minRatioCh, maxRatioCh):
+  #
+  K = w.size
+  # Theta
+  varX = 0.1 * np.ones( K )
+  varY = 0.1 * np.ones( K )
+  theta = asTheta( w, muX, muY, varX, varY)
+  # Mathieson
+  x0, y0, dx0, dy0 = xyDxDy0
+  xyInfSup0 = padToXYInfSup( x0, y0, dx0, dy0)
+  z0 = PCWrap.compute2DMathiesonMixturePadIntegrals( xyInfSup0, theta, chId )
+  x1, y1, dx1, dy1 = xyDxDy1
+  xyInfSup1 = padToXYInfSup( x1, y1, dx1, dy1)
+  z1 = PCWrap.compute2DMathiesonMixturePadIntegrals( xyInfSup1, theta, chId )
+  # Cathodes
+  cath0 = np.zeros( x0.size, dtype=np.int16 )
+  cath1 = np.ones( x1.size, dtype=np.int16 )
+
+  # Low Charge cutoff
+  zMinBefore = min( np.min(z0), np.min(z1) )
+  zMaxBefore = max( np.max(z0), np.max(z1) )
+  lowCutoff  = minRatioCh * zMaxBefore
+  (x0r, y0r, dx0r, dy0r, cath0r, z0r) = removePads( x0, y0, dx0, dy0, cath0, z0, ( z0 < lowCutoff ) )
+  (x1r, y1r, dx1r, dy1r, cath1r, z1r) = removePads( x1, y1, dx1, dy1, cath1, z1, ( z1 < lowCutoff ) )
+  N0 = x0r.size
+  N1 = x1r.size
+  (x, y, dx, dy) = mergePads( x0r, y0r, dx0r, dy0r, x1r, y1r, dx1r, dy1r)
+  xyDxy = padToXYdXY( x, y, dx, dy)
+  z = np.hstack( [z0r, z1r] )
+  cath = np.hstack( [ np.zeros( (N0), dtype=np.int16), 
+                      np.ones( (N0), dtype=np.int16) ] )
+  # High Charge cutoff - saturation
+  highCutoff = maxRatioCh * zMaxBefore
+  idx = np.where( z > highCutoff)
+  z[ idx ] = highCutoff
+  saturated = np.zeros( (N0+N1), dtype=np.int16)
+  saturated[idx] = 1
+  # Print info
+  print( "buildPreCluster")
+  print( "  min/max z before cutting-off", zMinBefore, zMaxBefore)
+  print( "  min/max z cutoff", lowCutoff, highCutoff )
+  print( "  # saturated pads", np.sum( saturated ))
+  # 
+  return ( xyDxy, cath, saturated, z )

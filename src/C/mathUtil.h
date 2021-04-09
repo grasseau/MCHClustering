@@ -75,8 +75,23 @@ inline static void vectorNotShort( const short *src, int N, short *dest) {
 inline static int vectorBuildMaskEqualShort( short *src, short value, int N, short *mask) {
     int count=0; for(int i=0; i < N; i++) { mask[i] = (src[i] == value); count += ((src[i] == value));} return count;}
 
-inline static int vectorMaskedCopy( const double *v, const Mask_t *mask, int N, double *maskedVector ) { 
-  int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) maskedVector[k++] = v[i];} return k;}
+inline static int vectorGather( const double *v, const Mask_t *mask, int N, double *gatherVector ) { 
+  int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) gatherVector[k++] = v[i];} return k;}
+
+inline static int vectorGatherShort( const short *v, const Mask_t *mask, int N, short *gatherVector ) { 
+  int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) gatherVector[k++] = v[i];} return k;}
+
+inline static int vectorGetIndexFromMaskShort( const Mask_t *mask, int N, short *index ) { 
+  int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) index[k++] = i;} return k;}
+
+inline static int vectorGetIndexFromMask( const Mask_t *mask, int N, int *index ) { 
+  int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) index[k++] = i;} return k;}
+
+inline static void vectorMaskedSet( const Mask_t *mask, const double *vTrue, const double *vFalse, int N, double *vR ) { 
+  for (int i=0; i < N; i++) { vR[i] = ( mask[i] ) ? vTrue[i] : vFalse[i];}; return; }
+
+inline static void vectorMaskedUpdate( const Mask_t *mask, const double *vTrue, int N, double *vR ) { 
+  for (int i=0; i < N; i++) { vR[i] = ( mask[i] ) ? vTrue[i] : vR[i];}; return; }
 
 inline static double vectorMaskedSum( const double *v, const Mask_t *mask, int N ) { 
   double sum=0; for (int i=0, k=0; i < N; i++) { sum += v[i]*mask[i];} return sum;}

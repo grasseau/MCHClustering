@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 import C.PyCWrapper as PCWrap
 import Util.plot as uPlt
-import utilitiesForTests as tUtil
+import Util.dataTools as tUtil
 
 if __name__ == "__main__":
     

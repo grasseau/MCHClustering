@@ -3,6 +3,9 @@
 
 # include "mathUtil.h"
 
+typedef short Saturated_t;
+
+// ??? To Remove
 # define Malloc( type, len) ( (type *) malloc( ((size_t ) len) * sizeof(type)))
 
 typedef int PadIdx_t;
@@ -57,7 +60,7 @@ void maskedCopyXYdXY( const double *xyDxy,  int nxyDxy, const Mask_t *mask,  int
 void maskedCopyToXYInfSup( const double *xyDxy, int ndxyDxy,  const Mask_t *mask, int nMask, 
                            double *xyDxyMasked, int ndxyDxyMasked );
 
-void maskedCopyTheta( const double *theta,  const Mask_t *mask,  int K, double *maskedTheta, int maskedK);
+void maskedCopyTheta( const double *theta, int K, const Mask_t *mask, int nMask , double *maskedTheta, int maskedK);
 
 void printTheta( const char *str, const double *theta, int K);
 
