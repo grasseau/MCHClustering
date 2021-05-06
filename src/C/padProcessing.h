@@ -19,6 +19,8 @@ extern "C" {
   // Helper to get results from Python
   int getNbrProjectedPads();
   //
+  void setNbrProjectedPads( int n);
+  
   void copyProjectedPads(double *xyDxy, double *chA, double *chB);
   
   PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN);
@@ -32,25 +34,36 @@ extern "C" {
           const double *xy1InfSup, const double *ch1, 
           PadIdx_t N0, PadIdx_t N1, int includeAlonePads);
   
-  void buildProjectedSaturatedPads( const Saturated_t *saturated0, const Saturated_t *saturated1, Saturated_t *saturatedProj);
+  void buildProjectedSaturatedPads( const Mask_t *saturated0, const Mask_t *saturated1, Mask_t *saturatedProj);
 
   int getConnectedComponentsOfProjPads( short *padGrp );
   
   int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
         Group_t *padToGrp,
         int nGroups,
-        int N, int K, double *laplacian,  double *theta, Group_t *thetaToGrp);
+        int N, int K, double *laplacian,  double *theta, PadIdx_t *thetaIndexes, 
+        Group_t *thetaToGrp);
 
   // ??? To remove
   int findLocalMaxWithLaplacianV0( const double *xyDxy, const double *z, const PadIdx_t *grpIdxToProjIdx, int N, int xyDxyAllocated, double *laplacian,  double *theta);
   
-  void assignCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup);
-  //
-  void copyCathToGrp( short *cath0Grp, short *cath1Grp, int nCath0, int nCath1);
+  void assignOneCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup);
   
-  void getMaskCathToGrp( short g, short* mask0, short *mask1, int nCath0, int nCath1);
+  void assignCathPadsToGroupFromProj( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, 
+                                      short *wellSplitGroup, short *matGrpGrp);
+
+  int assignCathPadsToGroup( short *matGrpGrp, int nGrp, int nCath0, int nCath1, short *grpToGrp );
+  
+  void storeProjectedPads ( const double *xyDxyProj, const double *z, int nPads);
+  //
+  void copyCathToGrpFromProj( short *cath0Grp, short *cath1Grp, int nCath0, int nCath1);
+  
+  void getMaskCathToGrpFromProj( short g, short* mask0, short *mask1, int nCath0, int nCath1);
   
   void freeMemoryPadProcessing();
+  
+  void printMatrixShort( const char *str, const short *matrix, int N, int M);
+  void printMatrixInt  ( const char *str, const int   *matrix, int N, int M);
 }
 #endif // _PADPROCESSING_H
 

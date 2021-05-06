@@ -16,6 +16,7 @@ int f_ChargeIntegral( const gsl_vector *gslParams, void *dataFit, gsl_vector *re
   double *dy = dataPtr->dy_ptr; 
   Mask_t  *cath = dataPtr->cath_ptr;
   double *zObs = dataPtr->zObs_ptr;
+  Mask_t *notSaturated = dataPtr->notSaturated_ptr;
   int chamberId = dataPtr->chamberId;
   double *cathWeights      = dataPtr->cathWeights_ptr;
   double *zCathTotalCharge = dataPtr->zCathTotalCharge_ptr;
@@ -76,6 +77,8 @@ int f_ChargeIntegral( const gsl_vector *gslParams, void *dataFit, gsl_vector *re
     // GG Note: if require compute the charge of k-th component
     // z_k[k] = vectorSum( zTmp, N )
     double wTmp = (k != K-1) ? w[k] : lastW;
+    // saturated pads
+    vectorMaskedMult( zTmp, notSaturated, N, zTmp);
     vectorAddVector( z, wTmp, zTmp, N, z );
   }
 
@@ -98,6 +101,7 @@ int f_ChargeIntegral( const gsl_vector *gslParams, void *dataFit, gsl_vector *re
   // TODO Optimize (elementwise not a good solution)
   for (i = 0; i < N; i++) {
     gsl_vector_set( residuals, i, (zObs[i] - z[i]) * (1.0+cathPenal) + wPenal );
+    // gsl_vector_set( residuals, i, (zObs[i] - z[i])  + 0.*wPenal );
   }
   if (verbose > 1) {
     printf("  cathPenal=%5.4g wPenal=%5.4g \n", 1.0+cathPenal, wPenal);
@@ -138,8 +142,11 @@ void printState (int iter, gsl_multifit_fdfsolver * s, int K) {
 
 // Notes : 
 //  - the intitialization of Mathieson module must be done before (initMathieson)
+// zCathTotalCharge = sum excludind saturated pads
 void fitMathieson( double *thetai, 
-                   double *xyDxy, double *z, Mask_t *cath, double *zCathTotalCharge,
+                   double *xyDxy, double *z, Mask_t *cath, Mask_t *notSaturated,
+ 
+                   double *zCathTotalCharge,
                    int K, int N, int chamberId, int process,
                    double *thetaf,
                    double *khi2,
@@ -188,6 +195,8 @@ void fitMathieson( double *thetai,
   mathiesonData.dy_ptr = getDY( xyDxy, N );
   mathiesonData.cath_ptr = cath;
   mathiesonData.zObs_ptr = z;
+  mathiesonData.notSaturated_ptr = notSaturated;
+  
   // Init the weights
   double cathWeights[N];
   for (int i=0; i < N; i++) {

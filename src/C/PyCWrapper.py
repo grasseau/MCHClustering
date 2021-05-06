@@ -126,16 +126,16 @@ def setupPyCWrapper():
   extCLib.getConnectedComponentsOfProjPads.resType = c_int
   extCLib.getConnectedComponentsOfProjPads.argtypes = [ array_1d_short ]  # Pad Groups
   #
-  extCLib.assignCathPadsToGroup.resType = None
-  extCLib.assignCathPadsToGroup.argtypes = [
+  extCLib.assignCathPadsToGroupFromProj.resType = None
+  extCLib.assignCathPadsToGroupFromProj.argtypes = [
                                             array_1d_short,     # padGroup
                                             c_int, c_int,       # nPads, nGroup (# of pad Groups)
                                             c_int, c_int,       # nCath0, nCath1
                                             array_1d_short,     # well split groups
                                             ]
   #                                            
-  extCLib.copyCathToGrp.resType = None
-  extCLib.copyCathToGrp.argtypes =  [
+  extCLib.copyCathToGrpFromProj.resType = None
+  extCLib.copyCathToGrpFromProj.argtypes =  [
                                     array_1d_short,     # cath0Grp
                                     array_1d_short,     # cath1Grp
                                     c_int, c_int,       # nCath0, nCath1
@@ -168,13 +168,41 @@ def setupPyCWrapper():
   extCLib.getNbrOfPadsInGroups.resType = c_int
   extCLib.getNbrOfPadsInGroups.argtypes = None
   #
+  extCLib.getNbrOfProjPads.resType = c_int
+  extCLib.getNbrOfProjPads.argtypes = None
+  #
+  extCLib.getNbrOfThetaEMFinal.resType = c_int
+  extCLib.getNbrOfThetaEMFinal.argtypes = None
+  #
   extCLib.collectPadsAndCharges.resType  = None
   extCLib.collectPadsAndCharges.argtypes = [
                                     array_1d_double,    # xyDxy
                                     array_1d_double,    # z
                                     array_1d_short,     # padToGrp
                                     c_int               # nTot
+                                    ] 
+  #
+  extCLib.getKThetaInit.resType = c_int
+  extCLib.getKThetaInit.argtypes = None
+  #
+  extCLib.collectLaplacian.resType  = None
+  extCLib.collectLaplacian.argtypes = [
+                                    array_1d_double,    # Laplacian
+                                    c_int               # nTot
+                                    ] 
+  #
+  extCLib.collectThetaInit.resType  = None
+  extCLib.collectThetaInit.argtypes = [
+                                    array_1d_double,    # theta init
+                                    c_int               # K
                                     ]  
+  #
+    #
+  extCLib.collectThetaEMFinal.resType  = None
+  extCLib.collectThetaEMFinal.argtypes = [
+                                          array_1d_double,    # theta EM Final
+                                          c_int               # K
+                                         ]  
   #
   extCLib.freeMemoryPadProcessing.resType = c_int
   extCLib.freeMemoryPadProcessing.argtypes = None
@@ -232,7 +260,8 @@ def weightedEMLoop( xyDxy, saturated, zObs, thetai, mode, LConvergence, verbose)
   N = int( xyDxy.size / 4)
   K = int( thetai.size / 5)
   thetaf = np.zeros( K*5 )
-  CLib.weightedEMLoop( xyDxy, saturated, zObs, thetai, K, N, mode, LConvergence, verbose, thetaf )
+  sat = saturated.astype( np.int16 )
+  CLib.weightedEMLoop( xyDxy, sat, zObs, thetai, K, N, mode, LConvergence, verbose, thetaf )
   return thetaf
 
 def copyProjectedPads( ):
@@ -312,7 +341,8 @@ def copyCathToGrp( nCath0, nCath1):
 
 def clusterProcess( xyDxyi, cathi, saturated, zi, chId ):
   N = int( xyDxyi.size / 4)
-  nbrOfHits = CLib.clusterProcess( xyDxyi, cathi, saturated, zi, chId, N)
+  sat = saturated.astype( np.int16 )
+  nbrOfHits = CLib.clusterProcess( xyDxyi, cathi, sat, zi, chId, N)
   return nbrOfHits
 
 def setMathiesonVarianceApprox( chId, theta):
@@ -327,12 +357,31 @@ def collectTheta( K ):
 
 def collectPadsAndCharges():
   N = CLib.getNbrOfPadsInGroups()
+  print("[python] collectPadsAndCharges N=", N)
   xyDxy = np.zeros( N*4)
   z     = np.zeros( N)
   padToGrp = np.zeros( N, dtype=np.int16)
   CLib.collectPadsAndCharges( xyDxy, z, padToGrp, N)
   return ( xyDxy, z, padToGrp)
 
+def collectLaplacian():
+  N = CLib.getNbrOfProjPads()
+  laplacian = np.zeros( N)
+  CLib.collectLaplacian( laplacian, N)
+  return laplacian
+
+def collectThetaInit():
+  K = CLib.getKThetaInit()
+  thetai = np.zeros( 5*K)
+  CLib.collectThetaInit( thetai, K)
+  return thetai
+
+def collectThetaEMFinal():
+  K = CLib.getNbrOfThetaEMFinal()
+  thetaf = np.zeros( 5*K)
+  CLib.collectThetaEMFinal( thetaf, K)
+  return thetaf
+  
 def freeMemoryPadProcessing():
   CLib.freeMemoryPadProcessing
   return

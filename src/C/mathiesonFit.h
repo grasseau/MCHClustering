@@ -16,6 +16,7 @@ typedef struct dataFit {
   double *dy_ptr;
   Mask_t *cath_ptr;
   double *zObs_ptr;
+  Mask_t *notSaturated_ptr;
   double *cathWeights_ptr;
   int    chamberId;
   double *zCathTotalCharge_ptr;
@@ -26,7 +27,8 @@ typedef struct dataFit {
 //  - the intitialization of Mathieson module must be done before (initMathieson)
 extern "C" {
   void fitMathieson( double *muAndWi, 
-                   double *xyAndDxy, double *z, Mask_t *cath, double *zCathTotalCharge,
+                   double *xyAndDxy, double *z, Mask_t *cath, Mask_t *notSaturated,
+                   double *zCathTotalCharge,
                    int K, int N, int chamberId, int jacobian,
                    double *muAndWf,
                    double *khi2,

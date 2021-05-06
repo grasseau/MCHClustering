@@ -102,10 +102,12 @@ void generateMixedGaussians2D( const double *xyInfSup, const double *theta, int 
   double zk[N];
   const double *w = getConstW( theta, K);
   vectorSetZero( z, N);
-  for (int k=0; k < K; k++) { 
-    computeDiscretizedGaussian2D( xyInfSup, theta, K, N, k, zk );
-    // z[i] = w[k] * zk[i]
-    vectorAddVector( z, w[k], zk, N, z  );
+  for (int k=0; k < K; k++) {
+    if (w[k] > 0.0) {
+      computeDiscretizedGaussian2D( xyInfSup, theta, K, N, k, zk );
+      // z[i] = w[k] * zk[i]
+      vectorAddVector( z, w[k], zk, N, z  );
+    }
   }
 }
                   
@@ -138,9 +140,11 @@ void EStep( const double *xyInfSup, const double *theta, int K, int N, int verbo
   for (int k=0; k < K; k++) {
     // eta[:, k] = w[k] * computeDiscretizedGaussian2D( xy[:,:], dxy, mu[k,:], var[k,:] ) 
     // kSum += eta[:,k]
-    computeDiscretizedGaussian2D( xyInfSup, theta, K, N, k, zEval );
-    vectorMultScalar( zEval, w[k], N, &eta[k*N] );
-    vectorAddVector( kSum, 1.0, &eta[k*N], N, kSum);
+    if (w[k] != 0.0) { 
+      computeDiscretizedGaussian2D( xyInfSup, theta, K, N, k, zEval );
+      vectorMultScalar( zEval, w[k], N, &eta[k*N] );
+      vectorAddVector( kSum, 1.0, &eta[k*N], N, kSum);
+    }
   }
   // eta normalisation
   for (int i=0; i < N; i++) {
@@ -153,6 +157,59 @@ void EStep( const double *xyInfSup, const double *theta, int K, int N, int verbo
     } else {
       // eta[ i, :] = eta[i, :] / kSum[i]
       for (int k=0; k < K; k++) {
+        eta[ k*N + i] = eta[ k*N + i]/kSum[i];
+      }       
+    }
+  }
+  if (verbose >= 2) {
+      double nSum[K];
+      vectorSetZero(kSum, N);
+      vectorSetZero(nSum, K);
+      for (int i=0; i < N; i++) {
+        for (int k=0; k < K; k++) { 
+          kSum[i] += eta[k*N+i];  
+          nSum[k] += eta[k*N+i];  
+        }    
+      }
+      printf("  E-Step check: sum_k{eta} min=%f max=%f\n", vectorMin(kSum, N), vectorMax(kSum, N));
+      printf("  E-Step check: sum_n{eta} min=%f max=%f\n", vectorMin(nSum, K), vectorMax(nSum, K));
+      printf("  E-Step check: sum_{eta} =%f\n", vectorSum(nSum, K) );
+  }
+  return;
+}
+
+void maskedEStep( const double *xyInfSup, const double *theta, const Mask_t *maskTheta, int K, int N, int verbose, double *eta, double *zEval) {
+/*
+          Compute new eta(i,k), fraction/proba that point i
+          belongs to kth gaussian
+*/
+  double kSum[N];
+  // ??? To remove : double zEval[N];
+  vectorSetZero( eta, K*N );
+  vectorSetZero( kSum, N );
+  const double *w = getConstW(theta, K);
+  
+  for (int k=0; k < K; k++) {
+    // eta[:, k] = w[k] * computeDiscretizedGaussian2D( xy[:,:], dxy, mu[k,:], var[k,:] ) 
+    // kSum += eta[:,k]
+    if (maskTheta[k]) {
+      computeDiscretizedGaussian2D( xyInfSup, theta, K, N, k, zEval );
+      vectorMultScalar( zEval, w[k], N, &eta[k*N] );
+      vectorAddVector( kSum, 1.0, &eta[k*N], N, kSum);
+    }
+  }
+  // eta normalisation
+  for (int i=0; i < N; i++) {
+    if (kSum[i] < DBL_EPSILON ) {
+      // print( "WARNING sum eta(i,:) is null, i=",i , "xy=", xy[:,i], "dxy=",dxy[:,i])
+      // eta[ i, :] = eta[i, :] / kSum[i]
+      for (int k=0; k < K; k++) {
+          eta[ k*N + i] = 0.;
+      }        
+    } else {
+      // eta[ i, :] = eta[i, :] / kSum[i]
+      for (int k=0; k < K; k++) {
+        // if (maskTheta[k]) eta[ k*N + i] = eta[ k*N + i]/kSum[i];
         eta[ k*N + i] = eta[ k*N + i]/kSum[i];
       }       
     }
@@ -196,6 +253,7 @@ void weightedMStep( const double *xyDxy, const double *z, const double *eta, int
   gsl_matrix_const_view gsl_eta = gsl_matrix_const_view_array (eta, K, N);
   gsl_blas_dgemv(CblasNoTrans, 1.0, &gsl_eta.matrix, &gsl_z.vector, 0.0, &gsl_wk.vector);
 
+  // vectorPrint( "??? MStep ", wk, K);
           
   double u[N];
   gsl_vector_view gsl_u = gsl_vector_view_array (u, N);
@@ -261,19 +319,20 @@ void weightedMStep( const double *xyDxy, const double *z, const double *eta, int
   return;
 }
 
-void weightedEMLoop( const double *xyDxy, const Saturated_t *saturated, const double *zObs, const double *theta0, int K, int N, 
-                    int mode, double LConvergence, int verbose, double *theta) {
+double weightedEMLoop( const double *xyDxy, const Mask_t *saturated, const double *zObs, 
+                     const double *theta0, const Mask_t *maskTheta, int K, int N, 
+                     int mode, double LConvergence, int verbose, double *theta) {
 
   // Mode of computation
   // TODO make a function
   int m = mode;
   int cstVarMode = m & 0x1;
   // Saturated
-  // Not selected way ??? int saturatedMode = (m >> 1) & 0x1; 
-  int saturatedMode = vectorSumShort( saturated, N);
+  // Not selected way ??? int nbrSaturatedPads = (m >> 1) & 0x1; 
+  int nbrSaturatedPads = vectorSumShort( saturated, N);
   if (verbose >= 2) {
    printf("  wheightedEMLoop : cstVarMode =%d\n", cstVarMode);
-   printf("  wheightedEMLoop : saturatedMode =%d\n", saturatedMode);
+   printf("  wheightedEMLoop : nbrSaturatedPads =%d\n", nbrSaturatedPads);
   }
   // vectorPrint("  zObs", zObs, N);
   // vectorPrint("  xydxy", xyDxy, N*4);
@@ -307,6 +366,11 @@ void weightedEMLoop( const double *xyDxy, const Saturated_t *saturated, const do
   vectorMultScalar( zObs, 1.0 /zSum, N, zObsNorm );
   //
   // Initial Likelihood
+  if ( maskTheta ) {
+    for (int k=0; k < K; k++) {
+      w[k] = (maskTheta[k] == 1) ? w[k] : 0;
+    }  
+  }
   double logL = computeWeightedLogLikelihood( xyInfSup, theta0, zObsNorm, K, N);
   if (verbose >= 1) printEMState( -1, logL, 0.0);
   //      
@@ -325,9 +389,12 @@ void weightedEMLoop( const double *xyDxy, const Saturated_t *saturated, const do
     // EM Step
     //
     // E-Step
-    EStep( xyInfSup, theta, K, N, verbose, eta, zEval);
+    if (maskTheta == 0) 
+      EStep( xyInfSup, theta, K, N, verbose, eta, zEval);
+    else
+      maskedEStep( xyInfSup, theta, maskTheta, K, N, verbose, eta, zEval);
     //
-    if (saturatedMode) {
+    if (nbrSaturatedPads > 0) {
       // Set (or update) saturated pads to the estimate 
       // values i.e. zEval
       // Remark 
@@ -344,9 +411,14 @@ void weightedEMLoop( const double *xyDxy, const Saturated_t *saturated, const do
     if (verbose >= 2) printTheta( "  EM new theta", theta, K);
     it += 1;
   }
+  if (verbose >= 1) 
+     printEMState( it, logL, logL - prevLogL ); 
   if (verbose >= 2)
     printf("End GaussianEM\n");
-  return;
+  
+  // Return BIC criterion
+  int kSignificant = vectorSumOfGreater( w, 10.e-5, K);
+  return (-2*logL + (3*kSignificant-1) * log(N - nbrSaturatedPads) );
 }
 
 

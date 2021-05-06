@@ -37,10 +37,25 @@ static double* projDY;
 static double* projCh0=0;
 static double* projCh1=0;
 // cathodes group
-static short* cath0ToGrp=0;
-static short* cath1ToGrp=0;
-
+static short* cath0ToGrpFromProj=0;
+static short* cath1ToGrpFromProj=0;
+//
+static short* cath0ToTGrp=0;
+static short* cath1ToTGrp=0;
+//
 int getNbrProjectedPads() { return nbrOfProjPads; };
+
+void setNbrProjectedPads( int n) { nbrOfProjPads = n; maxNbrOfProjPads= n; };
+
+void storeProjectedPads ( const double *xyDxyProj, const double *z, int nPads) {
+  projected_xyDxy = new double[nPads*4];
+  projCh0 = new double[nPads];
+  projCh1 = new double[nPads];
+
+  vectorCopy( xyDxyProj, 4*nPads, projected_xyDxy);
+  vectorCopy( z, nPads, projCh0 );
+  vectorCopy( z, nPads, projCh1 );
+}
 
 void copyProjectedPads(double *xyDxy, double *chA, double *chB) {
 
@@ -62,6 +77,17 @@ void printMatrixInt( const char *str, const int *matrix, int N, int M) {
   }
   printf("\n");
 }    
+
+void printMatrixShort( const char *str, const short *matrix, int N, int M) {
+  printf("%s\n", str);
+  for ( int i=0; i < N; i++) {
+    for ( int j=0; j < M; j++) {
+      printf(" %2d", matrix[i*M+j]);
+    }
+    printf("\n");
+  }
+  printf("\n");
+}  
 
 void printInterMap( const char *str, const PadIdx_t *inter, int N) {
   const PadIdx_t *ij_ptr = inter;
@@ -163,15 +189,18 @@ int checkConsistencyMapKToIJ( const PadIdx_t *aloneIPads, const PadIdx_t *aloneJ
 
 int getIndexByRow( PadIdx_t *matrix, PadIdx_t N, PadIdx_t M, PadIdx_t *IIdx) {
   int k = 0;
+  // printf("N=%d, M=%d\n", N, M);
   for( PadIdx_t i=0; i < N; i++) {
     for( PadIdx_t j=0; j < M; j++) {    
       if (matrix[i*M+j] == 1) {
         IIdx[k]= j; k++;
+        // printf("k=%d,", k);
       }
     }
     // end of row/columns
     IIdx[k]= -1; k++;
   }
+  // printf("\n final k=%d \n", k);
   return k;
 }
 
@@ -195,7 +224,7 @@ PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN) {
   const double *X = getConstX( xyDxy, allocatedN);
   const double *Y = getConstY( xyDxy, allocatedN);
   const double *DX = getConstDX( xyDxy, allocatedN);
-  const double *DY = getConstDY( xyDxy, allocatedN);
+  const double *DY = getConstDY( xyDxy, allocatedN); 
   // 8 neigbours + the center pad itself + separator (-1)
   neighbors = new PadIdx_t[MaxNeighbors*N];
   for( PadIdx_t i=0; i<N; i++) {
@@ -220,14 +249,16 @@ PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN) {
       throw std::overflow_error("Not enough allocation");
     }
   }
+  if (VERBOSE) printNeighbors();
   return neighbors;
 }
 
-
+/// Used ???
 void computeAndStoreFirstNeighbors( const double *xyDxy, int N, int allocatedN) {            
   neighbors = getFirstNeighbors( xyDxy, N, allocatedN);
 }
-    int buildProjectedPads( 
+
+int buildProjectedPads( 
             const double *xy0InfSup, const double *xy1InfSup, 
             PadIdx_t N0, PadIdx_t N1, 
             PadIdx_t *aloneIPads, PadIdx_t *aloneJPads, int includeAlonePads) {
@@ -318,7 +349,7 @@ void computeAndStoreFirstNeighbors( const double *xyDxy, int N, int allocatedN) 
   return k;
 }
 
-void buildProjectedSaturatedPads( const Saturated_t *saturated0, const Saturated_t *saturated1, Saturated_t *saturatedProj) {
+void buildProjectedSaturatedPads( const Mask_t *saturated0, const Mask_t *saturated1, Mask_t *saturatedProj) {
   for( int k=0; k < nbrOfProjPads; k++) {
     MapKToIJ_t ij = mapKToIJ[k];
     saturatedProj[k] = saturated0[ij.i] || saturated1[ij.j];
@@ -385,10 +416,10 @@ int projectChargeOnOnePlane(
     // Add alone cath1-pads 
     for( PadIdx_t j=0; j < N1; j++) {
       if ( vectorSumColumnInt( &intersectionMatrix[j], N0, N1) == 0) nbrOfAlonePads++; 
-    }
-    // Add alone pas and row/column separators
-    maxNbrOfProjPads += nbrOfAlonePads + fmax( N0, N1);  
+    }  
   }
+  // Add alone pas and row/column separators
+  maxNbrOfProjPads += nbrOfAlonePads + fmax( N0, N1);
   if (VERBOSE) printf("  maxNbrOfProjPads %d\n", maxNbrOfProjPads);
   //
   //
@@ -405,8 +436,17 @@ int projectChargeOnOnePlane(
   //
   IInterJ = new PadIdx_t[maxNbrOfProjPads]; 
   JInterI = new PadIdx_t[maxNbrOfProjPads]; 
-  getIndexByRow( intersectionMatrix, N0, N1, IInterJ);
-  getIndexByColumns( intersectionMatrix, N0, N1, JInterI);
+  int checkr = getIndexByRow( intersectionMatrix, N0, N1, IInterJ);
+
+  int checkc = getIndexByColumns( intersectionMatrix, N0, N1, JInterI);
+  if (CHECK) { 
+    if (( checkr > maxNbrOfProjPads) || (checkc > maxNbrOfProjPads)) {
+      printf("Allocation pb for  IInterJ or JInterI: allocated=%d, needed for row=%d, for col=%d \n", 
+          maxNbrOfProjPads, checkr, checkc);
+      throw std::overflow_error(
+         "Allocation pb for  IInterJ or JInterI" );
+    }
+  }
   if (VERBOSE) {
     printInterMap("  IInterJ", IInterJ, N0 );
     printInterMap("  JInterI", JInterI, N1 );
@@ -601,7 +641,7 @@ int getConnectedComponentsOfProjPads( short *padGrp ) {
 int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
         Group_t *padToGrp,
         int nGroups,
-        int N, int K, double *laplacian,  double *theta, Group_t *thetaToGrp) {
+        int N, int K, double *laplacian,  double *theta, PadIdx_t *thetaIndexes, Group_t *thetaToGrp) {
   //
   // ??? WARNING : theta must be allocated to N components (# of pads) 
   // ??? WARNING : use neigh of proj-pad
@@ -626,9 +666,23 @@ int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
   int nNeighi;
   // Group sum & max
   double sumW[nGroups+1];
+  double chargeMax[nGroups+1];
+  double chargeMin[nGroups+1];
   double maxLapl[nGroups+1];
   int kLocalMax[nGroups+1];
-  for( int g=0; g < nGroups+1; g++) { sumW[g]=0; maxLapl[g]=0; kLocalMax[g]=0;}
+  for( int g=0; g < nGroups+1; g++) { sumW[g]=0; maxLapl[g]=0; kLocalMax[g]=0; chargeMin[g]=DBL_MAX; chargeMax[g]= 0.0;}
+  //
+  // Min/max
+  for ( int i=0; i< N; i++) {
+    Group_t g = padToGrp[i];
+    if ( z[i] > chargeMax[g] ) chargeMax[g] = z[i];
+    if ( z[i] < chargeMin[g] ) chargeMin[g] = z[i];
+  }
+  double zMin = vectorMin( chargeMin,  nGroups+1); 
+  double zMax = vectorMax( chargeMax,  nGroups+1); 
+  // Min charge wich can be a maximum
+  double chargeMinForAMax = zMin + 0.05 * (zMax - zMin);
+  //
   //
   int j;
   for ( int i=0; i< N; i++) {
@@ -654,7 +708,7 @@ int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
     }
     /// printf("???? lapl=%g %d %d %d group=%d maxLapl[g]=%g\n", laplacian[i], nSupi, nInfi, nNeighi, g, maxLapl[g]);
     // Strong max
-    if ( (laplacian[i] >= 0.99) && (z[i] > 5.0) ) {
+    if ( (laplacian[i] >= 0.99) && (z[i] > chargeMinForAMax) ) {
         // save the seed
         w[k] = z[i];
         muX[k] = X[i];
@@ -662,6 +716,7 @@ int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
         thetaToGrp[k] = g;
         sumW[g]  += w[k];
         kLocalMax[g] += 1;
+        thetaIndexes[k] = i;
         k++;
     }
   }
@@ -679,6 +734,7 @@ int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
           thetaToGrp[k] = g;
           sumW[g] += w[k];
           kLocalMax[g] += 1;
+          thetaIndexes[k] = i;
           k++;
         }
       }
@@ -694,6 +750,7 @@ int findLocalMaxWithLaplacian( const double *xyDxy, const double *z,
       cst[g] = 1.0;
     }
   }
+  // 
   for( int l=0; l < k; l++) w[l] = w[l] * cst[ thetaToGrp[l]];
   //
   return k;
@@ -781,17 +838,54 @@ int findLocalMaxWithLaplacianV0( const double *xyDxy, const double *z, const Pad
   return k;
 }
 
-void assignCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup) {
-  cath0ToGrp = new short[nCath0];
-  cath1ToGrp = new short[nCath1];
-  vectorSetZeroShort( cath0ToGrp, nCath0);
-  vectorSetZeroShort( cath1ToGrp, nCath1);
+void assignOneCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup) {
+  cath0ToGrpFromProj = 0;
+  cath1ToGrpFromProj = 0;
+  if ( nCath0 != 0) {
+    cath0ToGrpFromProj = new short[nCath0];
+    vectorCopyShort( padGroup, nCath0, cath0ToGrpFromProj);
+  } else {
+    cath1ToGrpFromProj = new short[nCath1];
+    vectorCopyShort( padGroup, nCath1, cath1ToGrpFromProj);   
+  }
   vectorSetShort( wellSplitGroup, 1, nGrp+1);
+}
+
+/* ???
+void forceSplitCathodes( double *newCath0, double *newcath1) {
+    
+  // need i/j intersection 
+  // Cath0
+  for ( int c=0; c < nCath0; c++ ) {
+    if ( cath0ToGrp[c] <= 0 ) {
+      // find conflicting pads with cath1 (j index)
+      // .. i.e intersecting  j with an other group g
+      // then separated charge from pads with different groups
+      // To do that: project compute coef for group g
+      //  S = sum z[u, g], u in same grp g and intercep i
+      // For all g :
+      //   zi' = zi/ S(g,i)
+      // Matrix chargeRatio[ group, cathodes ]
+    } else {
+      // copy to new cath
+         
+    }   
+  }
+}
+*/
+
+void assignCathPadsToGroupFromProj( short *projPadGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup, short *matGrpGrp) {
+  cath0ToGrpFromProj = new short[nCath0];
+  cath1ToGrpFromProj = new short[nCath1];
+  vectorSetZeroShort( cath0ToGrpFromProj, nCath0);
+  vectorSetZeroShort( cath1ToGrpFromProj, nCath1);
+  vectorSetShort( wellSplitGroup, 1, nGrp+1);
+  vectorSetZeroShort( matGrpGrp, (nGrp+1)*(nGrp+1) );
   //
   PadIdx_t i, j; 
   short g, prevGroup0, prevGroup1;
   for( int k=0; k < nPads; k++) {
-    g = padGroup[k];
+    g = projPadGroup[k];
     i = mapKToIJ[k].i; j = mapKToIJ[k].j;
     //
     // Cathode 0
@@ -799,17 +893,20 @@ void assignCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, in
     if ( i >= 0 ) {
       // Remark: if i is an alone pad (j<0)
       // i is processed as well
-      prevGroup0 = cath0ToGrp[i];
+      prevGroup0 = cath0ToGrpFromProj[i];
       if ( (prevGroup0 == 0) || (prevGroup0 == g) ) {
         // No group before or same group
-        cath0ToGrp[i] = g;
+        cath0ToGrpFromProj[i] = g;
+        matGrpGrp[ g*(nGrp+1) +  g ] = 1; 
       } else  {
         // Already a Grp which differs
         if ( prevGroup0 > 0) {
           // Invalid Old group
           wellSplitGroup[ prevGroup0 ] = 0;
+          matGrpGrp[ g*(nGrp+1) +  prevGroup0 ] = 1; 
+          matGrpGrp[ prevGroup0*(nGrp+1) +  g ] = 1; 
         }
-        cath0ToGrp[i] = -g;
+        cath0ToGrpFromProj[i] = -g;
         // Invalid current group
         wellSplitGroup[ g ] = 0;
       }
@@ -820,32 +917,81 @@ void assignCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, in
     if ( j >= 0) {
       // Remark: if j is an alone pad (i<0)
       // j is processed as well
-      prevGroup1 = cath1ToGrp[j];
+      prevGroup1 = cath1ToGrpFromProj[j];
       if ( (prevGroup1 == 0) || (prevGroup1 == g) ){
          // No group before
-         cath1ToGrp[j] = g;
+         cath1ToGrpFromProj[j] = g;
+         matGrpGrp[ g*(nGrp+1) +  g ] = 1; 
       } else {
         // Already a Group 
         if ( prevGroup1 > 0) {
           // Invalid Old group
           wellSplitGroup[ prevGroup1 ] = 0;
+          matGrpGrp[ g*(nGrp+1) +  prevGroup1 ] = 1; 
+          matGrpGrp[ prevGroup1*(nGrp+1) +  g ] = 1; 
         }
-        cath1ToGrp[j] = -g;
+        cath1ToGrpFromProj[j] = -g;
         // Invalid current group
         wellSplitGroup[ g ] = 0;
       }
     }
   }
-}
- 
-void copyCathToGrp( short *cath0Grp, short *cath1Grp, int nCath0, int nCath1) {
-  vectorCopyShort( cath0ToGrp, nCath0, cath0Grp);
-  vectorCopyShort( cath1ToGrp, nCath1, cath1Grp);
+  if (VERBOSE) printMatrixShort("Group/Group matrix", matGrpGrp, nGrp+1, nGrp+1);
 }
 
-void getMaskCathToGrp( short g, short* mask0, short *mask1, int nCath0, int nCath1) {
-    vectorBuildMaskEqualShort( cath0ToGrp, g, nCath0, mask0);
-    vectorBuildMaskEqualShort( cath1ToGrp, g, nCath1, mask1);
+int assignCathPadsToGroup( short *matGrpGrp, int nGrp, int nCath0, int nCath1, short *grpToGrp ) {
+  cath0ToTGrp = new short[nCath0];
+  cath1ToTGrp = new short[nCath1];
+  vectorSetZeroShort(grpToGrp, nGrp+1);
+  int newGroupID = 0;
+  //
+  int iNewGroup = 1;
+  while ( iNewGroup < (nGrp+1)) {
+    newGroupID++; 
+    grpToGrp[iNewGroup] = newGroupID; 
+    // printf("new Group idx=%d, newGroupID=%d\n", iNewGroup, newGroupID);
+    for (int i=iNewGroup; i < (nGrp+1); i++) {
+      // New Group
+      int ishift = i*(nGrp+1);
+      for (int j=i+1; j < (nGrp+1); j++) {
+        if ( matGrpGrp[ishift+j] ) {
+          /*
+          if (CHECK) {
+            if ( (grpToGrp[j] != 0) && (grpToGrp[j] != i) ) {
+              printf("The mapping grpTogrp can't have 2 group values (surjective) oldGrp=%d newGrp=%d\n", grpToGrp[j], i);
+              throw std::overflow_error("The mapping grpTogrp can't have 2 group values");
+            }
+          }
+          */
+          grpToGrp[j] = newGroupID;        
+        }
+      }
+    }
+    // Get the next index which have not a group
+    int k;
+    for( k = iNewGroup; k < (nGrp+1) && (grpToGrp[k] > 0); k++);
+    iNewGroup = k; 
+  }
+  // vectorPrintShort( "grpToGrp", grpToGrp, nGrp+1);
+  for (int c=0; c < nCath0; c++) {
+    cath0ToTGrp[c] = grpToGrp[ abs( cath0ToGrpFromProj[c] ) ];
+  }
+  for (int c=0; c < nCath1; c++) {
+    cath1ToTGrp[c] = grpToGrp[ abs( cath1ToGrpFromProj[c] ) ];
+  }
+  // vectorPrintShort( "cath0ToTGrp", cath0ToTGrp, nCath0);
+  // vectorPrintShort( "cath1ToTGrp", cath1ToTGrp, nCath1);
+  return newGroupID;
+}
+
+void copyCathToGrpFromProj( short *cath0Grp, short *cath1Grp, int nCath0, int nCath1) {
+  vectorCopyShort( cath0ToGrpFromProj, nCath0, cath0Grp);
+  vectorCopyShort( cath1ToGrpFromProj, nCath1, cath1Grp);
+}
+
+void getMaskCathToGrpFromProj( short g, short* mask0, short *mask1, int nCath0, int nCath1) {
+    vectorBuildMaskEqualShort( cath0ToGrpFromProj, g, nCath0, mask0);
+    vectorBuildMaskEqualShort( cath1ToGrpFromProj, g, nCath1, mask1);
 }
 
 void freeMemoryPadProcessing() {
@@ -893,12 +1039,20 @@ void freeMemoryPadProcessing() {
     delete projCh1;
     projCh1 = 0;
   }
-  if( cath0ToGrp != 0) {
-    delete cath0ToGrp;
-    cath0ToGrp = 0;
+  if( cath0ToGrpFromProj != 0) {
+    delete cath0ToGrpFromProj;
+    cath0ToGrpFromProj = 0;
   }
-  if( cath1ToGrp != 0) {
-    delete cath1ToGrp;
-    cath1ToGrp = 0;
+  if( cath1ToGrpFromProj != 0) {
+    delete cath1ToGrpFromProj;
+    cath1ToGrpFromProj = 0;
+  }
+  if( cath0ToTGrp != 0) {
+    delete cath0ToTGrp;
+    cath0ToTGrp = 0;
+  }
+  if( cath1ToTGrp != 0) {
+    delete cath1ToTGrp;
+    cath1ToTGrp = 0;
   }
 }

@@ -17,13 +17,15 @@ import Util.IOv5 as IO
 # Analyses Tool Kit
 import analyseToolKit as aTK
 
-def statOnDistances( measure, mcObj, recoObj, evRange ):
+def statOnErrorLocalization( measure, mcObj, recoObj, evRange ):
   maxFP = 0
   maxFN = 0
   allTP = [0]*11
   allFP = [0]*11
   allFN = [0]*11
   allDMin = [ [] for _ in range(11) ]
+  allX = [ [] for _ in range(11) ]
+  allY = [ [] for _ in range(11) ]
   allDxMin = [ [] for _ in range(11) ]
   allDyMin = [ [] for _ in range(11) ]
   allPC = []*11
@@ -33,12 +35,8 @@ def statOnDistances( measure, mcObj, recoObj, evRange ):
     evNbrOfHits, evTP, evFP, evFN, evDMin, assign = measure[ev]
     for m in assign :
       (pc, match, nbrOfHits, TP, FP,FN, dMin, dxMin, dyMin, tfMatrix, mcHitsInvolved ) = m
-      # print("PreCluster pc, DEId", pc, recoObj.rClusterDEId[ev][pc], recoObj.rClusterX[ev][pc])
+      # print("tfMatrix.shape", tfMatrix.shape)
       # print("mcHitsInvolved", mcHitsInvolved)
-      # for mch in mcHitsInvolved:
-      #    tid, idx = mch
-      #    print("MC part, DEId", mcObj.trackParticleId[ev][tid], mcObj.trackDEId[ev][tid], mcObj.trackX[ev][tid])
-      # input('next')
       chIds = recoObj.padChId[ev][pc] 
       diffChIds = np.unique(chIds)
       if diffChIds.size != 1 : 
@@ -47,9 +45,42 @@ def statOnDistances( measure, mcObj, recoObj, evRange ):
         input("Warning on Chamber")
         continue
       chId = diffChIds[0]
+      sumMCHits = 0
+      mcHits = []
+      for mch in mcHitsInvolved:
+          tid, idx = mch
+          # print("MC part, DEId", mcObj.trackParticleId[ev][tid], mcObj.trackDEId[ev][tid][idx])
+          # print("MC part, X,Y", mcObj.trackX[ev][tid][idx], mcObj.trackY[ev][tid][idx])
+          sumMCHits += idx.size
+          for ix in idx:
+            mcHits.append( (tid, ix))
+      # print("sumMCHits", sumMCHits )
+      if ( (tfMatrix.shape[1] != sumMCHits) or (tfMatrix.shape[0] != recoObj.rClusterX[ev][pc].size ) ):
+        print("pb matrix size ???")
+        input("???")
+      # print("PreCluster pc, DEId", pc, recoObj.rClusterDEId[ev][pc])
+      # print("PreCluster pc, X, Y", recoObj.rClusterX[ev][pc], recoObj.rClusterY[ev][pc])
+      nPCHits = 0
+      for pcHit, deid in enumerate(recoObj.rClusterDEId[ev][pc]):
+        hitPCandMC = np.where ( tfMatrix[ pcHit,:] == 1)[0]
+        # print( "hitPCandMC", hitPCandMC)
+        if hitPCandMC.size > 1: 
+            print( pcHit, deid)
+            input("pb ???")
+        if hitPCandMC.size == 1:
+          ( tid, ix) = mcHits[hitPCandMC[0]]
+          # print("PreCluster pc, X, Y", recoObj.rClusterX[ev][pc][pcHit], recoObj.rClusterY[ev][pc][pcHit])
+          # print("MC part, X,Y", mcObj.trackX[ev][tid][ ix ], mcObj.trackY[ev][tid][ ix ])
+          # input('next')
+          allX[chId].append( mcObj.trackX[ev][tid][ ix ] )
+          allY[chId].append( mcObj.trackY[ev][tid][ ix ] )
+          nPCHits += ix.size
+
       allTP[chId] += TP 
       allFP[chId] += FP 
       allFN[chId] += FN
+      if( dxMin.size != nPCHits):
+        input("# pcHits != dxMin ???")
       allDxMin[chId].append(dxMin)
       allDyMin[chId].append(dyMin)
       allDMin[chId].append( np.concatenate( evDMin ).ravel() )
@@ -60,14 +91,15 @@ def statOnDistances( measure, mcObj, recoObj, evRange ):
   V = np.empty( shape=(0) )
   # X
   fig, ax = plt.subplots(nrows=2, ncols=5, figsize=(13, 7) ) 
-  for ch in range(1,11,2):
+  for ch in range(1,11):
     print( "ch=", ch, "All matched hits TP, FP, FN", allTP[ch], allFP[ch], allFN[ch] )
-    print( "ch=", ch+1, "All matched hits TP, FP, FN", allTP[ch+1], allFP[ch+1], allFN[ch+1] )
     allDMin[ch] = np.concatenate( allDMin[ch] ).ravel()
+    # print("x ???", allX[ch])
+    # print("dx ???", allDxMin[ch])
+    x = np.array( allX[ch] )
+    y = np.array( allY[ch] )
     dxMin = np.concatenate(allDxMin[ch]).ravel()
-    dxMin = np.hstack( [dxMin, np.concatenate(allDxMin[ch+1]).ravel()])
     dyMin = np.concatenate(allDyMin[ch]).ravel()
-    dyMin = np.hstack( [dyMin, np.concatenate(allDyMin[ch+1]).ravel()])
     # dyMin = np.concatenate(allDyMin[ch]).ravel()
     nValues = dxMin[ch].size
     totalnValues += nValues 
@@ -75,27 +107,32 @@ def statOnDistances( measure, mcObj, recoObj, evRange ):
     V = np.hstack( [ V, dyMin ])
     # aver = float( np.sum( allDMin[ch] ) ) / nValues
     # print("Distances", aver, np.max( allDMin[ch] ) )
-    jp = (ch - 1)  // 2
-    ax[0,jp].grid(True)
-    ax[1,jp].grid(True)
-
-    n, bins, patches  = ax[0, jp].hist(dxMin, bins=100, range= (-0.5, 0.5))
-    n, bins, patches  = ax[1, jp].hist(dyMin, bins=100, range= (-0.1, 0.1))
+    ip = (ch - 1) // 5
+    jp = (ch - 1)  % 5
+    ax[ip,jp].grid(True)
+    print ("???", ip, jp )
+    print("size ", x.size, y.size, dxMin.size, dyMin.size)
+    for i in range(x.size):
+      # ax[ip, jp].arrow( x[i], y[i], dxMin[i], dyMin[i])
+      ax[ip, jp].plot( [x[i], x[i]+10*dxMin[i]], [y[i], y[i]+100*dyMin[i]])      
+      #ax[ip, jp].plot( [x[i], y[i]], [x[i]+1*dxMin[i], y[i]+1*dyMin[i]])
+    # n, bins, patches  = ax[0, jp].hist(dxMin, bins=100, range= (-0.5, 0.5))
+    # n, bins, patches  = ax[1, jp].hist(dyMin, bins=100, range= (-0.1, 0.1))
     # X Std dev
     xMean = np.mean( dxMin)
     xStd = np.std( dxMin )
     t = r'$\sigma=%.3f$' % xStd
-    uPlt.setText( ax[0,jp], (0.6, 0.9), t, ha='left', fontsize=10)
+    # uPlt.setText( ax[ip,jp], (0.6, 0.9), t, ha='left', fontsize=10)
     t = r'St %1d' % (jp+1)
-    uPlt.setText( ax[0,jp], (0.1, 0.9), t, ha='left', fontsize=11)
+    # uPlt.setText( ax[ip,jp], (0.1, 0.9), t, ha='left', fontsize=11)
     # Y Std dev
     yMean = np.mean( dyMin)
     yStd = np.std( dyMin )
     t = r'$\sigma=%.3f$' % yStd
-    uPlt.setText( ax[1,jp], (0.6, 0.9), t, ha='left', fontsize=10)
+    # uPlt.setText( ax[ip,jp], (0.6, 0.9), t, ha='left', fontsize=10)
     print( "mean / std", xMean, xStd)
     t = r'St %1d' % (jp+1)
-    uPlt.setText( ax[1,jp], (0.1, 0.9), t, ha='left', fontsize=11)
+    # uPlt.setText( ax[1,jp], (0.1, 0.9), t, ha='left', fontsize=11)
     
   ax[0,0].set_ylabel( "Hist. of X residues" )
   ax[1,0].set_ylabel( "Hist. of Y residues" )
@@ -126,8 +163,7 @@ def statOnDistances( measure, mcObj, recoObj, evRange ):
   ax[0,0].set_xlabel( "X residues (cm)" )
   ax[0,1].set_xlabel( "Y residues (cm)" )
   plt.show()
-  
-  return (allTP, allFP, allFN )
+  return
 
 if __name__ == "__main__":
     
@@ -146,18 +182,12 @@ if __name__ == "__main__":
   recoMeasure = IO.readPickle("../Data/recoMeasure.obj")
   # EM measure
   nEvents = len( recoData.padX )
+  """
   emMeasure = []
   for ev in range(0, nEvents):
   # for ev in range(37, 38):
     emMeasure.append( aTK.processEvent( recoData, ev, mcData ) )    
-
-  recoConfMatrix = statOnDistances( recoMeasure, mcData, recoData, range(nEvents) )
-  
-  emConfMatrix = statOnDistances( emMeasure, mcData, recoData, range(nEvents) )
-  
-  (recoTP, recoFP, recoFN) = recoConfMatrix
-  (emTP, emFP, emFN) = emConfMatrix
-  for ch in range(1,11,1):
-    print('reco ', recoTP[ch], recoFP[ch], recoFN[ch])
-    print('em   ', emTP[ch], emFP[ch], emFN[ch])
+  """
+  statOnErrorLocalization( recoMeasure, mcData, recoData, range(nEvents) )
+  # statOnErrorLocalization( emMeasure, mcData, recoData, range(nEvents) )
     

@@ -3,8 +3,6 @@
 
 # include "mathUtil.h"
 
-typedef short Saturated_t;
-
 // ??? To Remove
 # define Malloc( type, len) ( (type *) malloc( ((size_t ) len) * sizeof(type)))
 
