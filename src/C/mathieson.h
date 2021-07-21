@@ -12,5 +12,7 @@ extern "C" {
   void compute2DMathiesonMixturePadIntegrals( const double *xyInfSup0, const double *theta,
                                               int N, int K, int chamberId, 
                                               double Integrals[] );
+  void computeCij( const double *xyInfSup0, const double *theta,
+                            int N, int K, int chamberId, double Cij[] );
 }
 # endif

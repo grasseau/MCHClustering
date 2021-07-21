@@ -35,6 +35,12 @@ if __name__ == "__main__":
     w   = np.array( [0.6, 0.4 ] )
     muX = np.array( [0.5, -0.5] )
     muY = np.array( [0.5, -0.5] )
+    #
+    # To test 1 cathode plane
+    x1 = np.zeros( 0 )
+    y1 = np.zeros( 0 )
+    dx1 = np.zeros( 0 )
+    dy1 = np.zeros( 0 )
     # Filter low charge & No saturation
     ( xyDxy, cath, saturated, z ) = dUtil.buildPreCluster( w, muX, muY, 
                                                      ( x0, y0, dx0, dy0),

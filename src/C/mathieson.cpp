@@ -79,6 +79,38 @@ void compute2DPadIntegrals( const double *xyInfSup,
     return;
   }
 
+void computeCij( const double *xyInfSup0, const double *theta,
+                            int N, int K, int chamberId, double Cij[] ) {
+    // Returning array: Charge Integral on all the pads
+    // Remarks:
+    // - This fct is a cumulative one, as a result it should be set to zero
+    //    before calling it
+    const double *xInf0 = getConstXInf( xyInfSup0, N);
+    const double *yInf0 = getConstYInf( xyInfSup0, N);
+    const double *xSup0 = getConstXSup( xyInfSup0, N);
+    const double *ySup0 = getConstYSup( xyInfSup0, N);    
+    //
+    const double *muX = getConstMuX( theta, K);
+    const double *muY = getConstMuY( theta, K);
+    const double *w = getConstW( theta, K);
+    
+    double z[N]; 
+    double xyInfSup[4*N];
+    double *xInf = getXInf( xyInfSup, N);
+    double *yInf = getYInf( xyInfSup, N);
+    double *xSup = getXSup( xyInfSup, N);
+    double *ySup = getYSup( xyInfSup, N);  
+    for (int k=0; k < K; k++) {
+      vectorAddScalar( xInf0, - muX[k], N, xInf );
+      vectorAddScalar( xSup0, - muX[k], N, xSup );
+      vectorAddScalar( yInf0, - muY[k], N, yInf );
+      vectorAddScalar( ySup0, - muY[k], N, ySup );
+      compute2DPadIntegrals( xyInfSup, N, chamberId, &Cij[N*k] );
+      // printf("Vector Sum %g\n", vectorSum(z, N) );
+      // ??? vectorMultScalar( &Cij[N*k], w[k], N,  &Cij[N*k]);
+    }
+  }
+
 void compute2DMathiesonMixturePadIntegrals( const double *xyInfSup0, const double *theta,
                             int N, int K, int chamberId, double Integrals[] ) {
     // Returning array: Charge Integral on all the pads

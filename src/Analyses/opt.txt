@@ -1,0 +1,40 @@
+### 0/49
+# 3 mc hits
+--------------------
+EMLoop # parameters 11, log( N -saturated)= 3.688879 
+EMLoop LogL=-1.089265
+EMLoop BIC=42.756204, AIC=24.178530, AICc=33.607102
+---------------
+EMLoop # parameters 8, log( N -saturated)= 3.688879 
+EMLoop LogL=-1.101293
+EMLoop BIC=31.713622, AIC=18.202586, AICc=22.847747
+
+### 3/13
+# 3 mc hits
+
+EMLoop # parameters 8, log( N -saturated)= 3.218876 
+EMLoop LogL=-2.438837
+EMLoop BIC=30.628680, AIC=20.877674, AICc=29.877674
+
+EMLoop # parameters 5, log( N -saturated)= 3.218876 
+EMLoop LogL=-2.435301
+EMLoop BIC=20.964981, AIC=14.870602, AICc=18.028497
+
+### 5/131
+# 2 mc hits
+EMLoop # parameters 5, log( N -saturated)= 2.944439 
+EMLoop LogL=-2.518950
+EMLoop BIC=19.760094, AIC=15.037899, AICc=19.653284
+
+EMLoop # parameters 2, log( N -saturated)= 2.944439 
+EMLoop LogL=-2.852508
+EMLoop BIC=11.593893, AIC=9.705015, AICc=10.455015
+
+### 26/68
+EMLoop # parameters 5, log( N -saturated)= 3.295837 
+EMLoop LogL=-2.537446
+EMLoop BIC=21.554077, AIC=15.074893, AICc=17.932036
+EMLoop # parameters 8, log( N -saturated)= 3.218876 
+EMLoop LogL=-2.438837
+EMLoop BIC=30.628680, AIC=20.877674, AICc=29.877674
+

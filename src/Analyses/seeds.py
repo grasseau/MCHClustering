@@ -40,6 +40,11 @@ def plotHistoSeeds():
     n, bins, patches  = ax[1, ch-1].hist(recoI, bins=20, color="red", log=True ) # , range= (-0.1, 0.1))
     n, bins, patches  = ax[2, ch-1].hist(mcF, bins=20, color="lightblue", log=True ) # range= (-0.5, 0.5))
     n, bins, patches  = ax[3, ch-1].hist(recoF, bins=20, color="purple", log=True ) # , range= (-0.1, 0.1))
+    if ch == 1 :
+      ax[0, 0].set_ylabel("EM-MC seeds Init")
+      ax[1, 0].set_ylabel("EM-Reco seeds Init")
+      ax[2, 0].set_ylabel("EM-MC seeds Final")
+      ax[3, 0].set_ylabel("EM-Reco seeds Final")
   #
   plt.show()
     
@@ -113,8 +118,10 @@ def preClusterSeeds( preClusters, ev, pc, mcObj):
       # Ratio seeds / MC hit
       thetaInit = PCWrap.collectThetaInit()
       nSeeds = thetaInit.size // 5
+      if ( nSeeds - nMCSeeds ) < -20:
+        input( "next")
       diffISeedsPerChamberWithMC [ chId ].append( nSeeds - nMCSeeds )  
-      diffISeedsPerChamberWithReco [ chId ].append( nRecoSeeds -  nMCSeeds)  
+      diffISeedsPerChamberWithReco [ chId ].append( nSeeds -  nRecoSeeds)  
       diffFSeedsPerChamberWithMC[ chId ].append( thetaf.size // 5- nMCSeeds )
       diffFSeedsPerChamberWithReco[ chId ].append( thetaf.size // 5 - nRecoSeeds )
       

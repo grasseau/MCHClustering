@@ -1,6 +1,9 @@
 # ifndef  _PADPROCESSING_H
 # define  _PADPROCESSING_H
 
+#include "dataStructure.h"
+
+
 typedef struct {
     PadIdx_t i;
     PadIdx_t j;
@@ -23,6 +26,8 @@ extern "C" {
   
   void copyProjectedPads(double *xyDxy, double *chA, double *chB);
   
+  void collectProjectedMinMax(double *chMin, double *chMax);
+  
   PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN);
   
   // Used when there is 1 cathode
@@ -33,7 +38,13 @@ extern "C" {
           const double *xy0InfSup, const double *ch0, 
           const double *xy1InfSup, const double *ch1, 
           PadIdx_t N0, PadIdx_t N1, int includeAlonePads);
-  
+
+  int projectChargeOnOnePlaneWithTheta( 
+        const double *xy0InfSup, const double *ch0, 
+        const double *xy1InfSup, const double *ch1, 
+        const double *chTheta0, const double *ch1Theta0, 
+        PadIdx_t N0, PadIdx_t N1, int includeAlonePads);
+
   void buildProjectedSaturatedPads( const Mask_t *saturated0, const Mask_t *saturated1, Mask_t *saturatedProj);
 
   int getConnectedComponentsOfProjPads( short *padGrp );
@@ -47,12 +58,18 @@ extern "C" {
   // ??? To remove
   int findLocalMaxWithLaplacianV0( const double *xyDxy, const double *z, const PadIdx_t *grpIdxToProjIdx, int N, int xyDxyAllocated, double *laplacian,  double *theta);
   
+  void assignPadsToGroupFromProjAndProjCharge( short *projPadGroup, double *chProj, int nProjPads, 
+        const PadIdx_t *cath0ToPadIdx, const PadIdx_t *cath1ToPadIdx, 
+        int nGrp, int nPads, short *padCathGrp);
+
   void assignOneCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup);
   
   void assignCathPadsToGroupFromProj( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, 
                                       short *wellSplitGroup, short *matGrpGrp);
 
   int assignCathPadsToGroup( short *matGrpGrp, int nGrp, int nCath0, int nCath1, short *grpToGrp );
+  
+  int assignPadsToGroupFromProj( short *projPadGroup, int nProjPads, const PadIdx_t *, const PadIdx_t *, int nGrp, int nPads, short *padGrp);  
   
   void storeProjectedPads ( const double *xyDxyProj, const double *z, int nPads);
   //

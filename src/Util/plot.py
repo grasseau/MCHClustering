@@ -302,15 +302,19 @@ def drawPads( fig, ax, x0, y0, dx0, dy0, z, title="", yTitle="", alpha=1.0,
     c = Colors[ idx ]
     if (displayLUT):
       # display a dummy image to initialize LUT
-      dummy = np.linspace(minZ, maxZ, num=256).reshape(1, 256)
-      pcm = ax.pcolormesh(dummy, cmap="rainbow")
+      # xMax = np.max( x0 ) + 2* np.max( dx0 )
+      # dummyX = np.linspace(xMax, xMax+256, num=256)
+      # .reshape(1, 256)
+      dummyY = np.linspace(minZ, maxZ, num=256).reshape(1, 256)
+      # dummyXY = np.asarray( [dummyX, dummyY] )
+      # print("???", dummyX)
+      pcm = ax.pcolormesh(dummyY.reshape(1, 256), cmap="rainbow", visible=False)
       fig.colorbar(pcm, ax=ax)
     #
     for r in range( xbl.shape[0] ):
           # print( "colorMap:", norm, clusters.charge[cID][r], clusters.charge[cID][r] * norm,  colors[ int( np.round( clusters.charge[cID][r]*norm ) ) ] )
           # rect = patches.Rectangle( (clusters.x[cID][r] - clusters.dx[cID][r], clusters.y[cID][r] - clusters.dy[cID][r]) ,2*clusters.dx[cID][r], 2*clusters.dy[cID][r],
           #  linewidth=1, edgecolor='b', facecolor=colors[ int( np.round( clusters.charge[cID][r] * norm ) ) ], alpha=0.5)
-          # print( "c", r, c[r]
           rect = patches.Rectangle(  (xbl[r], ybl[r]) , dx[r], dy[r], linewidth=1, edgecolor='b', facecolor=c[r], 
             alpha= alpha, hatch=hatchPattern )
           patch = ax.add_patch(rect)

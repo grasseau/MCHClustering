@@ -13,8 +13,9 @@
 
 // To keep internal data
 # define INSPECTMODEL 1
-# define VERBOSE 0
+# define VERBOSE 1
 # define CHECK 1
+# define DISABLE_EM_SATURATED 1
 
 // Type of projection
 // Here add alone pads
@@ -24,7 +25,7 @@ static int includeAlonePads = 0;
 static const double EMConvergence = 10.0e-6;
 // EM mode : 1 constant variance
 static const int EMmode = 1;
-static const int EMverbose = 0;
+static const int EMverbose = 1;
 // Mathieson approximation with one gaussian 
 /*
 static double cstSigXCh1ToCh2 = 0.1814;    
@@ -39,7 +40,7 @@ static double cstSigYCh3ToCh10 = 0.2024;
 //
 // Fit parameters
 // doProcess = verbose + (doJacobian << 2) + ( doKhi << 3) + (doStdErr << 4)
-static const int processFit = 0 + (0 << 2) + ( 1 << 3) + (1 << 4);
+static const int processFit = 1 + (0 << 2) + ( 1 << 3) + (1 << 4);
 // Limit of pad number  to perform the fitting
 static const int nbrOfPadsLimitForTheFitting = 50;
 //
@@ -53,8 +54,14 @@ static const double wCutoff = 5.e-2;
 static double *xy0Dxy = 0;
 static double *xy1Dxy = 0;
 static double *ch0=0, *ch1=0;
-static Mask_t *satPads0=0;
-static Mask_t *satPads1=0;
+static Mask_t *satPads0 = 0;
+static Mask_t *satPads1 = 0;
+// Mapping from cathode-pad to original pads
+static PadIdx_t *cath0ToPadIdx = 0; 
+static PadIdx_t *cath1ToPadIdx = 0; 
+static int nMergedGrp = 0;
+static short *padToMergedGrp = 0;
+
 //
 // Projection
 static int nProjPads = 0;
@@ -71,6 +78,8 @@ typedef struct dummy_t {
     // Data on Projected Pads
     int nbrOfProjPads;
     double *laplacian;
+    // Residual between projected charges and the EM model
+    double *residualProj;
     // Theta init
     double *thetaInit;
     int kThetaInit;
@@ -80,10 +89,13 @@ typedef struct dummy_t {
     std::vector< DataBlock_t > subClusterPadList;
     std::vector< DataBlock_t > subClusterChargeList;
     std::vector< DataBlock_t > subClusterThetaEMFinal;
+    // Cath groups
+    int nCathGroups;
+    short *padToCathGrp;
 } InspectModel_t;
 //
-static InspectModel_t inspectModel={.nbrOfProjPads=0, .laplacian=0, .thetaInit=0, .kThetaInit=0, 
-  .totalNbrOfSubClusterPads=0, .totalNbrOfSubClusterThetaEMFinal=0 };
+static InspectModel_t inspectModel={.nbrOfProjPads=0, .laplacian=0, .residualProj=0, .thetaInit=0, .kThetaInit=0, 
+  .totalNbrOfSubClusterPads=0, .totalNbrOfSubClusterThetaEMFinal=0, .nCathGroups=0, .padToCathGrp=0};
 
 // Total number of hits/seeds in the precluster;
 static int nbrOfHits = 0;
@@ -234,10 +246,15 @@ void cleanInspectModel( ) {
   inspectModel.subClusterThetaEMFinal.clear();
   //  
   if ( inspectModel.laplacian != 0) { delete[] inspectModel.laplacian; inspectModel.laplacian=0; }
+  if ( inspectModel.residualProj != 0) { delete[] inspectModel.residualProj; inspectModel.residualProj=0; }
   if ( inspectModel.thetaInit != 0) { delete[] inspectModel.thetaInit; inspectModel.thetaInit = 0;}
   //
   inspectModel.totalNbrOfSubClusterPads = 0;
   inspectModel.totalNbrOfSubClusterThetaEMFinal = 0;
+  // Cath group
+  delete [] inspectModel.padToCathGrp;
+  inspectModel.padToCathGrp = 0;
+  inspectModel.nCathGroups = 0;  
 }
 
 void finalizeInspectModel() {
@@ -268,6 +285,13 @@ int getNbrOfThetaEMFinal() {
   return inspectModel.totalNbrOfSubClusterThetaEMFinal;
 }
 
+// ???
+// Optim collectXXX can be replaced by getConstPtrXXX
+
+void collectPadToCathGroup( Mask_t *padToMGrp, int nPads ) {
+  vectorCopyShort( inspectModel.padToCathGrp, nPads, padToMGrp);
+}
+
 /// ???
 void collectPadsAndCharges( double *xyDxy, double *z, Group_t *padToGroup, int N) {
   int sumN=0;
@@ -293,6 +317,10 @@ void collectPadsAndCharges( double *xyDxy, double *z, Group_t *padToGroup, int N
 
 void collectLaplacian( double *laplacian, int N) {
   vectorCopy( inspectModel.laplacian, N, laplacian );
+}
+
+void collectResidual( double *residual, int N) {
+  vectorCopy( inspectModel.residualProj, N, residual );
 }
 
 int getKThetaInit() {
@@ -452,14 +480,16 @@ int kOptimizer( double *xyDxy, Mask_t *saturated, double *z,
       if (VERBOSE) { 
         printf(" kOptimizer BIC %10.5g\n", BIC );
       }
-      if ( BIC < minBIC) {
+      // if ( BIC < minBIC) {
+      printf(" kOptimizer BIC Test %10.5g > %10.5g \n", fabs( BIC - minBIC),  0.04 * fabs( minBIC));  
+      if ( (BIC > minBIC) && fabs( BIC - minBIC) > 0.04 * fabs( minBIC) ) {
         minBIC = BIC;
         // Copy Configuration
         vectorCopy( thetaTestResult, 5*K, thetaOpt );
         vectorCopyShort( thetaTestMask, K, thetaOptMask);
         betterConfig = 1;
         if (VERBOSE) {
-          printTheta("New theta config.", thetaOpt, K);
+          printTheta("New best theta config.", thetaOpt, K);
         }
       }
     }
@@ -472,6 +502,52 @@ int kOptimizer( double *xyDxy, Mask_t *saturated, double *z,
   return newK;
 }
 
+void computeMathiesonResidual( const double *xyDxy, const Mask_t *cath, const double *zObs, const double *theta, int chId, int K, int N, double *residual) {
+
+  // GG duplicated code with EM module ???
+  // define x, y, dx, dy description
+  const double *x  = getConstX( xyDxy, N);
+  const double *y  = getConstY( xyDxy, N);
+  const double *dX = getConstDX( xyDxy, N);
+  const double *dY = getConstDY( xyDxy, N); 
+  
+  // Compute boundary of each pads
+  double xyInfSup[4*N];
+  vectorAddVector( x, -1.0, dX, N, getXInf(xyInfSup, N) );
+  vectorAddVector( y, -1.0, dY, N, getYInf(xyInfSup, N) );
+  vectorAddVector( x, +1.0, dX, N, getXSup(xyInfSup, N) );
+  vectorAddVector( y, +1.0, dY, N, getYSup(xyInfSup, N) );
+  compute2DMathiesonMixturePadIntegrals( xyInfSup, theta, N, K, chId, residual );
+  // generateMixedGaussians2D( xyInfSup, theta, K, N, residual);
+  Mask_t cath0[N];  
+  vectorNotShort( cath, N, cath0);
+  double sumCh0 = vectorMaskedSum( zObs, cath0, N);
+  double sumCh1 = vectorMaskedSum( zObs, cath, N);
+  vectorMaskedMultScalar( residual, cath0, sumCh0, sumCh1, N);
+  vectorAddVector( zObs, -1.0, residual, N, residual);
+ }
+
+ void computeResidual( const double *xyDxy, const double *zObs, const double *theta, int K, int N, double *residual) {
+
+  // GG duplicated code with EM module ???
+  // define x, y, dx, dy description
+  const double *x  = getConstX( xyDxy, N);
+  const double *y  = getConstY( xyDxy, N);
+  const double *dX = getConstDX( xyDxy, N);
+  const double *dY = getConstDY( xyDxy, N); 
+  
+  // Compute boundary of each pads
+  double xyInfSup[4*N];
+  vectorAddVector( x, -1.0, dX, N, getXInf(xyInfSup, N) );
+  vectorAddVector( y, -1.0, dY, N, getYInf(xyInfSup, N) );
+  vectorAddVector( x, +1.0, dX, N, getXSup(xyInfSup, N) );
+  vectorAddVector( y, +1.0, dY, N, getYSup(xyInfSup, N) );     
+  generateMixedGaussians2D( xyInfSup, theta, K, N, residual);
+  double sumCh = - vectorSum( zObs, N);
+  vectorAddVector( zObs, sumCh, residual, N, residual);
+   
+ }
+ 
 // Extract hits/seeds of a pre-cluster
 int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *saturated, const double *zi, int chId, int nPads) {
 // Remarks:
@@ -495,6 +571,10 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
   double sumZ1 = vectorMaskedSum( zi, maskCath1, nPads);
   int nbrCath0 = vectorSumShort( maskCath0, nPads );
   int nbrCath1 = vectorSumShort( maskCath1, nPads );
+  if ( nbrCath0 > 0) cath0ToPadIdx = new PadIdx_t[nbrCath0];
+  if ( nbrCath1 > 0) cath1ToPadIdx = new PadIdx_t[nbrCath1];
+  vectorGetIndexFromMask( maskCath0, nPads, cath0ToPadIdx );
+  vectorGetIndexFromMask( maskCath1, nPads, cath1ToPadIdx );
   //
   // uniqueCath = id (0/1) of the unique cathode, -1 (2 cath.) if not
   short uniqueCath = -1;
@@ -584,8 +664,6 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     setNbrProjectedPads( nProjPads);
     getFirstNeighbors( xyDxyProj, nPads, nPads);
     if (INSPECTMODEL) storeProjectedPads ( xyDxyProj, zi, nPads);
-    // Group
-    
     // Saturated pads
     saturatedProj = new Mask_t[nProjPads];
     vectorCopyShort( saturated, nPads, saturatedProj);
@@ -610,12 +688,17 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     nProjGroups = getConnectedComponentsOfProjPads( projPadToGrp );
     wellSplitGroup = new short[nProjGroups+1];
     short matGrpGrp[ (nProjGroups+1)*(nProjGroups+1)];
+    // Get the matrix grpToGrp to identify ovelapping groups
     assignCathPadsToGroupFromProj( projPadToGrp, nProjPads, nProjGroups, nbrCath0, nbrCath1, wellSplitGroup, matGrpGrp);
     grpToCathGrp = new short[nProjGroups+1];
     nCathGroups = assignCathPadsToGroup( matGrpGrp, nProjGroups, nbrCath0, nbrCath1, grpToCathGrp );
     // V1, now projPad is associated with a cathGroup
     vectorMapShort( projPadToGrp, grpToCathGrp, nProjPads);
     nGroups = nCathGroups;
+    // Merge Groups or cathode group
+    // 
+    padToMergedGrp = new short[nPads];
+    nMergedGrp = assignPadsToGroupFromProj( projPadToGrp, nProjPads, cath0ToPadIdx, cath1ToPadIdx, nGroups, nPads, padToMergedGrp);
   } else {
     nProjGroups = getConnectedComponentsOfProjPads( projPadToGrp );
     wellSplitGroup = new short[nProjGroups+1];
@@ -628,11 +711,17 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     // printf("???? nCathGroups %d\n", nCathGroups);
     nCathGroups = nProjGroups;
     nGroups = nCathGroups;
+    // Merged groups
+    nMergedGrp = nGroups;
+    padToMergedGrp = new short[nPads];    
+    vectorCopyShort( projPadToGrp, nPads, padToMergedGrp);
   }
   
-  // Merge Groups
-  
-  
+  if (INSPECTMODEL) {
+    inspectModel.padToCathGrp = new Group_t[nPads];
+    vectorCopyShort( padToMergedGrp, nPads, inspectModel.padToCathGrp );
+    inspectModel.nCathGroups = 0;
+  } 
   //
   // Sub-Cluster loop
   //
@@ -658,6 +747,7 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
   double laplacian[nProjPads];
   Group_t thetaLToGrp[nProjPads];
   PadIdx_t thetaPadProjIdx[nProjPads];
+  vectorPrint( "xyDxyProj", xyDxyProj, 4*nProjPads);
   int KProj = findLocalMaxWithLaplacian( xyDxyProj, chProj, projPadToGrp, nGroups, nProjPads, nProjPads, 
                                      laplacian, thetaL, thetaPadProjIdx, thetaLToGrp);
   // printf("??? KProj %d\n", KProj);
@@ -687,6 +777,7 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     inspectModel.thetaInit =  new double[5*KProj];
     inspectModel.kThetaInit = KProj;
     copyTheta( thetaL, nProjPads, inspectModel.thetaInit, KProj, KProj ); 
+    inspectModel.residualProj = new double[nProjPads];
   }
   
   Mask_t maskThetaGrp[KProj];
@@ -699,12 +790,12 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     if (VERBOSE) printf("  group %d/%d \n", g, nGroups);
     //
     int K;
+    Mask_t maskGrp[nProjPads];
     if (nGroups != 1) {
       // Extract data (xydxyGrp, chGrp, ...)
       // associated with the group g
       //
       // Build the group-mask for pad
-      Mask_t maskGrp[nProjPads];
       nbrOfPadsInTheGroup = vectorBuildMaskEqualShort( projPadToGrp, g, nProjPads, maskGrp);
       // Build the index mapping proj indexes to group indexes
       PadIdx_t mapProjIdxToProjGrpIdx[nProjPads];
@@ -763,6 +854,7 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
       nbrOfPadsInTheGroup = nProjPads;
       xyDxyGrp = xyDxyProj; 
       chGrp = chProj;
+      vectorSetShort( maskGrp, 1, nProjPads);
       // Double delete ???
       saturatedGrp = saturatedProj;
       thetaPadProjGrpIdx = thetaPadProjIdx;
@@ -809,7 +901,7 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     double thetaOpt[K*5];
     Mask_t thetaOptMask[K];
     int kOpt = K;
-    if ( (K > 1) && K < 15) {
+    if ( 0 && (K > 1) && K < 15) {
       if (CHECK) {
         double *muXc  = getMuX ( theta0, K);        
         double *muYc  = getMuY ( theta0, K);
@@ -830,6 +922,9 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
                   thetaOpt, thetaOptMask );
     }
     double thetaEM[K*5];
+    if (DISABLE_EM_SATURATED){
+      vectorSetZeroShort( saturatedGrp, nbrOfPadsInTheGroup);
+    }
     if ( 1 && (kOpt != K) ) {
       weightedEMLoop( xyDxyGrp, saturatedGrp, chGrp, thetaOpt, thetaOptMask, K, nbrOfPadsInTheGroup, EMmode, EMConvergence, EMverbose, thetaEM);
     } else {
@@ -855,7 +950,10 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     
     /// ??????
     if (INSPECTMODEL ) {
-      copyInGroupList( thetaEMFinal, filteredK, 5, inspectModel.subClusterThetaEMFinal );  
+      copyInGroupList( thetaEMFinal, filteredK, 5, inspectModel.subClusterThetaEMFinal ); 
+      double residual[nbrOfPadsInTheGroup]; 
+      computeResidual( xyDxyGrp, chGrp, thetaEMFinal, filteredK, nbrOfPadsInTheGroup, residual);
+      vectorScatter( residual, maskGrp, nProjPads, inspectModel.residualProj );
     }
     //
     //
@@ -895,14 +993,21 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
         // Extract from cath1 the pads which belong to the group g
         maskedCopyXYdXY( xy1Dxy, nbrCath1, maskFit1, nbrCath1, &xyDxyFit[n0], nFit );
         // Saturated pads
-        vectorGatherShort( saturated, maskFit0, nbrCath0, &notSaturatedFit[0]);
-        vectorGatherShort( saturated, maskFit1, nbrCath1, &notSaturatedFit[n0]);
+        vectorPrintShort(" notSaturatedFit 0 ??? ", notSaturatedFit, nFit);
+        vectorGatherShort( satPads0, maskFit0, nbrCath0, &notSaturatedFit[0]);
+        vectorGatherShort( satPads1, maskFit1, nbrCath1, &notSaturatedFit[n0]);
+        vectorPrintShort(" notSaturatedFit 0 ??? ", notSaturatedFit, nFit);
         vectorNotShort( notSaturatedFit, nFit, notSaturatedFit);
+        vectorPrintShort(" MaskFit0 ??? ", maskFit0, nbrCath0);
+        vectorPrintShort(" MaskFit1 ??? ", maskFit1, nbrCath1);
+        vectorPrintShort(" saturatedFit ??? ", saturated, nFit);
+        vectorPrintShort(" notSaturatedFit ??? ", notSaturatedFit, nFit);
         // Chargei in group g 
         vectorGather( ch0, maskFit0, nbrCath0, zFit);
         vectorGather( ch1, maskFit1, nbrCath1, &zFit[n0]);
         // saturated pads are ignored
-        vectorMaskedMult( zFit, notSaturatedFit, nFit, zFit);
+        // ??? Don't Set to zero the sat. pads 
+        // vectorMaskedMult( zFit, notSaturatedFit, nFit, zFit);
         // Total Charge on both cathodes 
         zCathTotalCharge[0] = vectorMaskedSum( zFit,      &notSaturatedFit[0], n0);
         zCathTotalCharge[1] = vectorMaskedSum( &zFit[n0], &notSaturatedFit[n0], n1);
@@ -914,16 +1019,37 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
         // It is assumed that there is no subcluster
         //
         // Extract from  all pads which belong to the group g
+        printf("??? nPads, nFit, n0, n1 %d %d %d %d\n", nPads, nFit, n0, n1);
+        vectorPrintShort( "maskFit0", maskFit0, nbrCath0);
+        vectorPrintShort( "maskFit1", maskFit1, nbrCath1);
+        /* Inv pb with the groups (not expected)
         copyXYdXY( xyDxyi, nPads, xyDxyFit, nFit, nFit );
         vectorCopy( zi, nPads, zFit);
         vectorCopyShort( saturated, nPads, notSaturatedFit );
         vectorNotShort( notSaturatedFit, nPads, notSaturatedFit);
+        */
+        //
+        // GG ??? Maybe to shrink with the 2 cathodes processing
         // Total Charge on cathodes & cathode mask 
         if (nbrCath0 != 0) {
+          maskedCopyXYdXY( xyDxyi, nbrCath0, maskFit0, nbrCath0, xyDxyFit, nFit );
+          vectorGatherShort( saturated, maskFit0, nbrCath0, &notSaturatedFit[0]);
+          vectorNotShort( notSaturatedFit, nFit, notSaturatedFit);
+          vectorGather( zi, maskFit0, nbrCath0, zFit);
+          // ??? Don't Set to zero the sat. pads 
+          // vectorMaskedMult( zFit, notSaturatedFit, nFit, zFit);
+
           zCathTotalCharge[0] = vectorMaskedSum( zFit, notSaturatedFit, nFit);
           zCathTotalCharge[1] = 0;
           vectorSetShort(cath, 0, nFit);
         } else {
+          maskedCopyXYdXY( xyDxyi, nbrCath1, maskFit1, nbrCath1, xyDxyFit, nFit );
+          vectorGatherShort( saturated, maskFit1, nbrCath1, &notSaturatedFit[0]);
+          vectorNotShort( notSaturatedFit, nFit, notSaturatedFit);
+          vectorGather( zi, maskFit1, nbrCath1, zFit);
+          // ??? Don't Set to zero the sat. pads 
+          // vectorMaskedMult( zFit, notSaturatedFit, nFit, zFit);
+          
           zCathTotalCharge[0] = 0;
           zCathTotalCharge[1] = vectorMaskedSum( zFit, notSaturatedFit, nFit);
           vectorSetShort(cath, 1, nFit);
@@ -987,7 +1113,7 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     } else {
       nbrOfHits += filteredK;
       // Save the result of EM
-      appendInThetaList( thetaEMFinal, filteredK, subClusterThetaList);
+      appendInThetaList( thetaEMFinal, filteredK, subClusterThetaList);      
       if (INSPECTMODEL ) {
         copyInGroupList( xyDxyGrp, nbrOfPadsInTheGroup, 4, inspectModel.subClusterPadList);  
         copyInGroupList( chGrp,    nbrOfPadsInTheGroup, 1, inspectModel.subClusterChargeList);  
@@ -1026,10 +1152,14 @@ void cleanClusterProcessVariables( int uniqueCath) {
       if ( ch1 != 0) { delete[] ch1; ch1 = 0; }
       if ( satPads0 != 0) { delete[] satPads0; satPads0 = 0; }
       if ( satPads1 != 0) { delete[] satPads1; satPads1 = 0; }
+      if ( cath0ToPadIdx != 0) { delete[] cath0ToPadIdx; cath0ToPadIdx = 0; }
+      if ( cath1ToPadIdx != 0) { delete[] cath1ToPadIdx; cath1ToPadIdx = 0; }
     // }
     if ( xyDxyProj != 0 ) { delete[] xyDxyProj; xyDxyProj =0; }
     if ( chProj != 0 ) { delete[] chProj; chProj = 0; }
     if ( saturatedProj != 0 ) { delete[] saturatedProj; saturatedProj = 0; }
     if ( wellSplitGroup != 0) { delete[] wellSplitGroup; wellSplitGroup=0; };
+    if ( padToMergedGrp != 0) { delete[] padToMergedGrp; padToMergedGrp=0; };
     nProjPads = 0;
+    nMergedGrp = 0;
   }

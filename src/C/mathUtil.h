@@ -81,6 +81,12 @@ inline static int vectorSumOfGreater( const double *src, double cmpValue, int N)
 inline static int vectorBuildMaskEqualShort( short *src, short value, int N, short *mask) {
     int count=0; for(int i=0; i < N; i++) { mask[i] = (src[i] == value); count += ((src[i] == value));} return count;}
 
+inline static void vectorBuildMaskGreater( double *src, double value, int N, short *mask) {
+    for(int i=0; i < N; i++) { mask[i] = (src[i] > value); } return ;}
+
+inline static void vectorBuildMaskEqual( double *src, double value, int N, short *mask) {
+    for(int i=0; i < N; i++) { mask[i] = (src[i] == value); } return ;}
+
 inline static int vectorGetIndexFromMaskInt( const Mask_t *mask, int N, int *indexVector ) { 
   int k=0;for (int i=0; i < N; i++) {  if ( mask[i] == 1) { indexVector[i] = k ; k++;} } return k;}
   // int k=0;for (int i=0; i < N; i++) { indexVector[i] = ( mask[i] == 1) ? k : -1; k++;} return k;}
@@ -94,7 +100,10 @@ inline static int vectorGather( const double *v, const Mask_t *mask, int N, doub
 inline static int vectorGatherShort( const short *v, const Mask_t *mask, int N, short *gatherVector ) { 
   int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) gatherVector[k++] = v[i];} return k;}
 
-inline static int vectorGetIndexFromMaskShort( const Mask_t *mask, int N, short *index ) { 
+inline static int vectorScatter( const double *v, const Mask_t *mask, int N, double *scatterVec ) { 
+  int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) scatterVec[i] = v[k++];} return k;}
+
+      inline static int vectorGetIndexFromMaskShort( const Mask_t *mask, int N, short *index ) { 
   int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) index[k++] = i;} return k;}
 
 inline static int vectorGetIndexFromMask( const Mask_t *mask, int N, int *index ) { 
@@ -111,6 +120,9 @@ inline static double vectorMaskedSum( const double *v, const Mask_t *mask, int N
 
 inline static void vectorMaskedMult( const double *v, const Mask_t *mask, int N, double *res ) { 
   for (int i=0, k=0; i < N; i++) { res[i] = v[i]*mask[i];} return;} 
+
+inline static void vectorMaskedMultScalar( double *v, const Mask_t *mask, double trueVal, double falseVal, int N ) { 
+  for (int i=0, k=0; i < N; i++) { v[i] = (mask[i]) ? v[i]*trueVal : v[i]*falseVal;} return;} 
 
 inline static void vectorMapShort( short *array, const short *map, int N) {
   for (int i=0; i < N; i++) { array[i] = map[ array[i] ];} }

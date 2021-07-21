@@ -47,6 +47,14 @@ def setupPyCWrapper():
                                                 array_1d_double      # Integrals[]
                                                 ]
   #
+  extCLib.computeCij.resType = 0
+  extCLib.computeCij.argtypes = [ 
+                                                array_1d_double,     # xyInfSup 
+                                                array_1d_double,     # theta,
+                                                c_int, c_int, c_int, #  N, K, chamberId, 
+                                                array_1d_double      # Integrals[]
+                                                ]
+  #
   # Setup Mathieson fitting functions
   #
   extCLib.fitMathieson.resType = None
@@ -79,20 +87,42 @@ def setupPyCWrapper():
                                     array_1d_double,  # xyInfSup
                                     array_1d_double,  # theta
                                     c_int, c_int,     # K, N 
-                                    array_1d_double,  # z
+                                    array_1d_double   # z
                                 ]
                                 
-  extCLib.weightedEMLoop.resType = None
+  extCLib.weightedEMLoop.resType = c_double
   extCLib.weightedEMLoop.argtypes = [ 
                                     array_1d_double,  # xyDxy
                                     array_1d_short,   # saturated
                                     array_1d_double,  # zObs
                                     array_1d_double,  # theta0
+                                    array_1d_short,   # theta mask                                    
                                     c_int, c_int,     # K, N 
                                     c_int,            # mode
                                     c_double,         # LConvergence
                                     c_int,            # verbose
                                     array_1d_double   # theta
+                                ]
+  #
+  extCLib.computeResidual.resType = None
+  extCLib.computeResidual.argtypes = [ 
+                                    array_1d_double,  # xyInfSup
+                                    array_1d_double,  # z
+                                    array_1d_double,  # theta
+                                    c_int, c_int,     # K, N 
+                                    array_1d_double   # residual
+                                ]
+  #
+  #
+  extCLib.computeMathiesonResidual.resType = None
+  extCLib.computeMathiesonResidual.argtypes = [ 
+                                    array_1d_double,  # xyInfSup
+                                    array_1d_short,   # cath
+                                    array_1d_double,  # z
+                                    array_1d_double,  # theta
+                                    c_int,            # chId
+                                    c_int, c_int,     # K, N 
+                                    array_1d_double   # residual
                                 ]
   #
   # Setup Pad Processing functions
@@ -106,6 +136,17 @@ def setupPyCWrapper():
                                                 c_int, c_int,     # N0, N1
                                                 c_int             # includeAlonePads
                                             ]
+  extCLib.projectChargeOnOnePlaneWithTheta.resType = None
+  extCLib.projectChargeOnOnePlaneWithTheta.argtypes = [
+                                                array_1d_double,  # xy0Dxy
+                                                array_1d_double,  # ch0  
+                                                array_1d_double,  # xy1Dxy  
+                                                array_1d_double,  # ch1
+                                                array_1d_double,  # chTheta0
+                                                array_1d_double,  # chTheta1
+                                                c_int, c_int,     # N0, N1
+                                                c_int             # includeAlonePads
+                                            ]
   #
   extCLib.copyProjectedPads.resType = None
   extCLib.copyProjectedPads.argtypes = [
@@ -114,6 +155,12 @@ def setupPyCWrapper():
                                         array_1d_double,  # chB
                                        ]
   #
+  extCLib.collectProjectedMinMax.resType = None
+  extCLib.collectProjectedMinMax.argtypes = [
+                                        array_1d_double,  # Max Ch
+                                        array_1d_double   # Max Ch
+                                       ]
+  # 
   extCLib.findLocalMaxWithLaplacian.resType = c_int
   extCLib.findLocalMaxWithLaplacian.argtypes = [
                                                 array_1d_double,  # xyDxy
@@ -191,13 +238,24 @@ def setupPyCWrapper():
                                     c_int               # nTot
                                     ] 
   #
+  extCLib.collectPadToCathGroup.resType  = None
+  extCLib.collectPadToCathGroup.argtypes = [
+                                    array_1d_short,    # padToGrp
+                                    c_int              # nPads
+                                    ] 
+  #
+  extCLib.collectResidual.resType  = None
+  extCLib.collectResidual.argtypes = [
+                                    array_1d_double,    # Residual
+                                    c_int               # nTot
+                                    ] 
+  #  
   extCLib.collectThetaInit.resType  = None
   extCLib.collectThetaInit.argtypes = [
                                     array_1d_double,    # theta init
                                     c_int               # K
                                     ]  
   #
-    #
   extCLib.collectThetaEMFinal.resType  = None
   extCLib.collectThetaEMFinal.argtypes = [
                                           array_1d_double,    # theta EM Final
@@ -226,6 +284,14 @@ def compute2DMathiesonMixturePadIntegrals( xyInfSup, theta, chamberId ):
   CLib.compute2DMathiesonMixturePadIntegrals( xyInfSup, theta, N, K, chamberId, integrals )
   return integrals
 
+def computeCij( xyInfSup, theta, chamberId ):
+  N = int( xyInfSup.size / 4)
+  K = int( theta.size / 5)
+  Cij = np.zeros( (N*K) )
+  CLib.computeCij( xyInfSup, theta, N, K, chamberId, Cij )
+  return Cij.reshape((N,K), order="F") 
+
+
 def fitMathieson( thetai, xyAndDxy, cath, z, chId, verbose=0, doJacobian=0, doKhi=0, doStdErr=0):
   # process : verbose(2bits) + doJacobian(1bit) + computeKhi2(1bit) + computeStdDev(1bit)
   N = int( xyAndDxy.size / 4)
@@ -236,6 +302,18 @@ def fitMathieson( thetai, xyAndDxy, cath, z, chId, verbose=0, doJacobian=0, doKh
   thetaf = np.zeros( (5*K) )
   khi2 = np.zeros( (1) )
   pError = np.zeros( (3*K * 3*K) )
+  """
+  extCLib.fitMathieson.argtypes = [ array_1d_double,  # thetai
+                                    array_1d_double,  # xyAndDxy
+                                    array_1d_double,  # z (mesurred)
+                                    array_1d_short,   # cath
+                                    array_1d_double,  # zCathTotalCharge
+                                    c_int, c_int,     # K, N 
+                                    c_int, c_int,     # chamberId, jacobian
+                                    array_1d_double,  # thetaf
+                                    array_1d_double,  # Khi2
+                                    array_1d_double   # pErr
+  """                               
   CLib.fitMathieson( thetai, xyAndDxy, z, cath, zCathTotalCharge, K, N,
                          chId, doProcess, 
                          thetaf, khi2, pError 
@@ -256,13 +334,14 @@ def generateMixedGaussians2D( xyInfSup, theta):
   CLib.generateMixedGaussians2D( xyInfSup, theta, K, N, z)
   return z
 
-def weightedEMLoop( xyDxy, saturated, zObs, thetai, mode, LConvergence, verbose):
+def weightedEMLoop( xyDxy, saturated, zObs, thetai, thetaMask, mode, LConvergence, verbose):
   N = int( xyDxy.size / 4)
   K = int( thetai.size / 5)
   thetaf = np.zeros( K*5 )
   sat = saturated.astype( np.int16 )
-  CLib.weightedEMLoop( xyDxy, sat, zObs, thetai, K, N, mode, LConvergence, verbose, thetaf )
-  return thetaf
+  logL = CLib.weightedEMLoop( xyDxy, sat, zObs, thetai, thetaMask, K, N, mode, LConvergence, verbose, thetaf )
+  logL = thetaf[0]
+  return ( thetaf, logL )
 
 def copyProjectedPads( ):
   #
@@ -284,6 +363,12 @@ def copyProjectedPads( ):
   #
   return (xProj, dxProj, yProj, dyProj, chA, chB)
 
+def collectProjectedMinMax(nProj):
+  minCh = np.zeros( nProj)
+  maxCh = np.zeros( nProj)
+  CLib.collectProjectedMinMax( minCh, maxCh )
+  return minCh, maxCh
+
 def projectChargeOnOnePlane( x0, dx0, y0, dy0, x1, dx1, y1, dy1, ch0, ch1):
   N0 = x0.size
   xy0InfSup = np.zeros( (4*N0) )
@@ -299,6 +384,29 @@ def projectChargeOnOnePlane( x0, dx0, y0, dy0, x1, dx1, y1, dy1, ch0, ch1):
   xy1InfSup[3*N1:4*N1] = y1 + dy1
   includeAlonePads = 1
   CLib.projectChargeOnOnePlane( xy0InfSup, ch0, xy1InfSup, ch1, N0, N1, includeAlonePads)
+  #
+  # Get results
+  #
+  # proj = (xProj, dxProj, yProj, dyProj, chA, chB)
+  proj = copyProjectedPads()
+  #
+  return proj
+
+def projectChargeOnOnePlaneWithTheta( x0, dx0, y0, dy0, x1, dx1, y1, dy1, ch0, ch1, chTheta0, chTheta1):
+  N0 = x0.size
+  xy0InfSup = np.zeros( (4*N0) )
+  xy0InfSup[0*N0:1*N0] = x0 - dx0
+  xy0InfSup[1*N0:2*N0] = y0 - dy0
+  xy0InfSup[2*N0:3*N0] = x0 + dx0
+  xy0InfSup[3*N0:4*N0] = y0 + dy0
+  N1 = x1.size
+  xy1InfSup = np.zeros( (4*N1) )
+  xy1InfSup[0*N1:1*N1] = x1 - dx1
+  xy1InfSup[1*N1:2*N1] = y1 - dy1
+  xy1InfSup[2*N1:3*N1] = x1 + dx1
+  xy1InfSup[3*N1:4*N1] = y1 + dy1
+  includeAlonePads = 1
+  CLib.projectChargeOnOnePlaneWithTheta( xy0InfSup, ch0, xy1InfSup, ch1, chTheta0, chTheta1, N0, N1, includeAlonePads)
   #
   # Get results
   #
@@ -369,6 +477,31 @@ def collectLaplacian():
   laplacian = np.zeros( N)
   CLib.collectLaplacian( laplacian, N)
   return laplacian
+
+def collectPadToCathGroup( nPads ):
+  padToMGrp = np.zeros( (nPads),  dtype = np.int16 )
+  CLib.collectPadToCathGroup ( padToMGrp, nPads)
+  return padToMGrp
+
+def computeResidual( xyDxy, zObs, theta ):
+  K = int( theta.size / 5)
+  N = int( zObs.size )
+  residual = np.zeros(N)
+  CLib.computeResidual( xyDxy, zObs, theta, K, N, residual)
+  return residual
+
+def computeMathiesonResidual( xyDxy, cath, zObs, theta, chId ):
+  K = theta.size // 5
+  N = zObs.size
+  residual = np.zeros(N)
+  CLib.computeMathiesonResidual( xyDxy, cath, zObs, theta, chId, K, N, residual)
+  return residual
+
+def collectResidual():
+  N = CLib.getNbrOfProjPads()
+  residual = np.zeros( N)
+  CLib.collectResidual( residual, N)
+  return residual
 
 def collectThetaInit():
   K = CLib.getKThetaInit()

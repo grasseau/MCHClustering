@@ -23,6 +23,13 @@ if __name__ == "__main__":
     muY = np.array( [0.5] )
     varX = np.array( [0.1 * 0.1] )
     varY = np.array( [0.2 * 0.2] )
+    """
+    w   = np.array( [0.5, 0.5] )
+    muX = np.array( [0.5, 0.5] )
+    muY = np.array( [0.5, 0.5] )
+    varX = np.array( [0.1 * 0.1, 0.1 * 0.1] )
+    varY = np.array( [0.2 * 0.2, 0.2 * 0.2] )
+    """
     chId = 1
     
     x, y, dx, dy = tUtil.buildPads( 10, 10, -0.2, 1.2, -0.2, 1.2 )
@@ -55,20 +62,31 @@ if __name__ == "__main__":
     N = x.size
 
     thetaRef = tUtil.asTheta( w, muX, muY, varX, varY)
-    muXi = np.array( [0.5] )
-    muYi = np.array( [0.5] )
-    thetai = tUtil.asTheta( w, muXi, muYi, varX, varY)
+    """
+    muXi = np.array( [0.5, 0.5] )
+    muYi = np.array( [0.5, 0.5] )
+    """
+    wi   = np.array( [0.6, 0.4] )
+    muXi = np.array( [0.6, 0.4] )
+    muYi = np.array( [0.6, 0.4] )
+    varXi = np.array( [0.1 * 0.1, 0.1 * 0.1] )
+    varYi = np.array( [0.2 * 0.2, 0.2 * 0.2] )
+
+    thetai = tUtil.asTheta( wi, muXi, muYi, varXi, varYi)
     # Set variance to approximate Mathienson fct
     PCWrap.setMathiesonVarianceApprox( chId, thetai)
 
     xyDxy  = tUtil.asXYdXY( x, y, dx, dy)
     xyInfSup = tUtil.padToXYInfSup( x, y, dx, dy )
     zi = PCWrap.generateMixedGaussians2D( xyInfSup, thetai )
-    print("theta initial", thetai)
+    tUtil.printTheta("theta initial", thetai)
     print( "zi min/max/sum", min(zi), max(zi), sum(zi))
     # print( "zi", zi )
-    theta = PCWrap.weightedEMLoop( xyDxy, z, thetai, mode, LConv, verbose ) 
-    print("theta final", theta)
+    saturated = np.zeros( x.size, dtype=np.int16 )
+    thetaMask = np.ones( 1, dtype=np.int16  )
+    theta, logL = PCWrap.weightedEMLoop( xyDxy, saturated, z, thetai, thetaMask, mode, LConv, verbose ) 
+    # theta = PCWrap.weightedEMLoop( xyDxy, z, thetai, mode, LConv, verbose ) 
+    tUtil.printTheta("theta final", theta)
     # 
     zf = PCWrap.generateMixedGaussians2D( xyInfSup, theta )
     print( "zf min/max/sum", min(zf), max(zf), sum(zf))

@@ -19,13 +19,15 @@ def getMatchingMCTrackHits( spanDEIds, boxOfRecoPads, mcObj, ev, verbose = False
     print("matchMCTrackHits x0.shape=", x0.shape, "spanDEIds=", spanDEIds)
   # Pads half-size
   nbrOfTracks = len( mcObj.trackDEId[ev] )
+  # print("??? nbrOfTracks", nbrOfTracks)
+  # print("??? deIds", deIds)
   x = np.empty(shape=[0])
   y = np.empty(shape=[0])
   # Keep the location of McHits involved
   mcHitsInvolved = []
   totalMCHits = 0
+  xl = []; yl = []
   for t in range( nbrOfTracks):
-    xl = []; yl = []
     # Select track hits in DEIds
     for k, d in enumerate(deIds):
       # Must belong to the same DE and have a trackCharge in the DEId 
@@ -36,15 +38,28 @@ def getMatchingMCTrackHits( spanDEIds, boxOfRecoPads, mcObj, ev, verbose = False
       flags = np.bitwise_and( flag0, flag1)
       flags = np.bitwise_and( flags, flag2) 
       # flag1 = (mcObj.trackDEId[ev][t] == d) 
+      # print("??? flag0 DEids", flag0)
+      # print("??? flag1 charge", flag1)
+      # print("??? flag2 box", flag2)
+      # print("??? flags", flags)
+      
       idx = np.where( flags )[0]
       nbrOfHits = idx.shape[0]
+    #  print("??? nbrOfHits", nbrOfHits)
       totalMCHits += nbrOfHits
-      xl.append( mcObj.trackX[ev][t][idx] )
-      yl.append( mcObj.trackY[ev][t][idx] )
+      if ( nbrOfHits ) :
+        xl.append( mcObj.trackX[ev][t][idx] )
+        yl.append( mcObj.trackY[ev][t][idx] )
       if k > 0:
         input("??? Take care")
-    x = np.vstack(xl)
-    y = np.vstack(yl)
+    # print("??? xl", xl)
+    
+    if len(xl) > 0 :
+      x = np.hstack(xl)
+      y = np.hstack(yl)
+  # print("??? x", x)
+  # input("next")
+    
   return x, y
 
 

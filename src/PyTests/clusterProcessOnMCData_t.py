@@ -139,7 +139,7 @@ def processPreCluster( preClusters, ev, pc, display=False ):
 def processEvent( preClusters,  ev):
   nbrOfPreClusters = len( preClusters.padId[ev] )
   for pc in range(0, nbrOfPreClusters):
-    processPreCluster( preClusters, ev, pc, display=False)
+    processPreCluster( preClusters, ev, pc, display=True)
 
 
 if __name__ == "__main__":
@@ -148,10 +148,10 @@ if __name__ == "__main__":
   pcWrap.initMathieson()
   
   # Read MC data
-  mcData = IO.MCData(fileName="MCDataDump.dat")
+  mcData = IO.MCData(fileName="../MCData/MCDataDump.dat")
   mcData.read()
   # Read PreClusters
-  recoData = IO.PreCluster()
+  recoData = IO.PreCluster(fileName="../MCData/RecoDataDump.dat")
   recoData.read()
   print( "recoData.padChIdMinMax=", recoData.padChIdMinMax )
   print( "recoData.rClusterChIdMinMax=", recoData.rClusterChIdMinMax )

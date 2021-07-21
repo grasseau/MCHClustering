@@ -18,8 +18,18 @@ extern "C" {
   
   void collectPadsAndCharges( double *xyDxy, double *z, Group_t *padToGroup, int nTot);
   
+  void collectPadToCathGroup( Mask_t *padToMGrp, int nPads );
+  
   void collectLaplacian( double *laplacian, int N);
+  
+  void computeResidual( const double *xyDxy, const double *zObs, const double *theta, int K, int N, double *residual);
+  
+  void computeMathiesonResidual( const double *xyDxy, const Mask_t *cath, const double *zObs, const double *theta, int chId, int K, int N, double *residual);
 
+  void compute2DMathiesonMixturePadIntegrals( const double *xyInfSup0, const double *theta,
+                                              int N, int K, int chamberId, double Integrals[] );
+  void collectResidual( double *residual, int N);
+  
   int getKThetaInit();
   
   void collectThetaInit( double *thetai, int N);

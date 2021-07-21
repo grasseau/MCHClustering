@@ -37,10 +37,12 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True ):
   if (chIds.size != 1):
     input("Bab number of DEIds")
   chId = np.unique( chIds )[0]
-
+  nPads = xi.size
+  
   # Print cluster info
+  sumSaturated = np.sum( preClusters.padSaturated[ev][pc])
   print("[python] # DEIds", DEIds)
-  print("[python] # Nbr of pads:", xi.size)
+  print("[python] # Nbr of pads:", nPads)
   print("[python] # Saturated pads", np.sum( preClusters.padSaturated[ev][pc]))
   print("[python] # Calibrated pads", np.sum( preClusters.padCalibrated[ev][pc]))
   if ( xi.size !=  np.sum( preClusters.padCalibrated[ev][pc])) :
@@ -95,6 +97,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True ):
   # Return the projection
   
   (xProj, dxProj, yProj, dyProj, chA, chB) = PCWrap.copyProjectedPads()
+  chProj = (chA + chB)*0.5
   res = aTK.matchingThetaWithMC(thetaf, preClusters, ev, pc, mcObj)
   (pc_, match, nbrOfHits, TP, FP,FN, dMin, dxMin, dyMin, tfMatrix, mcHitsInvolved ) = res
   # Ratio
@@ -138,31 +141,79 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True ):
   wMin = np.min( w )
   print("[python] w", w )
   print("[python] wMin=", wMin )
+  
+  # Residual
+  residual = PCWrap.collectResidual( )
+  maxResidual = np.max( residual )
+  minResidual = np.min( residual )
+  sumAbsResidual =  np.sum( np.abs( residual) ) / chProj.size
+  maxAbsResidual = max( maxResidual, abs( minResidual) )
+  maxProj = np.max( chProj )
+  ratioResidual = maxAbsResidual / maxProj
+  print("[python] sumResidual", np.sum( residual) )
+  print("[python] minResidual",minResidual)
+  print("[python] maxResidual",maxResidual)
+  print("[python] maxProj", maxProj)
+  print("[python] ratioResidual", ratioResidual)
+  print("[python] sumAbsResidual", sumAbsResidual)
+  print("[python] sumSaturated", sumSaturated )
+
+  #
+  x0  = xi[cathi==0]
+  y0  = yi[cathi==0]
+  dx0 = dxi[cathi==0]
+  dy0 = dyi[cathi==0]
+  z0  = chi[cathi==0]
+  x1  = xi[cathi==1]
+  y1  = yi[cathi==1]
+  dx1 = dxi[cathi==1]
+  dy1 = dyi[cathi==1]
+  z1  = chi[cathi==1]
+  matchFlag = (match > 0.33)
+  notSaturated = ( sumSaturated == 0)
+  TPFlag = (( recoRatioTP > 0) or ( recoRatioFP < 0) or ( recoRatioFN < 0) )
+  residualFlag = (ratioResidual > 0.70)
+  severalGrp = ( max(padToGrp) > 1)
+  # MergedGroup or CathGroups 
+  padToCathGrp = PCWrap.collectPadToCathGroup( nPads )
+  padCathGrpMax = np.max( padToCathGrp )
+  thetaMaxGrp = np.max( thetaToGrp )
+  padGrpMax = np.max( padToGrp )
+  nRecoSeeds = preClusters.rClusterX[ev][pc].size
+  xyDxy0 = dUtil.asXYdXY(  x0, y0, dx0, dy0 )
+  xyDxy1 = dUtil.asXYdXY(  x1, y1, dx1, dy1 )
+  xl, yl = geom.findLocalMax( xyDxy0, xyDxy1, z0, z1 )
+  nNewSeeds = xl.size
+  
   drawPlot = display and (match > 0.33) 
   drawPlot = display and (match > 0.33)  and ( np.sum( saturated) > 0 )
-  drawPlot = display and (match > 0.33)  and ( ( seedRatio < 0.8 ) or ( seedRatio > 1.2 ) )
   drawPlot = display and (match > 0.33)  and ( ratioTP < 0.8 )
   drawPlot = display and (match > 0.33)  and ( ( seedRatio < 0.8 ) )
   drawPlot = display and (match > 0.33) and ( wMin < 0.005 )
-  drawPlot = display  
+  drawPlot = display
+  
   drawPlot = display and (match > 0.33) 
   drawPlot = display and (match > 0.33) and (maxDxMin > 0.15 or maxDyMin > 0.1) 
   drawPlot = display and (match > 0.33) and ( (maxDxMin < (maxRecoDxMin )) or (maxDyMin < (maxRecoDyMin )) )
   drawPlot = display and (match > 0.33) and ( (maxDxMin > (maxRecoDxMin + 0.05)) or (maxDyMin > (maxRecoDyMin + 0.03)) )
-  drawPlot = display and (match > 0.33) and (( recoRatioTP > 0) or ( recoRatioFP < 0) or ( recoRatioFN < 0) )
-  
+  drawPlot = display and (match > 0.33) and TPFlag
+  drawPlot = display  and notSaturated and (residualFlag or TPFlag)
+  drawPlot = display and severalGrp 
+  drawPlot = False
+  drawPlot = display and residualFlag
+  drawPlot = display and (match > 0.33)  and ( ( seedRatio < 0.8 ) or ( seedRatio > 1.2 ) )
+  drawPlot = display and (nRecoSeeds != nNewSeeds)
+  #
+  """
+  if (padCathGrpMax != thetaMaxGrp):
+      print("padCathGrpMax differs from thetaMaxGrp; padCathGrpMax", padCathGrpMax, thetaMaxGrp, padGrpMax)
+      print("padCathGrp", padToCathGrp)
+      input("next")
+      drawPlot = True
+  """    
   if drawPlot:
-    fig, ax = plt.subplots(nrows=2, ncols=4, figsize=(17, 13) )
-    x0  = xi[cathi==0]
-    y0  = yi[cathi==0]
-    dx0 = dxi[cathi==0]
-    dy0 = dyi[cathi==0]
-    z0  = chi[cathi==0]
-    x1  = xi[cathi==1]
-    y1  = yi[cathi==1]
-    dx1 = dxi[cathi==1]
-    dy1 = dyi[cathi==1]
-    z1  = chi[cathi==1]
+    fig, ax = plt.subplots(nrows=2, ncols=5, figsize=(17, 13) )
+
     """ ????
     xMin=np.min(xi-dxi)
     xMax=np.max(xi+dxi)
@@ -186,9 +237,8 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True ):
     # uPlt.drawPads( fig, ax[1,0], xr, yr, dxr, dyr, chResult, doLimits=True, alpha=1.0 )
     
     # Projection
-    chx = (chA + chB)*0.5
-    uPlt.setLUTScale( 0.0, np.max( chx) * 1.2 )
-    uPlt.drawPads( fig, ax[0,1], xProj, yProj, dxProj, dyProj, chx, doLimits=False, alpha=1.0 )
+    uPlt.setLUTScale( 0.0, np.max( chProj) * 1.2 )
+    uPlt.drawPads( fig, ax[0,1], xProj, yProj, dxProj, dyProj, chProj, doLimits=False, alpha=1.0 )
     uPlt.drawModelComponents( ax[0,1], thetaf, color="red", pattern='o')
     uPlt.drawMCHitsInFrame( ax[0,1], frame, mcObj, ev, DEIds )
     ax[0, 1].set_title("Projection & theta final")
@@ -197,10 +247,11 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True ):
     laplacian = PCWrap.collectLaplacian( )
     uPlt.setLUTScale( 0.0, 1.2)
     uPlt.drawPads( fig, ax[0,2], xProj, yProj, dxProj, dyProj, laplacian, doLimits=False, alpha=1.0 )
-    uPlt.drawModelComponents( ax[0,2], thetaInit, color="green", pattern='o')
+    uPlt.drawModelComponents( ax[0,2], thetaInit, color="red", pattern='o')
     uPlt.drawMCHitsInFrame( ax[0,2], frame, mcObj, ev, DEIds )
     ax[0,2].set_title("Laplacian & theta init.")
-    
+
+    #
     # EM Final
     thetaEMFinal = PCWrap.collectThetaEMFinal()
     uPlt.setLUTScale( 0.0, 1.2)
@@ -208,12 +259,28 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True ):
     uPlt.drawModelComponents( ax[0,3], thetaEMFinal, color="red", pattern='o')
     uPlt.drawMCHitsInFrame( ax[0,3], frame, mcObj, ev, DEIds )
     ax[0,3].set_title("Laplacian & theta EM Final.")
+    #
+    # Residual
+    uPlt.setLUTScale( np.min( residual ), np.max( residual ) * 1.2 )
+    uPlt.drawPads( fig, ax[1,0], xProj, yProj, dxProj, dyProj, residual, doLimits=False, alpha=1.0 )
+    uPlt.drawModelComponents( ax[1,0], thetaEMFinal, color="red", pattern='o')
+    uPlt.drawMCHitsInFrame( ax[1,0], frame, mcObj, ev, DEIds )
+    ax[1,0].set_title("Residual & theta EM final.")
+
     
     # Groups
+    #
+    # Projected Grp
+    """
     grpMax = np.max( padToGrp )
     uPlt.setLUTScale( 0.0, grpMax )
     uPlt.drawPads( fig, ax[1,1], xr, yr, dxr, dyr, padToGrp, doLimits=False, alpha=0.5 )
     # uPlt.drawPads( fig, ax[1,1], xProj, yProj, dxProj, dyProj, padToGrp, doLimits=False, alpha=1.0 )
+    """
+    #
+    # Merged Groups
+    uPlt.setLUTScale( 0.0, padCathGrpMax ) 
+    uPlt.drawPads( fig, ax[1,1], xi, yi, dxi, dyi, padToCathGrp,  doLimits=False, alpha=0.5 )
     ax[1,1].set_title("Group of pads")
 
     
@@ -227,7 +294,17 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True ):
     uPlt.drawPoints( ax[1,3],  preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc], color='green', pattern='o')
     uPlt.drawModelComponents( ax[1,3], thetaf, color="red", pattern='+')
     ax[1,3].set_title("EM versus Reco")
+    
+    # The two cathodes
+    zMax = np.max( chi )
+    uPlt.setLUTScale( 0.0, zMax ) 
+    uPlt.drawPads( fig, ax[0,4], x0, y0, dx0, dy0, z0,  doLimits=False)
+    uPlt.drawPads( fig, ax[1,4], x1, y1, dx1, dy1, z1,  doLimits=False )
 
+    uPlt.drawPoints( ax[0,4], xl, yl, color='black', pattern='x')
+    uPlt.drawPoints( ax[1,4], xl, yl, color='black', pattern='x')
+    ax[0,4].set_title("Cathode 0")
+    ax[1,4].set_title("Cathode 1")
     
     for i in range(ax.shape[0]):
       for j in range(ax.shape[1]):
@@ -238,7 +315,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True ):
     
     #
     # t = r'$\sigma=%.3f$' % xStd
-    t = r'Event=%d preCluster=%d' % (ev, pc)
+    t = r'Event=%d preCluster=%d DEId=%d Saturated=%d' % (ev, pc, DEIds[0], not notSaturated)
     fig.suptitle(t)
     plt.show()
 
@@ -259,7 +336,7 @@ def inspectEvent( preClusters,  ev, mcObj):
   # for pc in range(286, 287):
   # for pc in range(18, 19):
   # for pc in range(4, 5):
-  for pc in range(6, nbrOfPreClusters):
+  for pc in range(0, nbrOfPreClusters):
     thetaf = inspectPreCluster( preClusters, ev, pc, mcObj, display=True)
     res = aTK.matchingThetaWithMC(thetaf, preClusters, ev, pc, mcObj)
     (pc_, match, nbrOfHits, TP, FP,FN, dMin, dxMin, dyMin, tfMatrix, mcHitsInvolved ) = res
@@ -277,20 +354,22 @@ if __name__ == "__main__":
   pcWrap.initMathieson()
   
   # Read MC data
-  mcData = IO.MCData(fileName="../Data/MCDataDump.dat")
+  mcData = IO.MCData(fileName="../MCData/MCDataDump.dat")
   mcData.read()
   # Read PreClusters
-  recoData = IO.PreCluster(fileName="../Data/RecoDataDump.dat")
+  recoData = IO.PreCluster(fileName="../MCData/RecoDataDump.dat")
   recoData.read()
   print( "[python] recoData.padChIdMinMax=", recoData.padChIdMinMax )
   print( "[python] recoData.rClusterChIdMinMax=", recoData.rClusterChIdMinMax )
   # recoMeasure
-  recoMeasure = IO.readPickle("../Data/recoMeasure.obj")
+  recoMeasure = IO.readPickle("../MCData/recoMeasure.obj")
   # EM measure
   nEvents = len( recoData.padX )
   emMeasure = []
   # for ev in range(2, 3):
-  # for ev in range(20, 21):
+  # for ev in [14, 39]:
+  # inspectPreCluster( recoData, 0, 57, mcData, display=True)
+
   for ev in range(0, nEvents):
     emMeasure.append( inspectEvent( recoData, ev, mcData ) )    
 

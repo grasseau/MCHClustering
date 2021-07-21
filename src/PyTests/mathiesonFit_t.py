@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 import C.PyCWrapper as PCWrap
 import Util.plot as uPlt
-import utilitiesForTests as tUtil
+import Util.dataTools as tUtil
 
 if __name__ == "__main__":
     
@@ -56,13 +56,16 @@ if __name__ == "__main__":
     N = x.size
     thetai = tUtil.asTheta( w, muX, muY)
     xyDxy  = tUtil.asXYdXY( x, y, dx, dy)
-
+    # zCathTotalCharge = np.zeros( 2)
+    # zCathTotalCharge[0] = np.sum( z )
+    
     (thetaf, khi2, pError) = PCWrap.fitMathieson( thetai, xyDxy, cath, z,
-                         chId, verbose=1, doJacobian=0, doKhi=1, doStdErr=1)
-                         
+                         chId, verbose=1, doJacobian=0, doKhi=0, doStdErr=0)
+
     print("thetaf", thetaf)
     print("khi2", khi2)
     print("pError", pError)
+    
     fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(10, 7))
     uPlt.setLUTScale( 0, np.max(z) )
     uPlt.drawPads( fig, ax[0,0], x[cath==0], y[cath==0], dx[cath==0], dy[cath==0], z[cath==0],  title="Mathieson (%d,%d)" % (0,0))
