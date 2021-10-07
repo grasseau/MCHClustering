@@ -98,7 +98,7 @@ def readDouble(file, n):
 
     # Read N Double
     raw = file.read(nData * 8)
-    print("len(raw ", len(raw) )
+    # print("len(raw) ", len(raw) )
     # print("fmt unpack ", str(nData) + 'd')
     array = struct.unpack(str(nData) + 'd', raw)
     if nData != n: 

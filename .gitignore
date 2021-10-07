@@ -1,8 +1,12 @@
 # Python
 __pycache__/
 *.py[cod]
+
 # Prerequisites
 *.d
+
+# data python files
+*.obj
 
 # Compiled Object files
 *.slo

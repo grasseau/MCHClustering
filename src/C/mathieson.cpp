@@ -117,6 +117,7 @@ void compute2DMathiesonMixturePadIntegrals( const double *xyInfSup0, const doubl
     // Remarks:
     // - This fct is a cumulative one, as a result it should be set to zero
     //    before calling it
+    vectorSetZero(Integrals, N);
     const double *xInf0 = getConstXInf( xyInfSup0, N);
     const double *yInf0 = getConstYInf( xyInfSup0, N);
     const double *xSup0 = getConstXSup( xyInfSup0, N);

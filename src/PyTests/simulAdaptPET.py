@@ -15,7 +15,7 @@ verbose = 1
 # mode : cstVar (1bit)
 mode = 1 
 LConv = 1.0e-6
-
+  
 def EMPoisson( xyInfSup, qPad, theta, chId, nIt):
   (q, mux, muy, varx, vary) = tUtil.thetaAsWMuVar( theta)
   qPix = np.copy( q )
@@ -29,25 +29,32 @@ def EMPoisson( xyInfSup, qPad, theta, chId, nIt):
   for it in range(nIt):
     # if (it >= 20):
     #  nPixMax = (nPads + 1) // 3
-    if ( it % 20) == 0:
+    if ( it % 1) == 0:
+      #
       # cleaning
       # idx = np.where (qPix > 1.e-02 )[0]
-      idx = np.where (qPix > 5 )[0]
+      # idx = np.where (qPix > 5 )[0]
+      qPixMax = np.max( qPix )
+      qPixCut = min( 0.01 * np.max( qPix ), 0.2 )
+      idx = np.where (qPix > qPixCut )[0]
       qPix = qPix[idx] 
       mux = mux[idx]
       muy = muy[idx]
+      # qPix.size must be  less than nPixMax
       if ( qPix.size > nPixMax):
+        print( "qPix.size > nPixMax=nPads", qPix.size, " > ", nPixMax)
         idx = np.argsort(-qPix)
         qPix = qPix[idx[0:nPixMax]]
         mux = mux[idx[0:nPixMax]]
         muy = muy[idx[0:nPixMax]]
-      print( "qPix.size", qPix.size)
       nPix = qPix.size
+      prevQPix = np.copy( qPix )
     # Compute coef cij, i for pad, j for pixel
-    if ( it % 20) == 0:
+    if ( it % 1) == 0:
       theta = tUtil.asTheta(qPix, mux, muy, varx[0:nPix], vary[0:nPix] )
       Cij = PCWrap.computeCij( xyInfSup, theta, chId )
-      print("Cij", Cij.shape)
+      
+      # print("Cij", Cij.shape)
       # print(Cij)
     for i in range(nPads):
       qPredPad[i] = np.dot( Cij[ i, 0:nPix], qPix[0:nPix] )  #  Sum_j cij.qj
@@ -59,10 +66,20 @@ def EMPoisson( xyInfSup, qPad, theta, chId, nIt):
       # 
       r = np.sum( Cij[:,j]*qPad[0:nPads] / qPredPad[0:nPads] )
       qPix[j] = r * qPix[j] / norm
-    # 
+    #
+    residu = np.abs( prevQPix - qPix )
+    padResidu = np.abs( qPad - qPredPad )
+    print("it=", it, ", <pixResidu>", np.sum(residu)/qPix.size, ", <padResidu>", np.sum(padResidu)/qPad.size, ", max(padResidu)", np.max(padResidu))
   print( "Total Charge", np.sum(qPad))
   print( "Total Predictited Charge", np.sum(qPredPad))
   print( "Total Pixel Charge", np.sum(qPix))
+  print( "Total Cij", np.sum(Cij))
+  print( "Total Ci", np.sum(Cij, axis=0))
+  print( "Total Cj", np.sum(Cij, axis=1))
+  
+  # SVD
+  # (u, s, vh) = np.linalg.svd( Cij )
+  # print("s", s )
   theta = tUtil.asTheta(qPix, mux, muy, varx[0:nPix], vary[0:nPix] )
 
   return theta
@@ -226,7 +243,24 @@ def getPoint( pad0, pad1):
   ySup = min( y0Sup, y1Sup) 
   
   return ( 0.5*(xInf+xSup), 0.5*(yInf+ySup) )
+
+def intersectionArea( xrInf,  xrSup,  yrInf,  yrSup, xInf,  xSup,  yInf,  ySup, z ):
+  epsilon = 10.0e-5
+  area = np.zeros( x.size )
   
+  for j in range(xInf.shape[0]):
+    xmin = max( xrInf, xInf[j] )
+    xmax = min( xrSup, xSup[j] )
+    xInter = ( xmin <= (xmax - epsilon) )
+    ymin = max( yrInf, yInf[j] )
+    ymax = min( yrSup, ySup[j] )
+    yInter = ( ymin <= (ymax - epsilon))
+    # intersection
+    if xInter and yInter:
+      area[j] = (xmax-xmin) * (ymax-ymin) / ((xSup[i] - xInf[j]) * (ySup[i] - yInf[j]) ) * z[i]
+        
+  return area
+
 def intersection( refPad, pads):
   epsilon = 10.0e-5
   (xr, yr, dxr, dyr) = refPad
@@ -337,7 +371,9 @@ def runAdaptEM( event ):
     # MLEM loop until thetaChanged and not converged
     # Int zProj to 1 ???
     print("theta", )
-    newTheta = EMPoisson( xyInfSup, z, theta, chId, 100000 ) 
+    
+    
+    newTheta = EMPoisson( xyInfSup, z, theta, chId, 20 ) 
     # newTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix) 
     (qPix, _, _, _, _) = tUtil.thetaAsWMuVar( newTheta)
     # xMax, yMax = tUtil.maxXYDistance( theta, thetaMask, newTheta)
@@ -368,42 +404,44 @@ def runAdaptEM( event ):
       dxPix = dxPix[idx]
       dyPix = dyPix[idx]      
       #
-      print("##### Refinement ##########")
-      newXPix = np.zeros( nPix*4 )
-      newYPix = np.zeros( nPix*4 )
-      newdXPix = np.zeros( nPix*4 )
-      newdYPix = np.zeros( nPix*4 )
-      newXPix = np.zeros( nPix*4 )
-      newQPix = np.zeros( nPix*4 )
-      for p in range(nPix):
-        newXPix[4*p] = xPix[p] - dxPix[p]/2
-        newYPix[4*p] = yPix[p] - dyPix[p]/2
-        newXPix[4*p+1] = xPix[p] + dxPix[p]/2
-        newYPix[4*p+1] = yPix[p] - dyPix[p]/2   
-        newXPix[4*p+2] = xPix[p] - dxPix[p]/2
-        newYPix[4*p+2] = yPix[p] + dyPix[p]/2   
-        newXPix[4*p+3] = xPix[p] + dxPix[p]/2
-        newYPix[4*p+3] = yPix[p] + dyPix[p]/2
-        newdXPix[4*p]   = dxPix[p]/2
-        newdYPix[4*p]   = dyPix[p]/2
-        newdXPix[4*p+1] = dxPix[p]/2
-        newdYPix[4*p+1] = dyPix[p]/2   
-        newdXPix[4*p+2] = dxPix[p]/2   
-        newdYPix[4*p+2] = dyPix[p]/2   
-        newdXPix[4*p+3] = dxPix[p]/2
-        newdYPix[4*p+3] = dyPix[p]/2 
-        # Charge
-        newQPix[4*p]   = qPix[p]/4
-        newQPix[4*p+1] = qPix[p]/4
-        newQPix[4*p+2] = qPix[p]/4
-        newQPix[4*p+3] = qPix[p]/4
-      nPix = nPix*4
-      xPix = newXPix
-      yPix = newYPix
-      dxPix = newdXPix
-      dyPix = newdYPix
-      qPix = newQPix
-      newTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix)
+      """
+          print("##### Refinement ##########")
+          newXPix = np.zeros( nPix*4 )
+          newYPix = np.zeros( nPix*4 )
+          newdXPix = np.zeros( nPix*4 )
+          newdYPix = np.zeros( nPix*4 )
+          newXPix = np.zeros( nPix*4 )
+          newQPix = np.zeros( nPix*4 )
+          for p in range(nPix):
+            newXPix[4*p] = xPix[p] - dxPix[p]/2
+            newYPix[4*p] = yPix[p] - dyPix[p]/2
+            newXPix[4*p+1] = xPix[p] + dxPix[p]/2
+            newYPix[4*p+1] = yPix[p] - dyPix[p]/2   
+            newXPix[4*p+2] = xPix[p] - dxPix[p]/2
+            newYPix[4*p+2] = yPix[p] + dyPix[p]/2   
+            newXPix[4*p+3] = xPix[p] + dxPix[p]/2
+            newYPix[4*p+3] = yPix[p] + dyPix[p]/2
+            newdXPix[4*p]   = dxPix[p]/2
+            newdYPix[4*p]   = dyPix[p]/2
+            newdXPix[4*p+1] = dxPix[p]/2
+            newdYPix[4*p+1] = dyPix[p]/2   
+            newdXPix[4*p+2] = dxPix[p]/2   
+            newdYPix[4*p+2] = dyPix[p]/2   
+            newdXPix[4*p+3] = dxPix[p]/2
+            newdYPix[4*p+3] = dyPix[p]/2 
+            # Charge
+            newQPix[4*p]   = qPix[p]/4
+            newQPix[4*p+1] = qPix[p]/4
+            newQPix[4*p+2] = qPix[p]/4
+            newQPix[4*p+3] = qPix[p]/4
+          nPix = nPix*4
+          xPix = newXPix
+          yPix = newYPix
+          dxPix = newdXPix
+          dyPix = newdYPix
+          qPix = newQPix
+          newTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix)
+      """  
       EMConverge = False
     answer = input("stop ?")
     if answer == 'y':

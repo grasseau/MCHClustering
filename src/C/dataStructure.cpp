@@ -186,16 +186,37 @@ void printXYdXY( const char *str, const double *xyDxy, int NMax, int N, const do
   if (val2 != 0) nPrint++;
   if ((nPrint == 1) && (val2 != 0)) val1 = val2;
   
+  int n;
+  if ( N > 50 ) {
+    n = 50;
+  } else {
+    n = N;
+  }
   if ( nPrint == 0) {
-    for( PadIdx_t i=0; i < N; i++) {
+    for( PadIdx_t i=0; i < n; i++) {
       printf("  pad %2d: %9.3g %9.3g %9.3g %9.3g \n", i, X[i], Y[i], DX[i], DY[i]);
     }
+    if (n < N) {
+      printf("...\n");
+      PadIdx_t i = N-1;
+      printf("  pad %2d: %9.3g %9.3g %9.3g %9.3g \n", i, X[i], Y[i], DX[i], DY[i]);  
+    }
   } else if( nPrint == 1) {
-    for( PadIdx_t i=0; i < N; i++) {
+    for( PadIdx_t i=0; i < n; i++) {
+      printf("  pad %2d: %9.3g %9.3g %9.3g %9.3g - %9.3g \n", i, X[i], Y[i], DX[i], DY[i], val1[i]);  
+    }
+    if (n < N) {
+      printf("...\n");
+      PadIdx_t i = N-1;
       printf("  pad %2d: %9.3g %9.3g %9.3g %9.3g - %9.3g \n", i, X[i], Y[i], DX[i], DY[i], val1[i]);  
     }
   } else {
     for( PadIdx_t i=0; i < N; i++) {
+      printf("  pad %d: %9.3g %9.3g %9.3g %9.3g - %9.3g %9.3g \n", i, X[i], Y[i], DX[i], DY[i], val1[i], val2[i] );  
+    }
+    if (n < N) {
+      printf("...\n");
+      PadIdx_t i = N-1;
       printf("  pad %d: %9.3g %9.3g %9.3g %9.3g - %9.3g %9.3g \n", i, X[i], Y[i], DX[i], DY[i], val1[i], val2[i] );  
     }
   }

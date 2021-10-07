@@ -153,6 +153,7 @@ def drawModelComponents( ax, theta, color='black', pattern="o" ):
                     # facecolor=c[r], 
             ax.add_patch(circle)
           else:
+            # ax.plot( x, y, pattern, color="white", markersize=5 )
             ax.plot( x, y, pattern, color=color, markersize=3 )
             
     return
@@ -214,18 +215,17 @@ def drawModelComponentsV0( ax, w, mu, var, color='black', pattern="o" ):
     return
 
 def drawPoints( ax, x, y, color='black', pattern="o" ):
+    if type(x) is not np.ndarray:
+      x = np.array( [x])
+      y = np.array( [y])
     K = x.shape[0]
     if K == 0 : return
     ( bot, top) = ax.get_ylim()
-    """
-    wMax = np.max(w)
-    wMin = np.min(w)
-    cst = (top - bot) * 0.20 / wMax
-    """
-    """
+    ( right, left) = ax.get_xlim()
+    dx = (right - left) * 0.02 
+    dy = (top - bot) * 0.02 
+ 
     for k in range(K):
-          dx = np.sqrt( var[k,0]); dy = np.sqrt( var[k,1] )
-
           if pattern == "cross":
             hx = [ x - 0.5*dx,  x + 0.5*dx ]      
             hy = [ y,  y]
@@ -259,14 +259,14 @@ def drawPoints( ax, x, y, color='black', pattern="o" ):
             ax.plot( swx, swy, "-", color=color)
             ax.plot( nex, ney, "-", color=color)
             ax.plot( nwx, nwy, "-", color=color)
-          elif pattern == "show w":
+          elif pattern == "circle":
             # for k in range(K):
-            circle = patches.Circle(  (mu[k, 0], mu[k, 1]) , w[k]*cst, linewidth=1, edgecolor='black', facecolor=None, fill=False) 
+            circle = patches.Circle(  (x[k], y[k]) , dx, linewidth=1, edgecolor='black', facecolor=None, fill=False) 
                     # facecolor=c[r], 
             ax.add_patch(circle)
           else:
-          """
-    ax.plot( x, y, pattern, color=color, markersize=3 )
+           # ax.plot( x, y, pattern, color="white", markersize=5 )
+           ax.plot( x, y, pattern, color=color, markersize=3 )
             
     return
 
@@ -404,3 +404,40 @@ def drawPads0(ax, x0, y0, dx0, dy0, z, title="", yTitle="", alpha=1.0, doLimits=
     # ax.colorbar( )
     # ??? ig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax)
     return
+
+def getPad( x, y, dx, dy, mux, muy ):
+  eps = 10.0e-5
+  xInf = x - dx 
+  xSup = x + dx 
+  yInf = y - dy 
+  ySup = y + dy
+  maskX = np.bitwise_and( (xInf - eps) < mux, mux < (xSup +eps))
+  maskY = np.bitwise_and( (yInf - eps) < muy, muy < (ySup +eps))
+  mask = np.bitwise_and( maskX, maskY )
+  idx = np.where( mask) [0]
+  if (idx.size !=1):
+     print("getPad. several pads or 0", idx.size )
+  return idx[0]
+
+def spanMu( x, y, dx, dy, z, mux, muy, chId, cutOff ):
+  muIdx = getPad( x, y, dx, dy, mux, muy )
+  zMuMax = z[muIdx] 
+  xInfM = x - dx - mux
+  xSupM = x + dx - muy
+  yInfM = y - dy - muy
+  ySupM = y + dy - muy
+  f = np.max (tUtil.compute2DPadIntegrals( xInfM, xSupM, yInfM, ySupM, chId ))
+  zz = zMuMax/ f * tUtil.compute2DPadIntegrals( xInfM, xSupM, yInfM, ySupM, chId )
+  idx = ( zz > cutOff)
+  z = z[idx]
+  x = x[idx]
+  y = y[idx]
+  dx = dx[idx]
+  dy = dy[idx]
+  xMin = np.min( x - dx)
+  xMax = np.min( x + dx)
+  yMin = np.min( y - dy)
+  yMax = np.min( y + dy)
+  xWidth = 0.5*(xMin + xMax)
+  yWidth = 0.5*(yMin + yMax)
+  return xWidth, yWidth

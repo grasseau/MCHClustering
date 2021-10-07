@@ -18,6 +18,7 @@ typedef struct dataFit {
   double *zObs_ptr;
   Mask_t *notSaturated_ptr;
   double *cathWeights_ptr;
+  double *cathMax_ptr;
   int    chamberId;
   double *zCathTotalCharge_ptr;
   int    verbose;

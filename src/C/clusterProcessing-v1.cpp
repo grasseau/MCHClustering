@@ -698,7 +698,8 @@ int clusterProcess( const double *xyDxyi, const Mask_t *cathi, const Mask_t *sat
     // Merge Groups or cathode group
     // 
     padToMergedGrp = new short[nPads];
-    nMergedGrp = assignPadsToGroupFromProj( projPadToGrp, nProjPads, cath0ToPadIdx, cath1ToPadIdx, nGroups, nPads, padToMergedGrp);
+    short unusedProjGrpToMergedGrp[nGroups+1];
+    nMergedGrp = assignPadsToGroupFromProj( projPadToGrp, nProjPads, cath0ToPadIdx, cath1ToPadIdx, nGroups, nPads, padToMergedGrp,  unusedProjGrpToMergedGrp);
   } else {
     nProjGroups = getConnectedComponentsOfProjPads( projPadToGrp );
     wellSplitGroup = new short[nProjGroups+1];

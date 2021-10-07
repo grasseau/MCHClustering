@@ -4,8 +4,15 @@
 
 import numpy as np
 import numpy.random as npr
-import C.PyCWrapper as PCWrap
+# import C.PyCWrapper as PCWrap
+# import LaplacianProj.PyCWrapper as PCWrap
+import O2_Clustering.PyCWrapper as PCWrap
 import pickle
+
+cstSigXCh1ToCh2 = 0.1690;    
+cstSigYCh1ToCh2 = 0.1738;
+cstSigXCh3ToCh10 = 0.1978 ;
+cstSigYCh3ToCh10 = 0.2024;
 
 class SimulCluster:
   fileName = "sEvent.obj"
@@ -228,6 +235,30 @@ def asTheta( w, muX, muY, varX=None, varY=None):
   theta[4*K:5*K] = w
   return theta
 
+def setThetaVar( theta,  a, chId):
+  K = int(theta.size / 5 )
+  w = np.zeros((K))
+  muX = np.zeros((K))
+  muY = np.zeros((K))
+  varX = np.zeros((K))
+  varY = np.zeros((K))
+  #
+  varX = theta[0*K:1*K]
+  varY = theta[1*K:2*K]
+  muX = theta[2*K:3*K]
+  muY = theta[3*K:4*K]
+  w = theta[4*K:5*K]
+  if (chId < 3): 
+    varX = a * a * cstSigXCh1ToCh2 * cstSigXCh1ToCh2
+    varY = a * a * cstSigYCh1ToCh2 * cstSigYCh1ToCh2
+  else:
+    varX = a * a * cstSigXCh3ToCh10 * cstSigXCh3ToCh10
+    varY = a * a * cstSigYCh3ToCh10 * cstSigYCh3ToCh10
+    
+  theta_ = asTheta(w, muX, muY, varX, varY)
+      
+  return theta_
+
 def thetaAsWMuVar( theta):
   K = int(theta.size / 5 )
   w = np.zeros((K))
@@ -298,6 +329,7 @@ def compute2DPadIntegrals( xInf, xSup, yInf, ySup, chId ):
     xyInfSup[3*N:4*N] = ySup[:]
     z = PCWrap.compute2DPadIntegrals( xyInfSup, chId )
     return z
+
 
 def buildPreCluster( w, muX, muY, xyDxDy0, xyDxDy1, chId, minRatioCh, maxRatioCh):
   #

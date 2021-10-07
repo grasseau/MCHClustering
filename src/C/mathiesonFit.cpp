@@ -19,6 +19,7 @@ int f_ChargeIntegral( const gsl_vector *gslParams, void *dataFit, gsl_vector *re
   Mask_t *notSaturated = dataPtr->notSaturated_ptr;
   int chamberId = dataPtr->chamberId;
   double *cathWeights      = dataPtr->cathWeights_ptr;
+  double *cathMax      = dataPtr->cathMax_ptr;
   double *zCathTotalCharge = dataPtr->zCathTotalCharge_ptr;
   int verbose = dataPtr->verbose;
   // Parameters
@@ -85,9 +86,11 @@ int f_ChargeIntegral( const gsl_vector *gslParams, void *dataFit, gsl_vector *re
   // Normalize each cathodes
   double sumNormalizedZ[2];
   for (int i=0; i < N; i++) {
-      if (cath[i]==0) sumNormalizedZ[0] += notSaturated[i] * z[i];
-      else sumNormalizedZ[1] += notSaturated[i]*z[i];
+    if (cath[i]==0) sumNormalizedZ[0] += notSaturated[i] * z[i];
+    else sumNormalizedZ[1] += notSaturated[i]*z[i];
   }
+  if (0 ) {
+  // Normalize with the charge sum
   double var[2] = { 1.0/sumNormalizedZ[0], 1./sumNormalizedZ[1] };
   for (int i=0; i < N; i++) {
       if (cath[i]==0) z[i] = z[i] * var[0]; 
@@ -99,6 +102,19 @@ int f_ChargeIntegral( const gsl_vector *gslParams, void *dataFit, gsl_vector *re
   vectorMultVector( z, cathWeights, N, z);
   // vectorMultScalar( z, 2.0/sumNormalizedZ, N, z);
 
+  } else {
+  // Normalize with the max
+  double maxThZ[2];
+  for (int i=0; i < N; i++) {
+    maxThZ[cath[i]] = fmax( maxThZ[cath[i]], notSaturated[i] * z[i]);
+  }
+  double var[2] = {cathMax[0]/maxThZ[0], cathMax[1]/maxThZ[1] };
+  for (int i=0; i < N; i++) {
+    z[i] = z[i] * var[cath[i]]; 
+  }
+  }
+
+  
   // ??? why abs value for penalties
   double wPenal = abs( 1.0 - vectorSum( w, K-1 ) + lastW);
   // Not Used: zPenal
@@ -228,10 +244,13 @@ void fitMathieson( double *thetai,
   
   // Init the weights
   double cathWeights[N];
+  double cathMax[2] = { 0.0, 0.0};
   for (int i=0; i < N; i++) {
     cathWeights[i] = (cath[i] == 0) ? zCathTotalCharge[0] : zCathTotalCharge[1];
+    cathMax[cath[i]] = fmax( cathMax[cath[i]], z[i] ); 
   } 
   mathiesonData.cathWeights_ptr = cathWeights;
+  mathiesonData.cathMax_ptr = cathMax;
   mathiesonData.chamberId = chamberId;
   mathiesonData.zCathTotalCharge_ptr = zCathTotalCharge;
   mathiesonData.verbose = verbose;

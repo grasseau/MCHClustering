@@ -458,6 +458,8 @@ def setMathiesonVarianceApprox( chId, theta):
   CLib.setMathiesonVarianceApprox(chId, theta, K)
 
 def collectTheta( K ):
+  if (K==0): 
+    return (np.zeros( 0 ), np.zeros( 0 ))
   theta = np.zeros( K*5)
   thetaInGrp = np.zeros( K, dtype=np.int16)
   CLib.collectTheta( theta, thetaInGrp, K)
@@ -516,5 +518,5 @@ def collectThetaEMFinal():
   return thetaf
   
 def freeMemoryPadProcessing():
-  CLib.freeMemoryPadProcessing
+  CLib.freeMemoryPadProcessing()
   return

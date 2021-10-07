@@ -317,7 +317,7 @@ def getConnexComponents( xi, yi, dxi, dyi ):
     neighs = getFirstNeighbours( xi, yi, dxi, dyi )
     # print("neighs", neighs)
     while nextGrp:
-      print( "NEW Group", grpId, grp)
+      # print( "NEW Group", grpId, grp)
       k = np.argmax( grp == 0 )
       grp[k] = grpId
       nList = np.array( neighs[k] )
@@ -351,7 +351,7 @@ def getConnexComponents( xi, yi, dxi, dyi ):
       else:
         n += 1
     """
-    print("# of Groups ", n, grp)
+    print("getConnexComponents: # of Groups , padToGrp ", n, grp)
     return n, grp 
 
 def getFirstNeighboursInOneDir( x, y, dx, dy):
@@ -368,6 +368,63 @@ def getFirstNeighboursInOneDir( x, y, dx, dy):
       neighJ.append( np.where( np.bitwise_and(xMask1, yMask1) )[0])
       #
     return neighI, neighJ
+
+def addBoundaryPads( x, y, dx, dy, q ):
+    eps = 1.0e-4
+    neigh = getFirstNeighbours( x, y, dx, dy )
+    newX = list( np.copy(x) ) 
+    newY = list( np.copy(y) ) 
+    newDX = list( np.copy(dx) ) 
+    newDY = list( np.copy(dy) ) 
+    newQ = list( np.copy(q) ) 
+    for i in range( x.shape[0]):
+      east = True; west = True; north = True; south = True
+      for v in neigh[i]:
+        xDelta = (x[v] - x[i])
+        if abs(xDelta) > eps:
+          if xDelta > 0:
+            east = False
+          else:
+            west = False
+        yDelta = (y[v] - y[i])
+        if abs(yDelta) > eps:
+          if yDelta > 0:
+            north = False
+          else:
+            south = False        
+      # Add new pads
+      if east :
+        newX.append( x[i]+2*dx[i])
+        newY.append( y[i])
+        newDX.append( dx[i])
+        newDY.append( dy[i])
+        newQ.append( 0.0 )
+      if west:
+        newX.append( x[i]-2*dx[i])
+        newY.append( y[i])
+        newDX.append( dx[i])
+        newDY.append( dy[i])
+        newQ.append( 0.0 )
+      if north:
+        newX.append( x[i])
+        newY.append( y[i]+2*dy[i])
+        newDX.append( dx[i])
+        newDY.append( dy[i])
+        newQ.append( 0.0 )
+      if south:
+        newX.append( x[i])
+        newY.append( y[i]-2*dy[i])
+        newDX.append( dx[i])
+        newDY.append( dy[i])
+        newQ.append( 0.0 )
+
+    newX = np.array( newX )
+    newY = np.array( newY )
+    newDX = np.array( newDX )
+    newDY = np.array( newDY )
+    newQ = np.array( newQ )
+    #
+    return newX, newY, newDX, newDY, newQ
 
 def getFirstNeighbours( x, y, dx, dy ):
     eps = 1.0e-5
@@ -396,6 +453,45 @@ def getFirstNeighbours( x, y, dx, dy ):
     
     return neigh
 
+def getFirstNeighboursWithDiag1( x, y, dx, dy ):
+    eps = 1.0e-4
+    neigh = []
+    for i in range( x.shape[0]):
+        # 9 neighbors
+        # 25 neighbors
+        xMask0 = np.abs( x[i] - x ) <= (dx[i] + dx + eps) 
+        yMask0 = np.abs( y[i] - y ) <= (dy[i] + dy + eps) 
+
+        neigh.append( np.where( np.bitwise_and( xMask0, yMask0)) [0] ) 
+    
+    return neigh
+
+def getFirstNeighboursWithDiag15( x, y, dx, dy ):
+    eps = 1.0e-4
+    neigh = []
+    for i in range( x.shape[0]):
+        # 9 neighbors
+        # 25 neighbors
+        xMask0 = np.abs( x[i] - x ) <= (2*dx[i] + dx + eps) 
+        yMask0 = np.abs( y[i] - y ) <= (2*dy[i] + dy + eps) 
+
+        neigh.append( np.where( np.bitwise_and( xMask0, yMask0)) [0] ) 
+    
+    return neigh
+
+def getFirstNeighboursWithDiag2( x, y, dx, dy ):
+    eps = 1.0e-4
+    neigh = []
+    for i in range( x.shape[0]):
+        # 9 neighbors
+        # 25 neighbors
+        xMask0 = np.abs( x[i] - x ) <= (3*dx[i] + dx + eps) 
+        yMask0 = np.abs( y[i] - y ) <= (3*dy[i] + dy + eps) 
+
+        neigh.append( np.where( np.bitwise_and( xMask0, yMask0)) [0] ) 
+    
+    return neigh
+
 def getFirstCrossNeighbours( x, y, dx, dy ):
     eps = 1.0e-7
     neigh = []
@@ -417,6 +513,336 @@ def getFirstCrossNeighbours( x, y, dx, dy ):
     
     return neigh
 
+""" Neighbouring of locMax """
+def simpleLaplacian2D( xyDxy, z ):
+    charge = []
+    chBaryX = []
+    chBaryY = []
+    locMaxIdx = []
+    (u, v, du, dv) = uData.asXYdXdY( xyDxy )  
+    
+    eps = 1.0e-7
+    noise = 0
+    cutoff = noise 
+    atLeastOneMax = -1
+    # noise = 0
+    neigh = getFirstNeighbours(u, v, du, dv)
+    neigh2 = getFirstNeighboursWithDiag(u, v, du, dv)
+    #
+    # Laplacian in u direction
+    nPads = u.size
+    lapl = np.ones( u.size ) * (-1)
+    alreadySelect = np.zeros( u.size )
+    # qLissed = np.zeros( u.size )
+    boundery = np.zeros( u.size )
+    for i in range (u.size):
+      neighI = neigh[i]
+      # print("neighI", neighI)
+      # lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise) * unSelected[neighI])) / ( neighI.size)
+      lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)
+      mag = ( 5*z[i] - np.sum( z[neighI] ) ) 
+      # qLissed[i] =  np.sum( z[neighI] ) / neighI.size
+      if ( z[i] < cutoff ):
+        lapl[i] = 0;
+      # print("i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+      if (lapl[i] >= 1.0 ):
+        print("i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+        ch = 0; locX = 0; locY = 0; 
+        for ne in neigh2[i]:
+          ch += z[ne]
+          locX += u[ne] * z[ne]
+          locY += v[ne] * z[ne] 
+          # print("i, neigh2, x/y/z[i], alreadySelect[ne]", u[ne], v[ne], z[ne], alreadySelect[ne])
+
+          if not alreadySelect[ne]:
+            locMaxIdx.append(ne)
+            alreadySelect[ne] = 1
+        # print("Add local max", i, lapl[i])
+        charge.append( ch )
+        chBaryX.append( locX / ch )
+        chBaryY.append( locY / ch )
+      # print("i, neighI, z[i], lapl[i]", i, z[i], neighI, lapl[i])
+    # 
+    #
+
+    # print("Laplacian lapl", lapl)
+    # print("Laplacian qLissed", qLissed)
+    # locMaxIdx = np.where( lapl >= 1.0 )[0]
+    
+    return locMaxIdx, np.asarray( charge), np.asarray(chBaryX), np.asarray(chBaryY)
+
+""" Neighbouring of locMax """
+def expandOnLocalMax( xyDxy, z, hard=True ):
+    q = []
+    x = []
+    y = []
+    dx = []
+    dy = []
+    # Select max and neighbours
+    pixIdxSelected = []
+    locMaxIdx = []
+    (u, v, du, dv) = uData.asXYdXdY( xyDxy )  
+    
+    eps = 1.0e-7
+    noise = 0
+    cutoff = noise 
+    atLeastOneMax = -1
+    # noise = 0
+    neigh = getFirstNeighbours(u, v, du, dv)
+    #
+    # Laplacian in u direction
+    nPads = u.size
+    lapl = np.ones( u.size ) * (-1)
+    alreadySelect = np.zeros( u.size )
+    # qLissed = np.zeros( u.size )
+    boundery = np.zeros( u.size )
+    for i in range (u.size):
+      neighI = neigh[i]
+      # print("neighI", neighI)
+      # lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise) * unSelected[neighI])) / ( neighI.size)
+      # lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)
+      lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)
+          
+      mag = ( 5*z[i] - np.sum( z[neighI] ) ) 
+      # qLissed[i] =  np.sum( z[neighI] ) / neighI.size
+      if ( z[i] < cutoff ):
+        lapl[i] = 0;
+      #  print("i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+      if (lapl[i] >= 1.0 ) and neighI.size != 5:
+        x.append( u[i] )
+        y.append( v[i] )
+        dx.append( du[i] )
+        dy.append( dv[i] )
+        q.append( z[i] )
+        for k in range(-1, 2, 2):
+          x.append( u[i]+2*k*du[i] )
+          y.append( v[i] )
+          dx.append( du[i] )
+          dy.append( dv[i] )
+          q.append( z[i]*0.5 )
+        for k in range(-1, 2, 2):
+          x.append( u[i] )
+          y.append( v[i]+2*k*dv[i] )
+          dx.append( du[i] )
+          dy.append( dv[i] )
+          q.append( z[i]*0.5 )
+      else:
+        for ne in neigh[i]:
+          x.append( u[ne] )
+          y.append( v[ne] )
+          dx.append( du[ne] )
+          dy.append( dv[ne] )
+          q.append( z[ne] )          
+        # print("i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+      # print("i, neighI, z[i], lapl[i]", i, z[i], neighI, lapl[i])
+    # 
+    #
+
+    # print("Laplacian lapl", lapl)
+    # print("Laplacian qLissed", qLissed)
+    # pixIdxSelected = np.where( lapl >= 1.0 )[0]
+    q = np.asarray( q )
+    x = np.asarray( x )
+    y = np.asarray( y )
+    dx = np.asarray( dx )
+    dy = np.asarray( dy )
+    return q, x, y, dx, dy
+
+""" Neighbouring of locMax """
+def clipOnLocalMax( xyDxy, z, hard=True ):
+    charge = []
+    chBaryX = []
+    chBaryY = []
+    dxLoc = []
+    dyLoc = []
+    # Select max and neighbours
+    pixIdxSelected = []
+    locMaxIdx = []
+    (u, v, du, dv) = uData.asXYdXdY( xyDxy )  
+    
+    eps = 1.0e-7
+    noise = 0
+    cutoff = noise 
+    atLeastOneMax = -1
+    # noise = 0
+    neigh = getFirstNeighbours(u, v, du, dv)
+    neigh1 = getFirstNeighboursWithDiag1(u, v, du, dv)
+    neigh2 = getFirstNeighboursWithDiag2(u, v, du, dv)
+    if hard :
+      neigh12 = neigh1
+    else:
+      neigh12 = neigh2
+        
+    #
+    # Laplacian in u direction
+    nPads = u.size
+    lapl = np.ones( u.size ) * (-1)
+    alreadySelect = np.zeros( u.size )
+    # qLissed = np.zeros( u.size )
+    boundery = np.zeros( u.size )
+    for i in range (u.size):
+      neighI = neigh[i]
+      # print("neighI", neighI)
+      # lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise) * unSelected[neighI])) / ( neighI.size)
+      # lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)
+      """
+      if hard:
+        lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / 5
+      else:
+        lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)
+      """
+      lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)      
+      mag = ( 5*z[i] - np.sum( z[neighI] ) ) 
+      if ( z[i] < cutoff ):
+        lapl[i] = 0;
+      #  print("i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+      if (lapl[i] >= 1.0 ):
+        locMaxIdx.append( i )
+        ch = 0; locX = 0; locY = 0; 
+        print("Local Max : i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+        for ne in neigh12[i]:
+        # for ne in neigh1[i]:
+          ch += z[ne]
+          locX += u[ne] * z[ne]
+          locY += v[ne] * z[ne]
+          # print("i, neigh2, x/y/z[i], alreadySelect[ne]", u[ne], v[ne], z[ne], alreadySelect[ne])
+
+          if not alreadySelect[ne]:
+            pixIdxSelected.append(ne)
+            alreadySelect[ne] = 1
+        # print("Add local max", i, lapl[i])
+        charge.append( ch )
+        chBaryX.append( locX / ch )
+        chBaryY.append( locY / ch )
+        dxLoc.append( du[i] )
+        dyLoc.append( dv[i] )
+      # print("i, neighI, z[i], lapl[i]", i, z[i], neighI, lapl[i])
+    # 
+    #
+
+    # print("Laplacian lapl", lapl)
+    # print("Laplacian qLissed", qLissed)
+    # pixIdxSelected = np.where( lapl >= 1.0 )[0]
+    
+    return (pixIdxSelected, locMaxIdx, np.asarray( charge), np.asarray(chBaryX), np.asarray(chBaryY), 
+           np.asarray( dxLoc),  np.asarray( dyLoc) )
+
+""" Neighbouring of locMax """
+def clipOnLocalMax1( xyDxy, z, hard=True ):
+    charge = []
+    chBaryX = []
+    chBaryY = []
+    dxLoc = []
+    dyLoc = []
+    # Select max and neighbours
+    pixIdxSelected = []
+    locMaxIdx = []
+    (u, v, du, dv) = uData.asXYdXdY( xyDxy )  
+    
+    eps = 1.0e-7
+    noise = 0
+    cutoff = noise 
+    atLeastOneMax = -1
+    # noise = 0
+    neigh = getFirstNeighbours(u, v, du, dv)
+    neigh1 = getFirstNeighboursWithDiag1(u, v, du, dv)
+    neigh2 = getFirstNeighboursWithDiag2(u, v, du, dv)
+    if hard :
+      neigh12 = neigh1
+    else:
+      neigh12 = neigh2
+        
+    #
+    # Laplacian in u direction
+    nPads = u.size
+    lapl = np.ones( u.size ) * (-1)
+    alreadySelect = np.zeros( u.size )
+    # qLissed = np.zeros( u.size )
+    boundery = np.zeros( u.size )
+    for i in range (u.size):
+      neighI = neigh[i]
+      # print("neighI", neighI)
+      # lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise) * unSelected[neighI])) / ( neighI.size)
+      # lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)
+      """
+      if hard:
+        lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / 5
+      else:
+        lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)
+      """
+      lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise)) ) / ( neighI.size)      
+      mag = ( 5*z[i] - np.sum( z[neighI] ) ) 
+      if ( z[i] < cutoff ):
+        lapl[i] = 0;
+      #  print("i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+      if (lapl[i] >= 1.0 ):
+        locMaxIdx.append( i )
+      """
+      if (lapl[i] >= 1.0 ):
+        locMaxIdx.append( i )
+        ch = 0; locX = 0; locY = 0; 
+        print("Local Max : i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+        for ne in neigh12[i]:
+        # for ne in neigh1[i]:
+          ch += z[ne]
+          locX += u[ne] * z[ne]
+          locY += v[ne] * z[ne]
+          # print("i, neigh2, x/y/z[i], alreadySelect[ne]", u[ne], v[ne], z[ne], alreadySelect[ne])
+
+          if not alreadySelect[ne]:
+            pixIdxSelected.append(ne)
+            alreadySelect[ne] = 1
+        # print("Add local max", i, lapl[i])
+        charge.append( ch )
+        chBaryX.append( locX / ch )
+        chBaryY.append( locY / ch )
+        dxLoc.append( du[i] )
+        dyLoc.append( dv[i] )
+      """
+      # print("i, neighI, z[i], lapl[i]", i, z[i], neighI, lapl[i])
+    x = u[ locMaxIdx ]
+    y = v[ locMaxIdx ]
+    dx = du[ locMaxIdx ]
+    dy = dv [ locMaxIdx ]
+    qMax = z[locMaxIdx ]
+    nMax = len(locMaxIdx)
+    print( "??? qMax", qMax)
+    idx = np.argsort( -qMax )
+    print( "??? idx", idx)
+    mask  = np.ones ( nMax )
+    wNew  = np.zeros( nMax )
+    xNew  = np.zeros( nMax )
+    yNew  = np.zeros( nMax )
+    dxNew = np.zeros( nMax )
+    dyNew = np.zeros( nMax )    
+    neighLocMax = getFirstNeighboursWithDiag2( x, y, dx, dy)
+    for k in idx:
+      print( "??? z sort", qMax[ k ])
+      v = neighLocMax[k]
+      print("  ??? v", v)
+      if mask[k]:
+        wNew[k] = np.sum( qMax[v] * mask[v] )
+        print( "  wNew[k]", wNew[k] )
+        xNew[k] = np.sum( x[v] * mask[v] * qMax[v] )
+        yNew[k] = np.sum( y[v] * mask[v] * qMax[v] )
+        xNew[k] = xNew[k] / wNew[k] 
+        yNew[k] = yNew[k] / wNew[k] 
+        dxNew[k] = dx[k] 
+        dyNew[k] = dy[k] 
+        mask[v] = 0
+      else :
+        print( "  wNew[k]", wNew[k] )
+
+    # 
+    #
+
+    # print("Laplacian lapl", lapl)
+    # print("Laplacian qLissed", qLissed)
+    # pixIdxSelected = np.where( lapl >= 1.0 )[0]
+    
+    return (pixIdxSelected, locMaxIdx, np.asarray( wNew), np.asarray(xNew), np.asarray(yNew), 
+           np.asarray( dxNew),  np.asarray( dyNew) )
+           
 def laplacian2D( xyDxy, z ):
     (u, v, du, dv) = uData.asXYdXdY( xyDxy )  
     
@@ -679,6 +1105,305 @@ def laplacian1DOld( xyDxy, z ):
     print("locMax",locMax )
     return locMax
 
+def findLocalMaxOnPixels( pixTheta):
+    eps = 1.0e-7
+    noise = 0.1
+    cutoff = 0.1 
+    localMax = []
+    (z, u, v, du, dv) = uData.thetaAsWMuVar( pixTheta )  
+    neigh = getFirstNeighbours(u, v, du, dv)
+    #
+    # True Laplacian
+    nPads = u.size
+    # lapl = np.ones( u.size ) * (-1)
+    lapl = np.zeros( u.size )
+    # unSelected = np.ones( u.size )
+    # qLissed = np.zeros( u.size )
+    # boundery = np.zeros( u.size )
+    for i in range (u.size):
+      neighI = neigh[i]
+      # print("neighI", neighI)
+      # lapl[i] =  np.sum( z[neighI] <= ((z[i] + noise) * unSelected[neighI])) / ( neighI.size)
+      #
+      # factor 5 because i belong to neigh[i] list
+      # lapl[i] = 0.25 *( 5*z[i] - np.sum( z[neighI] ) 
+      # 
+      # Factor 0.25 = 1/5 (i is in the neigh list) - imply a penality on the egdes
+      if ( z[i] > cutoff):
+        lapl[i] =  np.sum( z[neighI] <= (z[i] - noise)) * 0.25
+        if (lapl[i] > 0.99):
+          localMax.append( i )
+          print("i, neighI, z[i], lapl[i]", i, z[i], neighI, lapl[i])
+    idx = np.array( localMax, dtype=np.int )
+    newZ = z[idx]
+    newMuX = u[idx]      
+    newMuY = v[idx] 
+    newVarX = du[idx]      
+    newVarY = dv[idx]   
+    # Approximate weight and location
+    sumCharge = np.zeros( idx.size )
+    for k, idx in enumerate(idx):
+        
+      for v in neigh[idx]:
+        sumCharge[k] += z[ v ]
+    print("sumCharge", np.sum(sumCharge), sumCharge)
+    
+    newTheta = uData.asTheta( newZ, newMuX, newMuY, newVarX, newVarY)
+    return newTheta, idx
+
+def findLocalMaxOnThe2Cath( xyDxy0, xyDxy1, q0, q1 ):
+    eps = 1.0e-8
+    localMaxIdx = []
+    localXMax = []
+    localYMax = []
+
+    (x0, y0, dx0, dy0) = uData.asXYdXdY( xyDxy0 )  
+    (x1, y1, dx1, dy1) = uData.asXYdXdY( xyDxy1 )
+    (xProj, yProj , dxProj, dyProj, qProj0, qProj1, mapIJToK, mapKToIJ, interIJ, interJI) = \
+      shorteningPads( x0, y0, dx0, dy0, q0, x1, y1, dx1, dy1, q1)
+
+    maxCath0, q0LissedLocMax, q0Liss = laplacian2D( xyDxy0, q0)
+    maxCath1, q1LissedLocMax, q1Liss = laplacian2D( xyDxy1, q1)
+    
+    print("findLocalMax q0", q0)
+    print("findLocalMax q1", q1)
+    print("findLocalMax maxCath0", maxCath0)
+    print("findLocalMax maxCath1", maxCath1)
+
+    # input("next")
+
+    # Sort the local max
+    locMaxVal0 = q0Liss[maxCath0]
+    locMaxVal1 = q1Liss[maxCath1]
+    idx0 = np.argsort( -locMaxVal0 ) 
+    idx1 = np.argsort( -locMaxVal1 ) 
+    maxCath0 = maxCath0[idx0]
+    maxCath1 = maxCath1[idx1]
+    q0LissedLocMax = q0LissedLocMax[idx0]
+    q1LissedLocMax = q1LissedLocMax[idx1]
+    print( "q0Liss", q0Liss)
+    print( "q1Liss", q1Liss)
+    print( locMaxVal0,  locMaxVal1)
+    print( "maxCath0", maxCath0)    
+    print( "maxCath1", maxCath1)    
+
+    # Select the cathode 
+    if maxCath0.size < maxCath1.size:
+      maxCathu = maxCath1
+      maxCathv = maxCath0
+      xu = x1; dxu = dx1
+      yu = y1; dyu = dy1
+      xv = x0; dxv = dx0
+      yv = y0; dyv = dy0
+      qu = q1Liss
+      qv = q0Liss
+      qvLissedLocMax = q0LissedLocMax
+      interUV = interJI
+      # qvAvailable = np.ones( q0.size )
+      order = "Cath1 / Cath0"
+      cath0CathU = False
+    elif maxCath1.size < maxCath0.size:
+      maxCathu = maxCath0
+      maxCathv = maxCath1
+      xu = x0; dxu = dx0
+      yu = y0; dyu = dy0
+      xv = x1; dxv = dx1
+      yv = y1; dyv = dy1
+      # qu = q0
+      qu = q0Liss
+      qv = q1Liss
+      qvLissedLocMax = q1LissedLocMax
+      interUV = interIJ
+      # qvAvailable = np.ones( q1.size )
+      order = "Cath1 / Cath0"
+      cath0CathU = True
+    else:
+      # Same numer of loc max on both cath
+      # Choose the max of the last loc. max.
+      n = maxCath0.size
+      if (maxCath0[-1] < maxCath1[-1]):
+        maxCathu = maxCath1
+        maxCathv = maxCath0
+        xu = x1; dxu = dx1
+        yu = y1; dyu = dy1
+        xv = x0; dxv = dx0
+        yv = y0; dyv = dy0
+        qu = q1Liss
+        qv = q0Liss
+        qvLissedLocMax = q0LissedLocMax
+        interUV = interJI
+        # qvAvailable = np.ones( q0.size )
+        order = "Cath1 / Cath0, equal nbr"        
+        cath0CathU = False
+      else:
+        maxCathu = maxCath0
+        maxCathv = maxCath1
+        xu = x0; dxu = dx0
+        yu = y0; dyu = dy0
+        xv = x1; dxv = dx1
+        yv = y1; dyv = dy1
+        qu = q0Liss
+        qv = q1Liss
+        qvLissedLocMax = q1LissedLocMax
+        interUV = interIJ
+        # qvAvailable = np.ones( q1.size )
+        order = "Cath0 / Cath1, equal nbr "
+        cath0CathU = True
+    #
+    qvAvailable = np.ones( maxCathv.size )
+
+    print( "findLocalMax cath0/1.size", maxCath0.size, maxCath1.size)
+    print( "findLocalMax order", order)      
+    #
+    for ii,i in enumerate(maxCathu):
+      print( "MaxCatU ", ii+1, "/", maxCathu.size, ", index=", i)
+      print("qu", qu)
+      print("qAvail", qvAvailable)
+
+      # print("??? interIJ[i]", interUV[i] )
+      interU = set( interUV[i] )
+      inter = interU & set( maxCathv )
+      # print("interU", interU)
+      # print("set( maxCathv )", set( maxCathv ))
+      # print("inter", inter)
+      #
+      # Build the set of pad index wich are in  maxCathv
+      maxValue = 0.0
+      j = -1
+      maxCathvIdx = -1
+      print(" maxCathv", maxCathv)
+      print(" qvLissedLocMax", qvLissedLocMax)
+      print(" qv[ maxCathv]", qv[ maxCathv])
+      for ii in inter:
+        idx = np.where(maxCathv == ii)[0]
+        if idx.size == 1: 
+          iii =idx[0]
+          val = qvLissedLocMax[iii] * qvAvailable[iii]
+          if ( val > maxValue):
+            maxValue = val
+            maxCathvIdx = iii
+            # pad index
+            j =  maxCathv[iii]
+
+        # idx.append( np.where(maxCathv == ii)[0])
+        # idx_size = idx_size + np.where(maxCathv == ii)[0].size
+      print("  maxCathvIdx, maxValue, maxCathv[maxCathvIdx]", maxCathvIdx, maxValue, j ) 
+      print("  maxCathvIdx maxCathv", maxCathvIdx, maxCathv )
+      # Take the maximum
+      """
+      if idx_size > 0:
+        idx = np.hstack( idx )
+        print("idx maxCathv", idx, maxCathv )
+        # print( " ", interUV[j])
+        print("  Max possible in maxCathv[idx]", maxCathv[idx] )
+        maxIdx = np.argmax( qvLissedLocMax[idx] * qvAvailable[idx] )
+        print( "  maxIdx", maxIdx)
+        print("maxCathv[idx][maxIdx]", maxCathv[idx[maxIdx]])
+        print("   max possible Valuex",  qvLissedLocMax[idx] * qvAvailable[idx] )
+        maxValue = (qvLissedLocMax[idx] * qvAvailable[idx])[maxIdx]
+        print("   max value", (qvLissedLocMax[idx] * qvAvailable[idx])[maxIdx])
+        print("   max index", (maxCathv[idx][maxIdx]))
+        print("   max index", (maxCathv[idx[maxIdx]]))
+        j = maxCathv[idx[maxIdx]]
+        verifIdx = np.where(  qvLissedLocMax == maxValue)[0]
+        print("verifIdx", verifIdx)
+        # maxIdx = idx[maxIdx]
+        maxIdx = verifIdx[0]
+        print("  found max in Cathv", maxIdx, maxCathv)
+        print("  qv",  qv)
+      """
+      # if idx_size > 0 and qvAvailable[maxIdx] != 0:
+      if j != -1:
+        #print("  selected max in Cathv", maxIdx, maxCathv)
+        # j = maxCathv [ maxIdx ]
+        print("    i,j", i, j)
+        # Mapping found between the two cathode
+        if cath0CathU:
+          k = mapIJToK[(i, j)]
+        else:
+          k = mapIJToK[(j, i)]
+            
+        localXMax.append( xProj[k] )
+        localYMax.append( yProj[k] )
+        qvAvailable[ maxCathvIdx ] = 0
+      else:
+        print("Approximate solution")
+        idx = interUV[i]
+        if xv.size != 0 and len(idx) !=0:
+          if (dxu[i] < dyu[i]):
+            print("??? xv yv", xv, yv, dyv, idx)
+            vMin = np.min( yv[idx] - dyv[idx] )
+            vMax = np.max( yv[idx] + dyv[idx] )
+            localXMax.append( xu[i] )
+            localYMax.append( 0.5*(vMin+vMax) )
+            # localYMax.append( yu[i] )
+          else:
+            vMin = np.min( xv[idx] - dxv[idx] )
+            vMax = np.max( xv[idx] + dxv[idx] )
+            localXMax.append( 0.5*(vMin+vMax) )
+            localYMax.append( yu[i] )
+        else:
+          # No loc. max in cathv
+          localXMax.append( xu[i] )
+          localYMax.append( yu[i] )
+
+            # localXMax.append(  )
+        """
+        if np.sum( maskUiV ) != 0:
+        # Have an intersection with other Loc Max
+          for j, m in enumerate(maskUiV):
+            # j = 0
+            # m = maskUiV[0]
+            if m :
+              localMaxIdx.append( (i, maxCathv[j]) )
+              x = 0.5 * (xSup[j] + xInf[j])
+              y = 0.5 * (ySup[j] + yInf[j])
+              localXMax.append( x )
+              localYMax.append( y )
+              # print("??? maxCathv, qvAvailable.size", maxCathv, i, qvAvailable.size)
+              print( "new seed with loc. max", x, y)
+              qvAvailable[ maxCathv[j] ] = 0 
+              mm = np.ones( maxCathv.size )
+              mm[j] = 0 
+              maxCathv = maxCathv[ mm == 1]
+              break
+        else:
+          # No intersection with loc Max, find an
+          # other possible maximun:
+          # - no already chosen as loc Max, and 
+          # - intersecting i loc max
+          #
+          # print("InterIJ", interUV[i] )
+          # print( "qv", qv)
+          interuv = np.zeros( qv.size )
+          # Set all intersection with i loc Max
+          interuv[interUV[i]] = 1
+          idx = np.argsort( - qv * qvAvailable * interuv)
+          print( "qv filtered", qv * qvAvailable * interuv)
+          for ii in idx[0:1]:
+            if dxu[i] < dxv[ii]:
+              x = xu[i]; y = yv[ii];
+            else:
+              x = xv[ii]; y = yu[i];
+            localXMax.append( x )
+            localYMax.append( y )
+            print( "new seed with a max", x, y, dxv[ii], dyv[ii], qv[ii])
+            qvAvailable[ ii ] = 0 
+          
+          # input("next")
+        """
+        #
+    #
+    # Process to unselected maxCathv
+    for l, todo in enumerate(qvAvailable):
+      if todo:
+        localXMax.append( xv[ maxCathv[l] ] )
+        localYMax.append( yv[ maxCathv[l] ] )        
+        
+    x = np.array( localXMax )
+    y = np.array( localYMax )
+    return ( x, y)
+
 def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
     eps = 1.0e-8
     localMaxIdx = []
@@ -931,7 +1656,7 @@ def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
     x = np.array( localXMax )
     y = np.array( localYMax )
     return ( x, y)
-    
+
 def findLocalMax0( xyDxy0, xyDxy1, q0, q1 ):
     eps = 1.0e-8
     localMaxIdx = []

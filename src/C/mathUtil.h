@@ -4,6 +4,9 @@
 # include <math.h>
 # include <float.h>
 # include <stddef.h>
+#include <climits>
+#include <algorithm>
+
 
 typedef short Mask_t;
 
@@ -63,6 +66,14 @@ inline static double vectorMin( const double *u, int N) {
 
 inline static double vectorMax( const double *u, int N) { 
   double res = -DBL_MAX; for (int i=0; i < N; i++) res = fmax(res, u[i]); return res; }
+
+inline static short vectorMaxShort( const short *u, int N) { 
+  short res = SHRT_MIN; for (int i=0; i < N; i++) res = std::max(res, u[i]); return res; }
+
+inline static int vectorArgMax( const double *u, int N) { 
+  int idx = -1; double maxVal = DBL_MIN; for (int i=0; i < N; i++) { if( u[i] > maxVal) { maxVal = u[i]; idx = i;} }
+  return idx;
+}
 //
 // Logical operations
 //
@@ -81,10 +92,10 @@ inline static int vectorSumOfGreater( const double *src, double cmpValue, int N)
 inline static int vectorBuildMaskEqualShort( short *src, short value, int N, short *mask) {
     int count=0; for(int i=0; i < N; i++) { mask[i] = (src[i] == value); count += ((src[i] == value));} return count;}
 
-inline static void vectorBuildMaskGreater( double *src, double value, int N, short *mask) {
+inline static void vectorBuildMaskGreater( const double *src, double value, int N, short *mask) {
     for(int i=0; i < N; i++) { mask[i] = (src[i] > value); } return ;}
 
-inline static void vectorBuildMaskEqual( double *src, double value, int N, short *mask) {
+inline static void vectorBuildMaskEqual( const double *src, double value, int N, short *mask) {
     for(int i=0; i < N; i++) { mask[i] = (src[i] == value); } return ;}
 
 inline static int vectorGetIndexFromMaskInt( const Mask_t *mask, int N, int *indexVector ) { 
@@ -103,7 +114,7 @@ inline static int vectorGatherShort( const short *v, const Mask_t *mask, int N, 
 inline static int vectorScatter( const double *v, const Mask_t *mask, int N, double *scatterVec ) { 
   int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) scatterVec[i] = v[k++];} return k;}
 
-      inline static int vectorGetIndexFromMaskShort( const Mask_t *mask, int N, short *index ) { 
+inline static int vectorGetIndexFromMaskShort( const Mask_t *mask, int N, short *index ) { 
   int k=0;for (int i=0; i < N; i++) { if ( mask[i] ) index[k++] = i;} return k;}
 
 inline static int vectorGetIndexFromMask( const Mask_t *mask, int N, int *index ) { 
