@@ -11,8 +11,8 @@ import math
 
 # Cluster Processing
 #import LaplacianProj.PyCWrapper as PCWrap
-# import O2_Clustering.PyCWrapper as PCWrap
-import C.PyCWrapper as PCWrap
+import O2_Clustering.PyCWrapper as PCWrap
+# import C.PyCWrapper as PCWrap
 
 import Util.plot as uPlt
 import Util.dataTools as tUtil
@@ -137,19 +137,20 @@ def getHitsInTracks( ev, DEId ):
 
 def processPreCluster( pc, display=False, displayBefore=False ):
 
+  # Current Reco
   (id, pads, hits ) = pc
   ( bc, orbit, iROF, DEId, nbrOfPads) = id
   chId = DEId // 100
   ( xi, yi, dxi, dyi, chi, saturated, cathi, adc ) = pads
   (nHits, xr, yr, errX, errY, uid, startPadIdx, nPadIdx) = hits
   
-  print("###")
-  print("### New Pre Cluster bc=", bc,", orbit=", orbit, ", iROF=", iROF)
-  print("###")
+  print("[python] ###")
+  print("[python] ### New Pre Cluster bc=", bc,", orbit=", orbit, ", iROF=", iROF)
+  print("[python] ###")
   # Print cluster info
-  print("# DEIds", DEId)
-  print("# Nbr of pads:", xi.size)
-  print("# Nbr of pads per cathodes:", xi[cathi==0].size, xi[cathi==1].size)
+  print("[python] # DEIds", DEId)
+  print("[python] # Nbr of pads:", xi.size)
+  print("[python] # Nbr of pads per cathodes:", xi[cathi==0].size, xi[cathi==1].size)
   if ( xi.size > 800):
     idx = np.where( chi > 2.0)
     chi =chi[idx]
@@ -173,10 +174,10 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     sumCh1 = np.sum( chi[cathi==1]) ; 
     minCh1 = np.min( chi[cathi==1]);  
     maxCh1 = np.max( chi[cathi==1]);
-  print("# Total charge on cathodes", sumCh0, sumCh1)
-  print("# Min charge on cathodes", minCh0, minCh1 )
-  print("# Max charge on cathodes", maxCh0, maxCh1 )
-  print("# Saturated pads", np.sum( saturated))
+  print("[python] # Total charge on cathodes", sumCh0, sumCh1)
+  print("[python] # Min charge on cathodes", minCh0, minCh1 )
+  print("[python] # Max charge on cathodes", maxCh0, maxCh1 )
+  print("[python] # Saturated pads", np.sum( saturated))
   # print("# Calibrated pads", np.sum( preClusters.padCalibrated[ev][pc]))
   # xyDxy
   xyDxy = tUtil.padToXYdXY( xi, yi, dxi, dyi)
@@ -235,11 +236,12 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   #
   try:
     nbrHits = PCWrap.clusterProcess( xyDxy, cathi, saturated, chi, chId )
-    print("nbrHits", nbrHits)
+    print("[python] nbrHits", nbrHits)
     (thetaResult, thetaToGrp) = PCWrap.collectTheta( nbrHits)
-    print("Cluster Processing Results:")
-    print("  theta   :", thetaResult)
-    print("  thetaGrp:", thetaToGrp)
+    nbrOfGroups = np.max(thetaToGrp)
+    print("[python] Cluster Processing Results:")
+    print("[python]   theta   :", thetaResult)
+    print("[python]   thetaGrp:", thetaToGrp)
     # Returns the fit status
     (xyDxyResult, chResult, padToGrp) = PCWrap.collectPadsAndCharges()
     # print("xyDxyResult ... ", xyDxyResult)
@@ -252,9 +254,10 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   except:
     print("except ???")
   plt.show()
-  nPETSeeds, thetaPET, pixTheta0, pixTheta1  = clusterProcessWithPET( xyDxy, cathi, saturated, chi, chId,  proj = (xProj, dxProj, yProj, dyProj, zProj) )
-  tUtil.printTheta("clusterProcessWithPET", thetaPET)  
+  # nPETSeeds, thetaPET, pixTheta0, pixTheta1  = clusterProcessWithPET( xyDxy, cathi, saturated, chi, chId,  proj = (xProj, dxProj, yProj, dyProj, zProj) )
+  # tUtil.printTheta("clusterProcessWithPET", thetaPET)  
   # New find local Max
+  
   xyDxy0 = tUtil.asXYdXY( x0, y0, dx0, dy0 )
   xyDxy1 = tUtil.asXYdXY( x1, y1, dx1, dy1 )
   # xl, yl = geom.findLocalMax( xyDxy0, xyDxy1, z0, z1 )
@@ -269,11 +272,12 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   
   selected = True
   selected = True if nbrHits > 10 else False
-  selected = diffNbrOfSeeds 
   selected = diffNbrOfSeeds and chId > 8
+  selected = diffNbrOfSeeds 
+  selected = (nbrOfGroups > 1)
   
   if display and selected:
-    nFigRow = 2; nFigCol = 3
+    nFigRow = 2; nFigCol = 4
     fig, ax = plt.subplots(nrows=nFigRow, ncols=nFigCol, figsize=(15, 7))
     x0  = xi[cathi==0]
     y0  = yi[cathi==0]
@@ -298,57 +302,140 @@ def processPreCluster( pc, display=False, displayBefore=False ):
       for iCol in range( nFigCol):
         ax[iRow,iCol].set_xlim( xMin, xMax)
         ax[iRow,iCol].set_ylim( yMin, yMax)
-    uPlt.drawPads( fig, ax[0,1], x0, y0, dx0, dy0, z0,  doLimits=False, alpha=0.5, displayLUT=False)
-    uPlt.drawPads( fig, ax[0,1], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=0.5, )
-    uPlt.drawPads( fig, ax[0,0], x0, y0, dx0, dy0, z0,  doLimits=False )
-    uPlt.drawPads( fig, ax[1,0], x1, y1, dx1, dy1, z1,  doLimits=False )  
-    uPlt.drawPads( fig, ax[0,2], x0, y0, dx0, dy0, z0,  doLimits=False, alpha=0.5, displayLUT=False)
-    uPlt.drawPads( fig, ax[0,2], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=0.5, )
-    # Saturated
-    ax[0,0].plot( x0[sat0==1], y0[sat0==1], "o", color='blue', markersize=3 )
-    ax[1,0].plot( x1[sat1==1], y1[sat1==1], "o", color='blue', markersize=3 )
-    
-    # Reco 
-    ax[0,0].plot( xr, yr, "+", color='black', markersize=4 )
-    ax[1,0].plot( xr, yr, "+", color='black', markersize=4 )
-    ax[0,1].plot( xr, yr, "+", color='white', markersize=4 )
-    ax[0,2].plot( xr, yr, "+", color='white', markersize=4 )
+
     #
-    (xr, yr, dxr, dyr) = tUtil.asXYdXdY( xyDxyResult)
+    # Reco
+    #
+    # uPlt.drawPads( fig, ax[0,0], x0, y0, dx0, dy0, z0,  doLimits=False )
+    # uPlt.drawPads( fig, ax[0,1], x1, y1, dx1, dy1, z1,  doLimits=False ) 
+    uPlt.drawPads( fig, ax[0,0], x0, y0, dx0, dy0, z0,  doLimits=False, alpha=0.5, displayLUT=False)
+    uPlt.drawPads( fig, ax[0,0], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=0.5, )
+    # Saturated
+    # ax[0,0].plot( x0[sat0==1], y0[sat0==1], "o", color='white', markersize=3 )
+    #ax[0,1].plot( x1[sat1==1], y1[sat1==1], "o", color='white', markersize=3 )
+    
+    #ax[0,0].plot( xr, yr, "+", color='black', markersize=4 )
+    #ax[0,1].plot( xr, yr, "+", color='black', markersize=4 )
+    ax[0,0].plot( xr, yr, "+", color='black', markersize=4 )
+    # ax[0,0].set_title("Cath0 & Current Algo")
+    # ax[0,1].set_title("Cath1 & Current Algo")
+    ax[0,0].set_title("Both Cath & Current Algo")
+    
+        #
+    # Merged Groups
+    padToCathGrp = PCWrap.collectPadToCathGroup( xi.size )
+    padCathGrpMax = 0
+    if padToCathGrp.size != 0:
+      padCathGrpMax = np.max( padToCathGrp )
+    uPlt.setLUTScale( 0.0, padCathGrpMax ) 
+    uPlt.drawPads( fig, ax[0,1], xi, yi, dxi, dyi, padToCathGrp,  doLimits=False, alpha=0.5 )
+    ax[0,1].set_title("Group of pads")
+      
+    #
+    # ??? (xr, yr, dxr, dyr) = tUtil.asXYdXdY( xyDxyResult)
+    
+    #
+    # Projection
+    #
+    """
     uPlt.setLUTScale( 0.0, np.max(zProj) )
-    # uPlt.drawPads( fig, ax[1,0], xProj, yProj, dxProj, dyProj, zProj, doLimits=False, alpha=1.0 )
-    uPlt.drawPads( fig, ax[1,1], xProj, yProj, dxProj, dyProj, zProj, doLimits=False, alpha=1.0 )
-    uPlt.drawPads( fig, ax[1,2], xProj, yProj, dxProj, dyProj, zProj, doLimits=False, alpha=1.0 )
+    uPlt.drawPads( fig, ax[0,2], xProj, yProj, dxProj, dyProj, zProj, doLimits=False, alpha=1.0 )
+    uPlt.drawModelComponents( ax[0,2], thetaResult, color="black", pattern='x')
+    ax[0,2].set_title("Projection & PET Algo")
+    """
+    
     """
     sigFactors = findSigmaFactor( xi, yi, dxi, dyi, chi, thetaResult, chId, 0.0 )
     thetaTmp = tUtil.setThetaVar(thetaResult, sigFactors, chId)
     """
-    thetaTmp = thetaResult
-    uPlt.drawModelComponents( ax[0,1], thetaTmp, color="black", pattern='x')
-    uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')
+    #uPlt.drawModelComponents( ax[0,1], thetaResult, color="black", pattern='x')
     # uPlt.drawPoints( ax[1,1], xr, yr, color='black', pattern="o" )
     
-    qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
-    uPlt.setLUTScale( 0.0, np.max(qPix))
-    uPlt.drawPads( fig, ax[1,2], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
-    thetaTmp = thetaPET
-    uPlt.drawModelComponents( ax[0,2], thetaTmp, color="black", pattern='x')
-    uPlt.drawModelComponents( ax[1,2], thetaTmp, color="black", pattern='x')
+    #
+    # Pixels
+    #    
+    # EM Final
+    thetaEMFinal = PCWrap.collectThetaEMFinal()
+    #
+    for p in range(7, -1, -1):
+      (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(p)
+      if nPix != 0: pEnd = p; break
+    
+    print( "pEnd ???", pEnd, )
+    (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(pEnd-1)
+    if (nPix >0 ):
+      (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
+      # qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
+      uPlt.setLUTScale( 0.0, np.max(qPix))
+      uPlt.drawPads( fig, ax[1,1], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
+      #uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')
+      uPlt.drawModelComponents( ax[1,1], thetaResult, color="black", pattern='x', markersize=4)
+      uPlt.drawModelComponents( ax[1,1], thetaEMFinal, color="lightgrey", pattern='x')
+    ax[1,1].set_title("Pixels & PET Algo (1)")
+    #
+    (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(pEnd)
+    if (nPix >0 ):
+      (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
+      # qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
+      uPlt.setLUTScale( 0.0, np.max(qPix))  
+      uPlt.drawPads( fig, ax[1,2], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
+      #uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')
+      uPlt.drawModelComponents( ax[1,2], thetaResult, color="black", pattern='x', markersize=4)
+      uPlt.drawModelComponents( ax[1,2], thetaEMFinal, color="lightgrey", pattern='x')
+      uPlt.drawModelComponents( ax[1,2], thetaResult, color="black", pattern='x')
+    ax[1,2].set_title("Pixels & PET Algo (2)")    
+    #
+    (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(0)
+    if (nPix >0 ):
+      (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
+      # qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
+      uPlt.setLUTScale( np.min(qPix), np.max(qPix)) 
+      uPlt.drawPads( fig, ax[0,2], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
+      #uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')
+      uPlt.drawModelComponents( ax[0,2], thetaResult, color="black", pattern='x', markersize=4)
+      uPlt.drawModelComponents( ax[0,2], thetaEMFinal, color="lightgrey", pattern='x')
+      uPlt.drawModelComponents( ax[0,2], thetaResult, color="black", pattern='x')
+    ax[0,2].set_title("dPixels & PET Algo")    
+    #ax[0,2].set_xlim( np.min(xPix), np.max(xPix))
+    #ax[0,2].set_ylim( np.min(yPix), np.max(yPix))
     
     # New find Local max
     # uPlt.drawPoints( ax[0,0], xl, yl, color='black', pattern='+')
     # uPlt.drawPoints( ax[1,0], xl, yl, color='black', pattern='+')
     
-    ax[0,0].set_xlim( xMin, xMax )
-    ax[1,0].set_ylim( yMin, yMax )
-    ax[0,1].set_xlim( xMin, xMax )
-    ax[1,1].set_ylim( yMin, yMax )
-    ax[0,2].set_xlim( xMin, xMax )
-    ax[1,2].set_ylim( yMin, yMax )    
+ 
     #
-    ax[0,0].set_title("Current Algo")
-    ax[0,1].set_title("Laplacian Algo")
-    ax[0,2].set_title("PET Algo")
+    # PET Algo
+    #
+    uPlt.setLUTScale( 0.0, zMax ) 
+    uPlt.drawPads( fig, ax[1,0], x0, y0, dx0, dy0, z0,  doLimits=False, alpha=0.5, displayLUT=False)
+    uPlt.drawPads( fig, ax[1,0], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=0.5, )
+    ax[1,0].plot( xr, yr, "o", color='red', markersize=4 )
+
+    uPlt.drawModelComponents( ax[1,0], thetaResult, color="black", pattern='x')
+    ax[1,0].set_title("PET Algo")
+
+    #   
+    # The max Laplacian of the 2 cathodes
+    #
+    xl, yl = geom.findLocalMax( xyDxy0, xyDxy1, z0, z1 )
+    zMax = np.max( chi )
+    uPlt.setLUTScale( 0.0, zMax ) 
+    uPlt.drawPads( fig, ax[0,3], x0, y0, dx0, dy0, z0,  doLimits=False)
+    uPlt.drawPads( fig, ax[1,3], x1, y1, dx1, dy1, z1,  doLimits=False )
+    # Saturated
+    xSat = x0[ sat0==1 ]
+    ySat = y0[ sat0==1 ]
+    uPlt.drawPoints( ax[0,3], xSat, ySat, color='white', pattern='o', markerSize=4)
+    xSat = x1[ sat1==1 ]
+    ySat = y1[ sat1==1 ]
+    uPlt.drawPoints( ax[1,3], xSat, ySat, color='white', pattern='o', markerSize=4)
+    #
+    uPlt.drawPoints( ax[0,3], xl, yl, color='black', pattern='o')
+    uPlt.drawPoints( ax[1,3], xl, yl, color='black', pattern='o')
+
+    ax[0,3].set_title("Cathode 0 & max Laplacian")
+    ax[1,3].set_title("Cathode 1 & max Laplacian")
     
     t = r'bCrossing=%d orbit=%d iROF=%d, DEId=%d sat=%d' % (bc, orbit, iROF, DEId, np.sum( saturated ))
     fig.suptitle(t)
@@ -412,8 +499,27 @@ if __name__ == "__main__":
     pc = reco.readPreCluster( 0, 0, 376)
     #processPreCluster ( pc, display=True, displayBefore=True)
     # processPreCluster ( pc, display=True, displayBefore=True)
-    processPreCluster ( pc, display=True, displayBefore=True)
-
+    # processPreCluster ( pc, display=True, displayBefore=True)
+    
+    # Grp pb
+    grpPb = [1, 6, 44, 133, 134, 173, 177, 198]
+    # Pix pb
+    pixPb = [21, 44, 71, 72, 91, 94, 96, 101, 133, 134, 144, 146, 173]
+    # Others
+    othersPix = [1, 8, 68]
+    # PCList = grpPb + pixPb
+    # PCList = pixPb 
+    PCList = [ 238 ]
+    
+    #
+    for pc in reco:
+      (id, pads, hits ) = pc
+      (bc, orbit, irof, _, _) = id
+      print(id)
+      if (orbit == 0) and (irof in PCList):
+        processPreCluster ( pc, display=True, displayBefore=False )
+      elif (orbit==7) and (irof==319):
+        processPreCluster ( pc, display=True, displayBefore=False )
   # reco.read(verbose=True)
   # nPreClusters = len(reco.padX )
   # for ipc in range(0, nPreClusters ):

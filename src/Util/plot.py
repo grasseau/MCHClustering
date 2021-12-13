@@ -97,11 +97,11 @@ def getMCHitsInFrame( frame, mcObj, ev, DEIds ):
     
 def drawMCHitsInFrame ( ax, frame, mcObj, ev, DEIds ):
     (x, y) = getMCHitsInFrame( frame, mcObj, ev, DEIds )
-    drawPoints( ax, x, y, color='black', pattern='x')
+    drawPoints( ax, x, y, color='black', pattern='cross')
     #
     return
 
-def drawModelComponents( ax, theta, color='black', pattern="o" ):
+def drawModelComponents( ax, theta, color='black', pattern="o", markersize=3 ):
     (w, muX, muY, varX, varY) = dUtl.thetaAsWMuVar( theta )
     K = w.shape[0]
     if K == 0 : return
@@ -154,7 +154,7 @@ def drawModelComponents( ax, theta, color='black', pattern="o" ):
             ax.add_patch(circle)
           else:
             # ax.plot( x, y, pattern, color="white", markersize=5 )
-            ax.plot( x, y, pattern, color=color, markersize=3 )
+            ax.plot( x, y, pattern, color=color, markersize=markersize )
             
     return
 
@@ -214,7 +214,7 @@ def drawModelComponentsV0( ax, w, mu, var, color='black', pattern="o" ):
             
     return
 
-def drawPoints( ax, x, y, color='black', pattern="o" ):
+def drawPoints( ax, x, y, color='black', pattern="o", markerSize=3 ):
     if type(x) is not np.ndarray:
       x = np.array( [x])
       y = np.array( [y])
@@ -222,8 +222,10 @@ def drawPoints( ax, x, y, color='black', pattern="o" ):
     if K == 0 : return
     ( bot, top) = ax.get_ylim()
     ( right, left) = ax.get_xlim()
-    dx = (right - left) * 0.02 
-    dy = (top - bot) * 0.02 
+    # dx = (right - left) * 0.02 
+    # dy = (top - bot) * 0.02 
+    dx = 0.07
+    dy = 0.05
  
     for k in range(K):
           if pattern == "cross":
@@ -266,7 +268,7 @@ def drawPoints( ax, x, y, color='black', pattern="o" ):
             ax.add_patch(circle)
           else:
            # ax.plot( x, y, pattern, color="white", markersize=5 )
-           ax.plot( x, y, pattern, color=color, markersize=3 )
+           ax.plot( x, y, pattern, color=color, markersize=markerSize )
             
     return
 

@@ -262,6 +262,14 @@ def setupPyCWrapper():
                                           c_int               # K
                                          ]  
   #
+  extCLib.collectPixels.resType  = c_int
+  extCLib.collectPixels.argtypes = [
+                                        c_int,              # which
+                                        c_int,              # N
+                                        array_1d_double,    # xyDxy
+                                        array_1d_double    # q
+                                    ]  
+  #
   extCLib.freeMemoryPadProcessing.resType = c_int
   extCLib.freeMemoryPadProcessing.argtypes = None
   #
@@ -516,6 +524,14 @@ def collectThetaEMFinal():
   thetaf = np.zeros( 5*K)
   CLib.collectThetaEMFinal( thetaf, K)
   return thetaf
+
+def collectPixels( which ):
+  N = CLib.collectPixels( which, 0, np.zeros(1), np.zeros(1))
+  xyDxy = np.zeros( 4*N)
+  q = np.zeros(N)
+  N = CLib.collectPixels( which, N, xyDxy, q)
+  return (N, xyDxy, q)
+  
   
 def freeMemoryPadProcessing():
   CLib.freeMemoryPadProcessing()

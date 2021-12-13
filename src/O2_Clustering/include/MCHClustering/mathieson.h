@@ -15,15 +15,28 @@
 #include <cstddef>
 #include <cmath>
 
+#include "PadsPEM.h"
+
 extern "C" {
 void initMathieson();
-void compute2DPadIntegrals(const double* xyInfSup, int N, int chamberId,
+void compute2DPadIntegrals(const double* xInf, const double* xSup, const double* yInf, const double* ySup,
+                           int N, int chamberId,
                            double Integrals[]);
 
 void compute2DMathiesonMixturePadIntegrals(const double* xyInfSup0, const double* theta,
                                            int N, int K, int chamberId,
                                            double Integrals[]);
-  void computeCij( const double *xyInfSup0, const double *theta,
+
+void computeCij( const double *xyInfSup0, const double *theta,
                             int N, int K, int chamberId, double Cij[] );
 }
+
+namespace o2
+{
+namespace mch
+{
+void computeCij( const Pads &pads, const Pads &theta,
+                            double Cij[] );
+} // namespace mch
+} // namespace o2
 #endif

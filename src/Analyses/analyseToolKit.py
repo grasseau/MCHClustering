@@ -4,10 +4,27 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import C.PyCWrapper as PCWrap
+# import C.PyCWrapper as PCWrap
+import O2_Clustering.PyCWrapper as PCWrap
+
 import Util.geometry as geom
 import Util.dataTools as dUtil
 import Util.plot as uPlt
+
+def minDxDy( x0, y0, x1, y1 ):
+  if (x0.size == 0) or (x1.size == 0):
+    return (1.0, 1.0)
+  minDx = np.zeros( x0.size )
+  minDy = np.zeros( x0.size )
+  for i in range(x0.size):
+    dx = (x1 - x0[i])
+    dy = (y1 - y0[i])
+    d = dx*dx + dy*dy
+    idx = np.argmin(d)
+    minDx[i] = np.abs( dx[idx] )
+    minDy[i] = np.abs( dy[idx] )
+  #
+  return (np.max( minDx), np.max( minDy))
 
 def getMatchingMCTrackHits( spanDEIds, boxOfRecoPads, mcObj, ev, verbose = False ):
   """
@@ -547,7 +564,9 @@ def iterateEMPoisson( Cij, Ci, Cj, maskCij, qPix, qPad, qPredPad):
   for j in range(nPix):
     # Normalization term
     # Cj[j] = np.sum( Cij[:,j   
-    r = np.sum( Cij[:,j]*qPad[0:nPads] / qPredPad[0:nPads] )
+    # r = np.sum( Cij[:,j]*qPad[0:nPads] / qPredPad[0:nPads] )
+    # ???
+    r = np.sum( maskCij[:,j]*Cij[:,j] * qPad[0:nPads] / qPredPad[0:nPads] )
     if ( Cj[j] > 0 ):
       newQPix[j] = r * qPix[j] / Cj[j]
     else :
@@ -605,8 +624,10 @@ def EMPoissonSQR( xyInfSup, qPad, theta, chId, minPadResidu, nIt, qCutMode=1):
   Ci = np.zeros( nPads )
   for i in range (nPads):
     Ci[i] = np.sum( Cij[i,:])
+  # print( "sum_Ci =", np.sum(Ci), "sum_Cj =", np.sum(Cj))
   qPredPad = np.zeros( nPads )
-    
+  # print( 'Pad size', qPad.size)
+  # print( 'Pixel size', qPix.size)
   converge = False
   it = 0
   residu = 0
@@ -648,21 +669,21 @@ def EMPoissonSQR( xyInfSup, qPad, theta, chId, minPadResidu, nIt, qCutMode=1):
     padResidu = np.abs( qPad - qPredPad )
     if 1 :
       # print("it=", it, ", pixResidu", np.sum(residu), ", padResidu", np.sum(padResidu), ", max(padResidu)", np.max(padResidu), ", ratio residu/charge", np.sum(padResidu)/np.sum(qPad))
-      print("it=", it, ", <pixResidu>", np.sum(residu)/qPix.size, ", <padResidu>", np.sum(padResidu)/qPad.size, ", max(padResidu)", np.max(padResidu), ", ratio pad residu/charge", np.sum(padResidu)/np.sum(qPad))
+      print("[python] it=", it, ", <pixRes.>", np.sum(residu)/qPix.size, ", <padRes.>", np.sum(padResidu)/qPad.size, ", max(padRes.)", np.max(padResidu), ", ratio(padRes./sum_charge)", np.sum(padResidu)/np.sum(qPad))
       # print("       sum padResidu>=", np.sum(padResidu), ", sum chargepad", np.sum(qPad), ", ratio residu/charge", np.sum(padResidu)/np.sum(qPad))
       # print("       EMPoisson qPixCut=", qPixCut)
     it += 1
     # converge = (it>nIt)
     converge = converge or (np.sum(padResidu)/qPad.size < minPadResidu) or (it>nIt)
     #
-  print("it=", it, ", <pixResidu>", np.sum(residu)/qPix.size, ", <padResidu>", np.sum(padResidu)/qPad.size, ", max(padResidu)", np.max(padResidu))
-  print("       sum padResidu =", np.sum(padResidu), ", sum chargepad", np.sum(qPad), ", ratio residu/charge", np.sum(padResidu)/np.sum(qPad))
-  print("       EMPoisson qPixCut=", qPixCut)
-  print( "Total Charge", np.sum(qPad))
-  print( "Total Predictited Charge", np.sum(qPredPad))
-  print( "Total Pixel Charge", np.sum(qPix))
+  # inv ??? print("[python] end it=", it, ", <pixResidu>", np.sum(residu)/qPix.size, ", <padResidu>", np.sum(padResidu)/qPad.size, ", max(padResidu)", np.max(padResidu))
+  print("[python] sum_padRes. =", np.sum(padResidu), ", sum_chargepad", np.sum(qPad) )
+  print("[python] EMPoisson qPixCut=", qPixCut)
+  print("[python] Total Charge", np.sum(qPad))
+  print("[python] Total Predictited Charge", np.sum(qPredPad))
+  print("[python] Total Pixel Charge", np.sum(qPix))
   #
-  print("tn, np.sum(Cij)", np.sum(Cij))
+  # ??? Inv print("tn, np.sum(Cij)", np.sum(Cij))
   # ????
 
   idx = np.where ( qPix > qPixCut )[0]
@@ -916,7 +937,7 @@ def findLocalMaxWithPET( xyDxy0, xyDxy1, q0, q1, chId, proj=None, display=False 
       dyMin = min( dyMin, np.min( dy1 ) )
       
     reso = 0.5 * min(dxMin, dyMin )
-    print( "findLocalMaxWithPET: reso=", reso)
+    # ??? inv print( "findLocalMaxWithPET: reso=", reso)
     #
     # Sub sample proj
     # if 0:
@@ -959,7 +980,7 @@ def findLocalMaxWithPET( xyDxy0, xyDxy1, q0, q1, chId, proj=None, display=False 
       
     else:
       xPix, dxPix, yPix, dyPix, qPix = buildPixels( x0, dx0, y0, dy0, x1, dx1, y1, dy1, q0, q1, reso)
-      print("??? qPix", qPix)
+      # Inv print("??? qPix", qPix)
     #
     initSize = qPix.size
     thetaInit = dUtil.asTheta(qPix, xPix, yPix, dxPix, dyPix )
@@ -1053,7 +1074,7 @@ def findLocalMaxWithPET( xyDxy0, xyDxy1, q0, q1, chId, proj=None, display=False 
       xyDxyPix = dUtil.asXYdXY( xPix, yPix, dxPix, dyPix )      
       pixIdx, idxLocMax, w, locX, locY, dxLoc, dyLoc  = geom.clipOnLocalMax1( xyDxyPix, qPix, hard=True)
       visuPix1 = np.copy( pixTheta )
-      print( "Pixel size initSize=", initSize, ", end size=", qPix.size )
+      # ??? print( "Pixel size initSize=", initSize, ", end size=", qPix.size )
 
     else :
       visuPix = np.copy( pixTheta )    
@@ -1064,8 +1085,6 @@ def findLocalMaxWithPET( xyDxy0, xyDxy1, q0, q1, chId, proj=None, display=False 
     # Filter position
     dx = np.max(dxPix) + np.min( dxPix )
     dy = np.max(dyPix) + np.min( dyPix )
-    print("??? dxLoc.shape", dxLoc.shape )
-    print("??? dyLoc.shape", dyLoc.shape )
     """
     eps = 1.0e-04
     n = w.size
@@ -1100,7 +1119,7 @@ def findLocalMaxWithPET( xyDxy0, xyDxy1, q0, q1, chId, proj=None, display=False 
     cutRatio = 0.01
     qCut = cutRatio * np.max( w )
     initSize = w.size
-    print("last solution qCut=", qCut, "sum w", np.sum( w ))
+    print("[python] last solution (remove solution 1% below the max) qCut=", qCut, "sum w", np.sum( w ))
     idx = np.where( w > qCut )[0]
     w = w[idx]
     locX = locX[ idx ]
@@ -1108,9 +1127,9 @@ def findLocalMaxWithPET( xyDxy0, xyDxy1, q0, q1, chId, proj=None, display=False 
     dxLocMax = dxLocMax[idx]
     dyLocMax = dyLocMax[idx]
     refinedTheta = dUtil.asTheta( w, locX, locY, dxLocMax, dyLocMax)
-    print( "--- > w selection: cutOff=", cutRatio, "nbr of removed peaks=", initSize - w.size)
+    print( "[python] --- > w selection: cutOff=", cutRatio, "nbr of removed peaks=", initSize - w.size)
     chisq = computeChiSq( xyInfSup, q, chId, refinedTheta )
-    print( "---> chisq=", chisq)
+    print( "[python]---> chisq=", chisq)
     return ( refinedTheta, thetaInit, visuPix0, visuPix1 )
 
 def trackLocalMax( grid, locMax, qLocMax):

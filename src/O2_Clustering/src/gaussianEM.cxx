@@ -430,27 +430,27 @@ double weightedEMLoop(const double* xyDxy, const Mask_t* saturated, const double
   int it = 0;
   // for( ; (( fabs((logL - prevLogL)/logL) > LConvergence) || (it < nIterMin)) && ( it < nIterMax ); ) {
   for (; ((fabs((logL - prevLogL) / logL) > LConvergence)) && (it < nIterMax);) {
-    if (verbose >= 1) 
-      printEMState( it, logL, logL - prevLogL );    
+    if (verbose >= 1)
+      printEMState( it, logL, logL - prevLogL );
     prevLogL = logL;
     //
     // EM Step
     //
     // E-Step
-    if (maskTheta == 0) 
+    if (maskTheta == 0)
       EStep( xyInfSup, theta, K, N, verbose, eta, zEval);
     else
       maskedEStep( xyInfSup, theta, maskTheta, K, N, verbose, eta, zEval);
     //
     if (nbrSaturatedPads > 0) {
-      // Set (or update) saturated pads to the estimate 
+      // Set (or update) saturated pads to the estimate
       // values i.e. zEval
-      // Remark 
-      // saturated is a constant array and 
+      // Remark
+      // saturated is a constant array and
       // the zObsNorm[ saturated == 0 )] are not modified
       // and take the zObsNorm Values
       vectorMaskedUpdate( saturated, zEval, N, zObsNorm);
-    } 
+    }
     // M-Step
     weightedMStep( xyDxy, zObsNorm, eta, K, N, cstVarMode, theta );
     // Log-Lilelihood
@@ -459,11 +459,11 @@ double weightedEMLoop(const double* xyDxy, const Mask_t* saturated, const double
     if (verbose >= 2) printTheta( "  EM new theta", theta, K);
     it += 1;
   }
-  if (verbose >= 1) 
-     printEMState( it, logL, logL - prevLogL ); 
+  if (verbose >= 1)
+     printEMState( it, logL, logL - prevLogL );
   if (verbose >= 2)
     printf("End GaussianEM\n");
-  
+
   // Return BIC criterion
   int kSignificant = vectorSumOfGreater( w, 10.e-5, K);
   printf("EMLoop # parameters %d, log( N -saturated)= %f \n", (3*kSignificant-1), log(N - nbrSaturatedPads) );
@@ -477,12 +477,12 @@ double weightedEMLoop(const double* xyDxy, const Mask_t* saturated, const double
   generateMixedGaussians2D( xyInfSup, theta, K, N, zPredict);
   double crossE = crossEntropy( zObs, zPredict, N);
   printf("EMLoop BIC=%f, AIC=%f, AICc=%f crossEntropy=%f\n", BIC, AIC, AICc, crossE );
-  
+
   return logL;
 }
 
-double weightedEMLoopWithMuCriterion( const double *xyDxy, const Mask_t *saturated, const double *zObs, 
-                     const double *theta0, const Mask_t *maskTheta, int K, int N, 
+double weightedEMLoopWithMuCriterion( const double *xyDxy, const Mask_t *saturated, const double *zObs,
+                     const double *theta0, const Mask_t *maskTheta, int K, int N,
                      int mode, double LConvergence, int verbose, double *theta) {
 
   // Mode of computation
@@ -490,7 +490,7 @@ double weightedEMLoopWithMuCriterion( const double *xyDxy, const Mask_t *saturat
   int m = mode;
   int cstVarMode = m & 0x1;
   // Saturated
-  // Not selected way ??? int nbrSaturatedPads = (m >> 1) & 0x1; 
+  // Not selected way ??? int nbrSaturatedPads = (m >> 1) & 0x1;
   int nbrSaturatedPads = vectorSumShort( saturated, N);
   if (verbose >= 2) {
    printf("  wheightedEMLoop : cstVarMode =%d\n", cstVarMode);
@@ -513,8 +513,8 @@ double weightedEMLoopWithMuCriterion( const double *xyDxy, const Mask_t *saturat
   const double *x  = getConstX( xyDxy, N);
   const double *y  = getConstY( xyDxy, N);
   const double *dX = getConstDX( xyDxy, N);
-  const double *dY = getConstDY( xyDxy, N); 
-  
+  const double *dY = getConstDY( xyDxy, N);
+
   // Compute boundary of each pads
   double xyInfSup[4*N];
   vectorAddVector( x, -1.0, dX, N, getXInf(xyInfSup, N) );
@@ -533,28 +533,28 @@ double weightedEMLoopWithMuCriterion( const double *xyDxy, const Mask_t *saturat
   if ( maskTheta ) {
     for (int k=0; k < K; k++) {
       w[k] = (maskTheta[k] == 1) ? w[k] : 0;
-    }  
+    }
   }
   double logL = computeWeightedLogLikelihood( xyInfSup, theta0, zObsNorm, K, N);
   if (verbose >= 1) printEMState( -1, logL, 0.0);
-  //      
+  //
   // EM Loop
   //
   double prevTheta[5*K];
   double zEval[N];
-  double prevLogL = logL; 
+  double prevLogL = logL;
   vectorCopy( theta, K*5, prevTheta);
   double *prevMuX = getMuX(prevTheta, K);
   double *prevMuY = getMuY(prevTheta, K);
   double *prevW   = getW(prevTheta, K);
-  
+
   logL = 1.0 + prevLogL;
   int it = 0;
   int muChanged = 0;
   // for( ; (( fabs((logL - prevLogL)/logL) > LConvergence) || (it < nIterMin)) && ( it < nIterMax ); ) {
   for( ; (muChanged==0) && ( fabs((logL - prevLogL)/logL) > LConvergence) && ( it < nIterMax ); ) {
-    if (verbose >= 1) 
-      printEMState( it, logL, logL - prevLogL );    
+    if (verbose >= 1)
+      printEMState( it, logL, logL - prevLogL );
     prevLogL = logL;
     //
     // EM Step
@@ -586,10 +586,10 @@ double weightedEMLoopWithMuCriterion( const double *xyDxy, const Mask_t *saturat
     Mask_t significantMuChange[N];
     for(int k=0; k < K; k++) {
       significantMuChange[k]=0;
-      double diffX = fabs( prevMuX[k] - muX[k] );   
+      double diffX = fabs( prevMuX[k] - muX[k] );
       double diffY = fabs( prevMuY[k] - muY[k] );
       if ( maskTheta[k] & (( diffX > minDxPad ) || ( diffY > minDyPad ))) {
-        significantMuChange[k] = 1; 
+        significantMuChange[k] = 1;
         muChanged=1;
       }
     }

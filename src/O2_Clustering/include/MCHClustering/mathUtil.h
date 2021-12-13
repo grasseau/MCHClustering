@@ -92,6 +92,14 @@ inline static void vectorAddVector(const double* u, double cst, const double* v,
   return;
 }
 
+inline static void vectorAbs(const double* u, int N, double* res)
+{
+  for (int i = 0; i < N; i++) {
+    res[i] = fabs( u[i] );
+  }
+  return;
+}
+
 inline static void vectorAddScalar(const double* u, double cst, int N, double* res)
 {
   for (int i = 0; i < N; i++) {
@@ -114,6 +122,15 @@ inline static void vectorMultScalar(const double* u, double cst, int N, double* 
     res[i] = u[i] * cst;
   }
   return;
+}
+
+inline static double vectorNorm(const double* u, int N)
+{
+  double res = 0;
+  for (int i = 0; i < N; i++) {
+    res += u[i] * u[i];
+  }
+  return sqrt(res);
 }
 
 inline static double vectorSum(const double* u, int N)
@@ -220,10 +237,22 @@ inline static int vectorArgMax( const double *u, int N)
   }
   return idx;
 }
+
+inline static int vectorArgMin( const double *u, int N)
+{
+  int idx = -1; double minVal = DBL_MAX; 
+  for (int i=0; i < N; i++) {
+    if( u[i] < minVal) {
+      minVal = u[i]; idx = i;
+    } 
+  }
+  return idx;
+}
+
 //
 // Mask operations
 //
-inline static int vectorBuildMaskEqualShort(short* src, short value, int N, short* mask)
+inline static int vectorBuildMaskEqualShort(const short* src, short value, int N, short* mask)
 {
   int count = 0;
   for (int i = 0; i < N; i++) {
@@ -282,6 +311,16 @@ inline static int vectorGather(const double* v, const Mask_t* mask, int N, doubl
 }
 
 inline static int vectorScatter(const double* v, const Mask_t* mask, int N, double* scatterVec)
+{
+  int k = 0;
+  for (int i = 0; i < N; i++) {
+    if (mask[i]) {
+      scatterVec[i] = v[k++];
+    }
+  }
+  return k;
+}
+inline static int vectorScatterShort(const short* v, const Mask_t* mask, int N, short* scatterVec)
 {
   int k = 0;
   for (int i = 0; i < N; i++) {

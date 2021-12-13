@@ -696,10 +696,10 @@ def clipOnLocalMax( xyDxy, z, hard=True ):
       if ( z[i] < cutoff ):
         lapl[i] = 0;
       #  print("i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
+      print("[python] clipOnLocalMax LocalMax : hard, i, neighI, z[i], <lapl>, lapl[i]", hard, i, neighI, z[i], mag, lapl[i])
       if (lapl[i] >= 1.0 ):
         locMaxIdx.append( i )
         ch = 0; locX = 0; locY = 0; 
-        print("Local Max : i, neighI, z[i], <lapl>, lapl[i]", i, neighI, z[i], mag, lapl[i])
         for ne in neigh12[i]:
         # for ne in neigh1[i]:
           ch += z[ne]
@@ -867,10 +867,10 @@ def laplacian2D( xyDxy, z ):
       if ( z[i] < cutoff ):
         lapl[i] = 0;
       unSelected[i] = (lapl[i] != 1)
-      print("i, neighI, z[i], lapl[i]", i, z[i], neighI, lapl[i])
+      # print("i, neighI, z[i], lapl[i]", i, z[i], neighI, lapl[i])
 
-    print("Laplacian lapl", lapl)
-    print("Laplacian qLissed", qLissed)
+    # print("Laplacian lapl", lapl)
+    # print("Laplacian qLissed", qLissed)
     locMax = np.where( lapl >= 1.0 )[0]
 
         
@@ -887,10 +887,10 @@ def laplacian2D( xyDxy, z ):
     else:
       aspectRatio = 0
     if nPads < 6 and aspectRatio > 0.6 and locMax.size > 1:
-      print ("Too many solutionslocMax, keep only one", locMax )
+      # print ("Too many solutionslocMax, keep only one", locMax )
       idx = np.argmax(qLissed[ locMax ] )
       locMax = locMax[idx:idx+1]
-      print ("locMax", locMax )
+      # print ("locMax", locMax )
     # At least one pad
     if locMax.size == 0 and nPads != 0:
        locMax = np.array( [0])
@@ -900,7 +900,7 @@ def laplacian2D( xyDxy, z ):
       locMax = np.sort( locMax )
       locMax  = locMax[0: int(n)]
     qLissedLocMax =  qLissed[ locMax ]      
-    print("Laplacian locMax",locMax )
+    # print("Laplacian locMax",locMax )
     return locMax, qLissedLocMax, qLissed
 
 
@@ -1316,7 +1316,7 @@ def findLocalMaxOnThe2Cath( xyDxy0, xyDxy1, q0, q1 ):
       if j != -1:
         #print("  selected max in Cathv", maxIdx, maxCathv)
         # j = maxCathv [ maxIdx ]
-        print("    i,j", i, j)
+        # print("    i,j", i, j)
         # Mapping found between the two cathode
         if cath0CathU:
           k = mapIJToK[(i, j)]
@@ -1418,11 +1418,12 @@ def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
     maxCath0, q0LissedLocMax, q0Liss = laplacian2D( xyDxy0, q0)
     maxCath1, q1LissedLocMax, q1Liss = laplacian2D( xyDxy1, q1)
     
+    """
     print("findLocalMax q0", q0)
     print("findLocalMax q1", q1)
     print("findLocalMax maxCath0", maxCath0)
     print("findLocalMax maxCath1", maxCath1)
-
+    """
     # input("next")
 
     # Sort the local max
@@ -1434,12 +1435,13 @@ def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
     maxCath1 = maxCath1[idx1]
     q0LissedLocMax = q0LissedLocMax[idx0]
     q1LissedLocMax = q1LissedLocMax[idx1]
+    """
     print( "q0Liss", q0Liss)
     print( "q1Liss", q1Liss)
     print( locMaxVal0,  locMaxVal1)
     print( "maxCath0", maxCath0)    
     print( "maxCath1", maxCath1)    
-
+    """
     # Select the cathode 
     if maxCath0.size < maxCath1.size:
       maxCathu = maxCath1
@@ -1504,15 +1506,17 @@ def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
         cath0CathU = True
     #
     qvAvailable = np.ones( maxCathv.size )
-
+    """
     print( "findLocalMax cath0/1.size", maxCath0.size, maxCath1.size)
     print( "findLocalMax order", order)      
+    """
     #
     for ii,i in enumerate(maxCathu):
+      """
       print( "MaxCatU ", ii+1, "/", maxCathu.size, ", index=", i)
       print("qu", qu)
       print("qAvail", qvAvailable)
-
+      """
       # print("??? interIJ[i]", interUV[i] )
       interU = set( interUV[i] )
       inter = interU & set( maxCathv )
@@ -1524,9 +1528,11 @@ def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
       maxValue = 0.0
       j = -1
       maxCathvIdx = -1
+      """
       print(" maxCathv", maxCathv)
       print(" qvLissedLocMax", qvLissedLocMax)
       print(" qv[ maxCathv]", qv[ maxCathv])
+      """
       for ii in inter:
         idx = np.where(maxCathv == ii)[0]
         if idx.size == 1: 
@@ -1540,8 +1546,10 @@ def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
 
         # idx.append( np.where(maxCathv == ii)[0])
         # idx_size = idx_size + np.where(maxCathv == ii)[0].size
+      """
       print("  maxCathvIdx, maxValue, maxCathv[maxCathvIdx]", maxCathvIdx, maxValue, j ) 
       print("  maxCathvIdx maxCathv", maxCathvIdx, maxCathv )
+      """
       # Take the maximum
       """
       if idx_size > 0:
@@ -1569,7 +1577,7 @@ def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
       if j != -1:
         #print("  selected max in Cathv", maxIdx, maxCathv)
         # j = maxCathv [ maxIdx ]
-        print("    i,j", i, j)
+        # print("    i,j", i, j)
         # Mapping found between the two cathode
         if cath0CathU:
           k = mapIJToK[(i, j)]
@@ -1580,11 +1588,13 @@ def findLocalMax( xyDxy0, xyDxy1, q0, q1 ):
         localYMax.append( yProj[k] )
         qvAvailable[ maxCathvIdx ] = 0
       else:
+        """
         print("Approximate solution")
+        """
         idx = interUV[i]
         if xv.size != 0 and len(idx) !=0:
           if (dxu[i] < dyu[i]):
-            print("??? xv yv", xv, yv, dyv, idx)
+            # print("??? xv yv", xv, yv, dyv, idx)
             vMin = np.min( yv[idx] - dyv[idx] )
             vMax = np.max( yv[idx] + dyv[idx] )
             localXMax.append( xu[i] )
@@ -1838,7 +1848,7 @@ def findLocalMax0( xyDxy0, xyDxy1, q0, q1 ):
     return ( x, y)
     
 def shorteningPads( x0, y0, dx0, dy0, ch0, x1, y1, dx1, dy1, ch1, verbose = 0 ):
-    print("Use of SHORTENING PADS")
+    # print("Use of SHORTENING PADS")
     epsilon = 10.0e-5
     maxFloat = sys.float_info.max
     x0Inf = x0 - dx0

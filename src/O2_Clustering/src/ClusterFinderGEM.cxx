@@ -358,9 +358,9 @@ void ClusterFinderGEM::findClusters(gsl::span<const Digit> digits,
   }
   uint32_t nPreviousCluster = mClusters.size();
   printf("----------------------------------------\n");
-  std::cout << "  [GEM] PreCluster BC=" << bunchCrossing 
-          << ", orbit = " << orbit 
-          << ", iROF = " << iROF 
+  std::cout << "  [GEM] PreCluster BC=" << bunchCrossing
+          << ", orbit = " << orbit
+          << ", iROF = " << iROF
           << std::endl;
   printf("----------------------------------------\n");
 
