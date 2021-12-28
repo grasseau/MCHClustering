@@ -239,9 +239,11 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     print("[python] nbrHits", nbrHits)
     (thetaResult, thetaToGrp) = PCWrap.collectTheta( nbrHits)
     nbrOfGroups = np.max(thetaToGrp)
+
     print("[python] Cluster Processing Results:")
     print("[python]   theta   :", thetaResult)
     print("[python]   thetaGrp:", thetaToGrp)
+    (w, muX, muY, varX, varY) = tUtil.thetaAsWMuVar( thetaResult )
     # Returns the fit status
     (xyDxyResult, chResult, padToGrp) = PCWrap.collectPadsAndCharges()
     # print("xyDxyResult ... ", xyDxyResult)
@@ -270,11 +272,15 @@ def processPreCluster( pc, display=False, displayBefore=False ):
       selected = True
   else : selected = False
   
-  selected = True
+   # Compute the max of the Reco and EM seeds/hits
+  maxDxMinREM, maxDyMinREM = aTK.minDxDy( muX, muY, xr, yr)
+  
   selected = True if nbrHits > 10 else False
   selected = diffNbrOfSeeds and chId > 8
   selected = diffNbrOfSeeds 
+  selected = True
   selected = (nbrOfGroups > 1)
+  selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
   
   if display and selected:
     nFigRow = 2; nFigCol = 4
@@ -361,7 +367,6 @@ def processPreCluster( pc, display=False, displayBefore=False ):
       (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(p)
       if nPix != 0: pEnd = p; break
     
-    print( "pEnd ???", pEnd, )
     (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(pEnd-1)
     if (nPix >0 ):
       (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
@@ -371,7 +376,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
       #uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')
       uPlt.drawModelComponents( ax[1,1], thetaResult, color="black", pattern='x', markersize=4)
       uPlt.drawModelComponents( ax[1,1], thetaEMFinal, color="lightgrey", pattern='x')
-    ax[1,1].set_title("Pixels & PET Algo (1)")
+    ax[1,1].set_title( 'Pixels & PET Algo {:1d}'.format(pEnd-1) )
     #
     (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(pEnd)
     if (nPix >0 ):
@@ -383,7 +388,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
       uPlt.drawModelComponents( ax[1,2], thetaResult, color="black", pattern='x', markersize=4)
       uPlt.drawModelComponents( ax[1,2], thetaEMFinal, color="lightgrey", pattern='x')
       uPlt.drawModelComponents( ax[1,2], thetaResult, color="black", pattern='x')
-    ax[1,2].set_title("Pixels & PET Algo (2)")    
+    ax[1,2].set_title( 'Pixels & PET Algo {:1d}'.format(pEnd) )
     #
     (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(0)
     if (nPix >0 ):
@@ -395,7 +400,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
       uPlt.drawModelComponents( ax[0,2], thetaResult, color="black", pattern='x', markersize=4)
       uPlt.drawModelComponents( ax[0,2], thetaEMFinal, color="lightgrey", pattern='x')
       uPlt.drawModelComponents( ax[0,2], thetaResult, color="black", pattern='x')
-    ax[0,2].set_title("dPixels & PET Algo")    
+    ax[0,2].set_title( 'Pixels & PET Algo {:1d}'.format(0) )
     #ax[0,2].set_xlim( np.min(xPix), np.max(xPix))
     #ax[0,2].set_ylim( np.min(yPix), np.max(yPix))
     
@@ -510,16 +515,21 @@ if __name__ == "__main__":
     # PCList = grpPb + pixPb
     # PCList = pixPb 
     PCList = [ 238 ]
+    PCList = [ 72, 227, 136 ]
     
     #
     for pc in reco:
       (id, pads, hits ) = pc
       (bc, orbit, irof, _, _) = id
       print(id)
+      """
       if (orbit == 0) and (irof in PCList):
-        processPreCluster ( pc, display=True, displayBefore=False )
-      elif (orbit==7) and (irof==319):
-        processPreCluster ( pc, display=True, displayBefore=False )
+        processPreCluster ( pc, display=True, displayBefore=True )
+      """
+      if (orbit==3) and (irof==329):
+        processPreCluster ( pc, display=True, displayBefore=True )
+      if (orbit==7) and (irof==319):
+        processPreCluster ( pc, display=True, displayBefore=True )
   # reco.read(verbose=True)
   # nPreClusters = len(reco.padX )
   # for ipc in range(0, nPreClusters ):

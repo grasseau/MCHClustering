@@ -146,7 +146,7 @@ void inspectSavePixels( int which, o2::mch::Pads &pixels  ) {
    vectorCopy( pixels.q, N, q);
    DataBlock_t db= {N, xyDxyQ};
    inspectPadProcess.xyDxyQPixels[which].push_back( db);
-   // inspectPadProcess.xyDxyQPixels[which].second = xyDxyQ;
+   // printf("[inspectPadProcess], chanel=%d, nbrGrp=%ld\n", which, inspectPadProcess.xyDxyQPixels[which].size() );
 }
 
 int getNbrProjectedPads() { return nbrOfProjPads; };
@@ -484,6 +484,7 @@ int buildProjectedPads(
   return k;
 }
 
+// Unused
 void buildProjectedSaturatedPads( const Mask_t *saturated0, const Mask_t *saturated1, Mask_t *saturatedProj) {
   for( int k=0; k < nbrOfProjPads; k++) {
     MapKToIJ_t ij = mapKToIJ[k];
@@ -1979,6 +1980,7 @@ void forceSplitCathodes( double *newCath0, double *newcath1) {
 */
 // Assign a group to the original pads
 // No group merging, the charge select the group
+/*
 void assignPadsToGroupFromProjAndProjCharge( const short *projPadGroup, double *chProj, int nProjPads,
         const PadIdx_t *cath0ToPadIdx, const PadIdx_t *cath1ToPadIdx,
         int nGrp, int nPads, short *padToCathGrp) {
@@ -2010,7 +2012,7 @@ void assignPadsToGroupFromProjAndProjCharge( const short *projPadGroup, double *
       PadIdx_t padIdx = cath0ToPadIdx[i];
       prevGroup = padToCathGrp[ padIdx ];
       if ( (prevGroup == 0) || (prevGroup == g) ) {
-        // Case: no group before or same group
+        // Case: pad with no group before or same group
         //
         padToCathGrp[ padIdx ] = g;
         // Update the max-charge contribution for i/padIdx
@@ -2047,15 +2049,14 @@ void assignPadsToGroupFromProjAndProjCharge( const short *projPadGroup, double *
     }
   }
 }
-
+*/
 
 // Assign a group to the original pads
-int assignPadsToGroupFromProj( short *projPadGroup, int nProjPads,
+int assignPadsToGroupFromProj( short *projPadToGrp, int nProjPads,
         const PadIdx_t *cath0ToPadIdx, const PadIdx_t *cath1ToPadIdx,
-        int nGrp, int nPads, short *padMergedGrp, short* grpToMergedGrp) {
+        int nGrp, int nPads, short *padMergedGrp ) {
+// cath0ToPadIdx : pad indices of cath0 (cath0ToPadIdx[0..nCath0] -> i-pad
 // outputs:
-//   - wellSplitGroup[ nGrp+1]: 1 if the group is well splitted,  0 if not
-  // ??? To suppres nPads
   short padToGrp[nPads];
   short matGrpGrp[ (nGrp+1)*(nGrp+1)];
   vectorSetZeroShort( padToGrp, nPads);
@@ -2065,8 +2066,15 @@ int assignPadsToGroupFromProj( short *projPadGroup, int nProjPads,
   //
   PadIdx_t i, j;
   short g, prevGroup;
+  // Expand the projected Groups
+  // 'projPadToGrp' to the pad groups 'padToGrp'
+  // If there are conflicts, fuse the groups
+  // Build the Group-to-Group matrix matGrpGrp
+  // which describe how to fuse Groups
+  // with the projected Groups
+  // projPadToGrp
   for( int k=0; k < nProjPads; k++) {
-    g = projPadGroup[k];
+    g = projPadToGrp[k];
     // give the indexes of overlapping pads
     i = mapKToIJ[k].i; j = mapKToIJ[k].j;
     //
@@ -2086,16 +2094,15 @@ int assignPadsToGroupFromProj( short *projPadGroup, int nProjPads,
         matGrpGrp[ g*(nGrp+1) +  g ] = 1;
       } else {
         // Already a Grp which differs
-        if ( prevGroup > 0) {
+        // if ( prevGroup > 0) {
           // Invalid prev group
           // wellSplitGroup[ prevGroup ] = 0;
           // Store in the grp to grp matrix
+          // Group to fuse
           matGrpGrp[ g*(nGrp+1) +  prevGroup ] = 1;
           matGrpGrp[ prevGroup*(nGrp+1) +  g ] = 1;
-        }
-        padToGrp[padIdx] = -g;
-        // Invalid current group
-        // wellSplitGroup[ g ] = 0;
+        //}
+        // padToGrp[padIdx] = -g;
       }
     }
     //
@@ -2114,15 +2121,11 @@ int assignPadsToGroupFromProj( short *projPadGroup, int nProjPads,
          matGrpGrp[ g*(nGrp+1) +  g ] = 1;
       } else {
         // Already a Group
-        if ( prevGroup > 0) {
-          // Invalid Old group
-          // wellSplitGroup[ prevGroup ] = 0;
+        // if ( prevGroup > 0) {
           matGrpGrp[ g*(nGrp+1) +  prevGroup ] = 1;
           matGrpGrp[ prevGroup*(nGrp+1) +  g ] = 1;
-        }
-        padToGrp[padIdx] = -g;
-        // Invalid current group
-        // wellSplitGroup[ g ] = 0;
+        // }
+        // padToGrp[padIdx] = -g;
       }
     }
   }
@@ -2132,81 +2135,83 @@ int assignPadsToGroupFromProj( short *projPadGroup, int nProjPads,
     vectorPrintShort("  padToGrp", padToGrp, nPads);
   }
   //
-  // Merge overlapping groups
+  // Merge the groups (build the mapping grpToMergedGrp)
   //
-  // short grpToMergedGrp[nGrp+1];
+  Group_t grpToMergedGrp[nGrp+1]; // Mapping old groups to new merged groups
   vectorSetZeroShort(grpToMergedGrp, nGrp+1);
-  int newGroupID = 0;
-  int curGroup;
   //
-  int iNewGroup = 1;
-  while ( iNewGroup < (nGrp+1)) {
-    // Define the new group
-    if ( grpToMergedGrp[iNewGroup] == 0 ) {
-        newGroupID++;
-        curGroup= newGroupID;
-        grpToMergedGrp[iNewGroup] = newGroupID;
-    } else {
-        curGroup = grpToMergedGrp[iNewGroup];
+  int iGroup = 1; // Describe the current group
+  int curGroup;   // Describe the mapping grpToMergedGrp[iGroup]
+  while ( iGroup < (nGrp+1)) {
+    // Define the new group to process
+    if ( grpToMergedGrp[iGroup] == 0 ) {
+        // newGroupID++;
+        // grpToMergedGrp[iGroup] = newGroupID;
+        grpToMergedGrp[iGroup] = iGroup;
     }
-
-    // printf("new Group idx=%d, newGroupID=%d\n", iNewGroup, newGroupID);
+    curGroup = grpToMergedGrp[iGroup];
+    // printf( "  current iGroup=%d -> grp=%d \n", iGroup, curGroup);
     //
-    // Propagate the new grp
-    /// ??? for (int i=iNewGroup; i < (nGrp+1); i++) {
-    int i = iNewGroup;
-      int ishift = i*(nGrp+1);
+      // Look for other groups in matGrpGrp
+      int ishift = iGroup*(nGrp+1);
       // Check if there are an overlaping group
-      for (int j=i+1; j < (nGrp+1); j++) {
+      for (int j=iGroup+1; j < (nGrp+1); j++) {
         if ( matGrpGrp[ishift+j] ) {
-          /*
-          if (CHECK) {
-            if ( (grpToGrp[j] != 0) && (grpToGrp[j] != i) ) {
-              printf("The mapping grpTogrp can't have 2 group values (surjective) oldGrp=%d newGrp=%d\n", grpToGrp[j], i);
-              throw std::overflow_error("The mapping grpTogrp can't have 2 group values");
+          // Merge the groups with the current one
+          if ( grpToMergedGrp[j] == 0) {
+            // printf( "    newg merge grp=%d -> grp=%d\n", j, curGroup);
+            // No group assign before, merge the groups with the current one
+            grpToMergedGrp[j] = curGroup;
+          } else {
+            // Fuse grpToMergedGrp[j] with
+            // Merge curGroup and grpToMergedGrp[j]
+            // printf( "    oldg merge grp=%d -> grp=%d\n", curGroup, grpToMergedGrp[j]);
+
+            // A group is already assigned, the current grp takes the grp of ???
+            // Remark : curGroup < j
+            // Fuse and propagate
+            grpToMergedGrp[ curGroup ] = grpToMergedGrp[j];
+            for( int g=1; g < nGrp+1; g++) {
+                if (grpToMergedGrp[g] == curGroup) {
+                    grpToMergedGrp[g] = grpToMergedGrp[j];
+                }
             }
           }
-          */
-          // Merge the groups with the current one
-          grpToMergedGrp[j] = curGroup;
         }
       }
-      iNewGroup++;
-    // ???? }
-    // Go to the next index which have not a group
-    /*
-    int k;
-    for( k = iNewGroup; k < (nGrp+1) && (grpToMergedGrp[k] > 0); k++);
-    iNewGroup = k;
-    */
+      iGroup++;
   }
-  // vectorPrintShort( "grpToMergedGrp", grpToMergedGrp, nGrp+1);
-  //
+
   // Perform the mapping group -> mergedGroups
   if (VERBOSE >0 ) {
+    vectorPrintShort( "  grpToMergedGrp", grpToMergedGrp, nGrp+1);
+  }
+  //
+  // Renumber the fused groups
+  //
+  int newGroupID = 0;
+  Mask_t map[nGrp+1];
+  vectorSetZeroShort( map, (nGrp+1) );
+  for (int g=1; g < (nGrp+1); g++) {
+    int gm = grpToMergedGrp[g];
+    if ( map[gm] == 0) {
+      newGroupID++;
+      map[gm] = newGroupID;
+    }
+  }
+  // vectorPrintShort( "  map", map, nGrp+1);
+  // Apply the renumbering
+  for (int g=1; g < (nGrp+1); g++) {
+    grpToMergedGrp[g] = map[ grpToMergedGrp[g] ];
+  }
+
+  // Perform the mapping group -> mergedGroups
+  if ( VERBOSE >0 ) {
     vectorPrintShort( "  grpToMergedGrp", grpToMergedGrp, nGrp+1);
   }
   for (int p=0; p < nPads; p++) {
     padMergedGrp[p] = grpToMergedGrp[ abs( padToGrp[p] ) ];
   }
-  // Integrate isolated pads
-  /* ???
-  Mask_t maskPadWithNoGrp[nPads];
-  nPadWithNoGrp = vectorBuildMaskEqualShort( padMergedGrp, 0, nPads, maskPadWithNoGrp) - 1;
-  for (int p=0; p < nPads; p++) {
-    if ( padMergedGrp[p] == 0 ) {
-      for( PadIdx_t *neigh_ptr = getNeighborsOf(neigh, p); *neigh_ptr != -1; neigh_ptr++) {
-        j = *neigh_ptr;
-        if (padMergedGrp[j] != 0) {
-          // propagate the grp
-          grpStatusChanged = 1;
-        }
-          padMergedGrp[p] = padMergedGrp[j]
-        }
-    }
-      getNeighborsOf( neighbours, p);
-    }
-  */
   if (CHECK) {
     for (int p=0; p < nPads; p++) {
       if ( (VERBOSE > 0) && (padMergedGrp[p] == 0)) {
@@ -2214,8 +2219,10 @@ int assignPadsToGroupFromProj( short *projPadGroup, int nProjPads,
       }
     }
   }
-  //
+  // Update the group of the proj-pads
+  vectorMapShort(projPadToGrp, grpToMergedGrp, nProjPads);
 
+  //
   return newGroupID;
 }
 
@@ -2309,7 +2316,7 @@ int renumberGroupsV2( Mask_t *cath0Grp, int nbrCath0, Mask_t *cath1Grp, int nbrC
     }
   }
   int newNbrGroups = currentGrp;
-  if (VERBOSE > 0) {
+  if ( VERBOSE > 0) {
     printf("[renumberGroups] nbrOfGroups=%d\n", newNbrGroups);
     vectorPrintShort("  cath0ToGrp", cath0Grp, nbrCath0);
     vectorPrintShort("  cath1ToGrp", cath1Grp, nbrCath1);
@@ -2357,7 +2364,7 @@ int renumberGroups( short *grpToGrp, int nGrp ) {
   return curGrp;
 }
 
-int assignGroupToCathPads( short *projPadGroup, int nPads, int nGrp, int nCath0, int nCath1, short *cath0ToGrp, short *cath1ToGrp) {
+int assignGroupToCathPads( short *projPadGroup, int nProjPads, int nGrp, int nCath0, int nCath1, short *cath0ToGrp, short *cath1ToGrp) {
   cath0ToGrpFromProj = new short[nCath0];
   cath1ToGrpFromProj = new short[nCath1];
   vectorSetZeroShort( cath0ToGrpFromProj, nCath0);
@@ -2381,7 +2388,7 @@ int assignGroupToCathPads( short *projPadGroup, int nPads, int nGrp, int nCath0,
     vectorCopyShort( projPadGroup, nCath0, cath0ToGrp);
     return nGrp;
   }
-  for( int k=0; k < nPads; k++) {
+  for( int k=0; k < nProjPads; k++) {
     g = projPadGroup[k];
     i = mapKToIJ[k].i; j = mapKToIJ[k].j;
     if (VERBOSE > 1) {
@@ -2417,59 +2424,6 @@ int assignGroupToCathPads( short *projPadGroup, int nPads, int nGrp, int nCath0,
          projGrpToCathGrp[g] = prevGroup1;
       }
     }
-
-    /*
-    //
-    // Cathode 0
-    //
-    if ( (i >= 0) && (nCath0 != 0) ) {
-      // Remark: if i is an alone pad (j<0)
-      // i is processed as well
-      prevGroup0 = cath0ToGrpFromProj[i];
-      if ( (prevGroup0 == 0) || (prevGroup0 == g) ) {
-        // No group before or same group
-        cath0ToGrpFromProj[i] = g;
-        if( projGrpToCathGrp[g] == 0 ) {
-          nCathGrp++;
-          projGrpToCathGrp[g] = nCathGrp;
-          printf("projGrpToCathGrp[g] = nCathGrp, g=%d,  nCathGrp=%d\n", g, nCathGrp);
-          vectorPrintShort("projGrpToCathGrp", projGrpToCathGrp, nGrp+1);
-        }
-      } else  {
-        // Already a Grp which differs
-        // Set the same cath-group
-        if( projGrpToCathGrp[g] == 0 ) {
-          projGrpToCathGrp[g] = projGrpToCathGrp[prevGroup0];
-          printf("projGrpToCathGrp[g] = projGrpToCathGrp[prevGroup0], g=%d,  projGrpToCathGrp[prevGroup0]=%d\n", g, projGrpToCathGrp[prevGroup0]);
-          vectorPrintShort("projGrpToCathGrp", projGrpToCathGrp, nGrp+1);
-        }
-      }
-    }
-    //
-    // Cathode 1
-    //
-    if ( (j >= 0) && (nCath1 != 0) ) {
-      // Remark: if j is an alone pad (i<0)
-      // j is processed as well
-      prevGroup1 = cath1ToGrpFromProj[j];
-      if ( (prevGroup1 == 0) || (prevGroup1 == g) ){
-        // No group before or same group
-        cath1ToGrpFromProj[j] = g;
-        if( projGrpToCathGrp[g] == 0 ) {
-            nCathGrp++;
-            projGrpToCathGrp[g] = nCathGrp;
-            printf("cath1 projGrpToCathGrp[g] = nCathGrp, g=%d,  nCathGrp=%d\n", g, nCathGrp);
-            vectorPrintShort("projGrpToCathGrp", projGrpToCathGrp, nGrp+1);
-        }
-      } else  {
-        // Already a Grp which differs
-        // Set the same cath-group
-        projGrpToCathGrp[g] = projGrpToCathGrp[prevGroup1];
-        printf("cath1 projGrpToCathGrp[g] = projGrpToCathGrp[prevGroup1], g=%d,  projGrpToCathGrp[prevGroup1]=%d\n", g, projGrpToCathGrp[prevGroup1]);
-        vectorPrintShort("projGrpToCathGrp", projGrpToCathGrp, nGrp+1);
-
-      }
-     */
   }
   if (VERBOSE > 2) {
     printf("assignGroupToCathPads\n");
@@ -2502,11 +2456,11 @@ int assignGroupToCathPads( short *projPadGroup, int nPads, int nGrp, int nCath0,
   vectorMapShort( cath1ToGrpFromProj, projGrpToCathGrp, nCath1);
   vectorCopyShort( cath1ToGrpFromProj, nCath1, cath1ToGrp);
 
-  for( i=0; i<nPads; i++) {
+  for( i=0; i<nProjPads; i++) {
     projPadGroup[i] = projGrpToCathGrp[ projPadGroup[i] ];
   }
   if (VERBOSE > 1) {
-    vectorPrintShort("  projPadGroup", projPadGroup, nPads);
+    vectorPrintShort("  projPadGroup", projPadGroup, nProjPads);
     vectorPrintShort("  cath0ToGrp", cath0ToGrp, nCath0);
     vectorPrintShort("  cath1ToGrp", cath1ToGrp, nCath1);
   }
@@ -2571,6 +2525,10 @@ void updateProjectionGroups ( short *projPadToGrp, int nProjPads, const short *c
     if (VERBOSE > 0) {
       printf("[updateProjectionGroups]\n");
     }
+    Group_t savePadGrp[nProjPads];
+    if (CHECK) {
+      vectorCopyShort(projPadToGrp, nProjPads, savePadGrp );
+    }
     for (int k=0; k < nProjPads; k++) {
          MapKToIJ_t ij = mapKToIJ[k];
          PadIdx_t i = ij.i;
@@ -2587,7 +2545,8 @@ void updateProjectionGroups ( short *projPadToGrp, int nProjPads, const short *c
            // projPadToGrp[k] = grpToGrp[ projPadToGrp[k] ];
            projPadToGrp[k] = cath0ToGrp[i];
            if ( CHECK && (cath0ToGrp[i] != cath1ToGrp[j]) ) {
-             throw std::overflow_error("updateProjectionGroups cath0ToGrp[i] != cath1ToGrp[j]");
+             printf("  [updateProjectionGroups] i, cath0ToGrp[i]=(%d, %d); j, cath1ToGrp[j]=(%d, %d)\n", i, cath0ToGrp[i], j, cath1ToGrp[j]);
+             // throw std::overflow_error("updateProjectionGroups cath0ToGrp[i] != cath1ToGrp[j]");
            }
            // printf("  projPadToGrp[k] = grpToGrp[ projPadToGrp[k] ], i=%d, j=%d, k=%d \n", i, j, k);
          } else {
@@ -2596,6 +2555,17 @@ void updateProjectionGroups ( short *projPadToGrp, int nProjPads, const short *c
     }
     if (VERBOSE > 0) {
       vectorPrintShort("  updated projGrp", projPadToGrp, nProjPads);
+    }
+    if (0 && CHECK) {
+        bool same=true;
+        for( int p=0; p < nProjPads; p++) {
+            same = same && (projPadToGrp[p] == savePadGrp[p] );
+        }
+        if (same == false) {
+            vectorPrintShort("  WARNING: old projPadToGrp", savePadGrp, nProjPads);
+            vectorPrintShort("  WARNING: new projPadToGrp", projPadToGrp, nProjPads);
+            // throw std::overflow_error("updateProjectionGroups projection has changed");
+        }
     }
 }
 
@@ -3449,7 +3419,7 @@ Pads *findLocalMaxWithPET( const Pads &cath0, const Pads &cath1, const Pads &pro
 
     /// ??? Verify if not already done
     // Already done if 1 group
-    int verbose = 1;
+    int verbose = 0;
     PadIdx_t *neighCath0 =getFirstNeighbors(cath0);
     PadIdx_t *neighCath1 =getFirstNeighbors(cath1);
     // Pads *bPads0 = addBoundaryPads( cath0, neighborsCath0);
@@ -3501,7 +3471,7 @@ Pads *findLocalMaxWithPET( const Pads &cath0, const Pads &cath1, const Pads &pro
       dof = nMaxPads - 3*nParameters +1;
       // dof = nMaxPads - 3*nParameters+2;
       if (dof == 0) dof = 1;
-      if (VERBOSE > 0) {
+      if (1 || VERBOSE > 0) {
         printf("  CHI2 step %d: chi2=%8.2f, nParam=%d, sqrt(chi2)/nPads=%8.2f,  chi2/dof=%8.2f, sqrt(chi2)/dof=%8.2f\n", macroIt, chi2, nParameters, sqrt(chi2) / nMaxPads,  chi2 / dof, sqrt(chi2) / dof);
       }
       inspectSavePixels( macroIt, *pixels);
@@ -3578,6 +3548,37 @@ Pads *findLocalMaxWithPET( const Pads &cath0, const Pads &cath1, const Pads &pro
     double qCut = cutRatio * vectorMax ( localMax->q, localMax->nPads);
     int k=0;
     double qSum = 0.0;
+    // Remove the last hits if > (nMaxPads +1) / 3
+    int nMaxSolutions = int( (std::max( cath0.nPads, cath0.nPads) + 1.0 ) / 3.0);
+    // if (nMaxSolutions < 1) {
+    //     nMaxSolutions = 1;
+    //}
+    // To avoid 0 possibility and give more inputs to the fitting
+    nMaxSolutions +=1;
+    printf("--> Reduce the nbr max of solutions=%d, nLocMax=%d\n", nMaxSolutions, localMax->nPads );
+    if (localMax->nPads > nMaxSolutions ) {
+      printf("--> Reduce the nbr of solutions to fit: Take %d/%d solutions\n", nMaxSolutions, localMax->nPads );
+      int index[localMax->nPads];
+      for( int k=0; k<localMax->nPads; k++) { index[k]=k; }
+      std::sort( index, &index[localMax->nPads], [=](int a, int b){ return (localMax->q[a] > localMax->q[b]); });
+      // Reoder
+      /*
+      for (int i=0; i<localMax->nPads; i++) {
+        q[i] = localMax->q[index[i]];
+        x[i] = localMax->x[index[i]];
+        y[i] = localMax->y[index[i]];
+        dx[i] = localMax->dx[index[i]];
+        dy[i] = localMax->dy[index[i]];
+      }
+      for (int i=0; i<localMax->nPads; i++) {
+        localMax->q[i] = q[i];
+        localMax->x[i] = x[i];
+        localMax->y[i] = y[i];
+        localMax->dx[i] = dx[i];
+        localMax->dy[i] = dy[i];
+      }*/
+      qCut = localMax->q[index[nMaxSolutions-1]] - 1.e-03;
+    }
     for (int i=0; i<localMax->nPads; i++) {
       if (localMax->q[i] > qCut) {
         qSum += localMax->q[i];
@@ -3614,7 +3615,7 @@ Pads *findLocalMaxWithPET( const Pads &cath0, const Pads &cath1, const Pads &pro
       localMax->q[i] = localMax->q[i] / qSum;
     }
 
-    if (VERBOSE > 0) {
+    if (1 || VERBOSE > 0) {
       printf( "---> Final cut %d percent (qcut=%8.2f), number of local max removed = %d\n", int(cutRatio*100), qCut, removedLocMax);
     }
     // ??? chisq = computeChiSq( xyInfSup, q, chId, refinedTheta )
@@ -3838,7 +3839,7 @@ Pads *findLocalMaxWithPETV0( const Pads &cath0, const Pads &cath1, const Pads &p
     int removedLocMax = localMax->nPads - k;
     localMax->nPads = k;
     // Quality
-    if ( localMax->nPads > 1) {
+    if ( 0 && localMax->nPads > 1) {
       Pads copyLocalMax( *localMax, o2::mch::Pads::xydxdyMode );
       printf("Quality test\n");
       PoissonEMLoop( *pads, copyLocalMax, 0, 0.5, 60, 1 );
@@ -3848,11 +3849,12 @@ Pads *findLocalMaxWithPETV0( const Pads &cath0, const Pads &cath1, const Pads &p
       PoissonEMLoop( *pads, *testLocalMax, 0, 0.5, 60, 1 );
       delete testLocalMax;
     }
-    // Remove the last hit
+
+
 
     // Weight normalization
     for (int i=0; i<localMax->nPads; i++) {
-      printf( "??? q[i]=%f, qSum=%f\n", localMax->q[i], qSum);
+      printf( "??? Weight normalizationq[i]=%f, qSum=%f\n", localMax->q[i], qSum);
       localMax->q[i] = localMax->q[i] / qSum;
     }
 
@@ -3869,7 +3871,7 @@ Pads *findLocalMaxWithPETV0( const Pads &cath0, const Pads &cath1, const Pads &p
 int findLocalMaxWithPET( double *xyDxyGrp0, double *qGrp0, Mask_t *saturate0, int nbrOfPadsInTheGroupCath0,
                          double *xyDxyGrp1, double *qGrp1, Mask_t *saturate1, int nbrOfPadsInTheGroupCath1,
                          double *xyDxyProj, double *qProj, int nProjPads, int chId,
-                         const PadIdx_t *mapGrpIdxToI, const PadIdx_t *mapGrpIdxToJ, int nbrCath0, int nbrCath1,
+                         // const PadIdx_t *mapGrpIdxToI, const PadIdx_t *mapGrpIdxToJ, int nbrCath0, int nbrCath1,
                          double *thetaL, int nbrOfPadsInTheGroupCath) {
     int N0 = nbrOfPadsInTheGroupCath0;
     int N1 = nbrOfPadsInTheGroupCath1;

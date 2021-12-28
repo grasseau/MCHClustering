@@ -83,7 +83,7 @@ int findLocalMaxWithLaplacian(const double* xyDxy, const double* z,
   int findLocalMaxWithPET( double *xyDxyGrp0, double *qGrp0, Mask_t *saturateGrp0, int nbrOfPadsInTheGroupCath0, 
                          double *xyDxyGrp1, double *qGrp1, Mask_t *saturateGrp1, int nbrOfPadsInTheGroupCath1, 
                          double *xyDxyProj, double *qProj, int nProjPads, int chId, 
-                         const PadIdx_t *mapGrpIdxToI, const PadIdx_t *mapGrpIdxToJ, int nbrCath0, int nbrCath1,
+                         // const PadIdx_t *mapGrpIdxToI, const PadIdx_t *mapGrpIdxToJ, int nbrCath0, int nbrCath1,
                          double *thetaL, int nbrOfPadsInTheGroupCath);
   
   void inspectSavePixels( int which, o2::mch::Pads &pixels  );
@@ -106,7 +106,7 @@ void assignCathPadsToGroupFromProj(short* padGroup, int nPads, int nGrp, int nCa
 int assignCathPadsToGroup(short* matGrpGrp, int nGrp, int nCath0, int nCath1, short* grpToGrp);
 
   int assignPadsToGroupFromProj( short *projPadGroup, int nProjPads, const PadIdx_t *, const PadIdx_t *, int nGrp, int nPads, 
-                                 short *padGrp, short* grpToMergedGrp); 
+                                 short *padGrp); 
   
   int renumberGroups( short *grpToGrp, int nGrp );
   int renumberGroupsV2( Mask_t *cath0Grp, int nbrCath0, Mask_t *cath1Grp, int nbrCath1, Mask_t *grpToGrp, int nGrp );

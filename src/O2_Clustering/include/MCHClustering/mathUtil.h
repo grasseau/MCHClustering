@@ -383,7 +383,7 @@ inline static void vectorMaskedUpdate(const Mask_t* mask, const double* vTrue, i
 inline static double vectorMaskedSum(const double* v, const Mask_t* mask, int N)
 {
   double sum = 0;
-  for (int i = 0, k = 0; i < N; i++) {
+  for (int i = 0; i < N; i++) {
     sum += v[i] * mask[i];
   }
   return sum;
@@ -391,7 +391,7 @@ inline static double vectorMaskedSum(const double* v, const Mask_t* mask, int N)
 
 inline static void vectorMaskedMult(const double* v, const Mask_t* mask, int N, double* res)
 {
-  for (int i = 0, k = 0; i < N; i++) {
+  for (int i = 0; i < N; i++) {
     res[i] = v[i] * mask[i];
   }
   return;
@@ -399,7 +399,7 @@ inline static void vectorMaskedMult(const double* v, const Mask_t* mask, int N, 
 
 inline static void vectorMaskedMultScalar( double *v, const Mask_t *mask, double trueVal, double falseVal, int N )
 {
-  for (int i=0, k=0; i < N; i++) {
+  for (int i=0; i < N; i++) {
     v[i] = (mask[i]) ? v[i]*trueVal : v[i]*falseVal;
   }
   return;
