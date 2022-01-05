@@ -18,7 +18,12 @@
 #include <cstddef>
 #include <algorithm>
 
-typedef short Mask_t;
+#include "MCHClustering/PadsPEM.h"
+
+namespace o2
+{
+namespace mch
+{
 
 inline static void vectorSetZero(double* u, int N)
 {
@@ -37,6 +42,14 @@ inline static void vectorSetZeroInt(int* u, int N)
 }
 
 inline static void vectorSetZeroShort(short* u, int N)
+{
+  for (int i = 0; i < N; i++) {
+    u[i] = 0;
+  }
+  return;
+}
+
+inline static void vectorSetZeroChar(char* u, int N)
 {
   for (int i = 0; i < N; i++) {
     u[i] = 0;
@@ -160,6 +173,15 @@ inline static int vectorSumShort(const short* u, int N)
   return res;
 }
 
+inline static int vectorSumChar(const char* u, int N)
+{
+  int res = 0;
+  for (int i = 0; i < N; i++) {
+    res += u[i];
+  }
+  return res;
+}
+
 inline static int vectorSumRowInt(const int* matrix, int N, int M)
 {
   int res = 0;
@@ -170,6 +192,24 @@ inline static int vectorSumRowInt(const int* matrix, int N, int M)
 }
 
 inline static int vectorSumColumnInt(const int* matrix, int N, int M)
+{
+  int res = 0;
+  for (int i = 0; i < N; i++) {
+    res += matrix[i * M];
+  }
+  return res;
+}
+
+inline static int vectorSumRowChar(const char* matrix, int N, int M)
+{
+  int res = 0;
+  for (int j = 0; j < M; j++) {
+    res += matrix[j];
+  }
+  return res;
+}
+
+inline static int vectorSumColumnChar(const char* matrix, int N, int M)
 {
   int res = 0;
   for (int i = 0; i < N; i++) {
@@ -416,5 +456,14 @@ void vectorPrint(const char* str, const double* x, int N);
 void vectorPrintInt(const char* str, const int* x, int N);
 void vectorPrintShort(const char* str, const short* x, int N);
 void vectorPrint2Columns(const char* str, const double* x, const double* y, int N);
+
+void printMatrixInt( const char *str, const int *matrix, int N, int M);
+void printMatrixShort( const char *str, const short *matrix, int N, int M);
+void printMatrixChar( const char *str, const char *matrix, int N, int M);
+
+void printInterMap( const char *str, const PadIdx_t *inter, int N);
+
+} // namespace mch
+} // namespace o2
 
 #endif // _MATHUTIL_H

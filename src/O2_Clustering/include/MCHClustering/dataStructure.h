@@ -12,10 +12,18 @@
 #ifndef _DATASTRUCT_H
 #define _DATASTRUCT_H
 
-#include "mathUtil.h"
+typedef short Mask_t;
 
-typedef int PadIdx_t;
+#include "MCHClustering/PadsPEM.h"
 
+//#include "mathUtil.h"
+
+// ??? typedef int PadIdx_t;
+
+namespace o2
+{
+namespace mch
+{
 // theta
 double* getVarX(double* theta, int K);
 double* getVarY(double* theta, int K);
@@ -70,5 +78,8 @@ void maskedCopyTheta(const double* theta, int K, const Mask_t* mask, int nMask, 
 void printTheta(const char* str, const double* theta, int K);
 
 void printXYdXY(const char* str, const double* xyDxy, int NMax, int N, const double* val1, const double* val2);
+
+} // namespace mch
+} // namespace o2
 
 #endif // _DATASTRUCT_H

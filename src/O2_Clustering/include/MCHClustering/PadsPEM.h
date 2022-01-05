@@ -18,10 +18,14 @@
 #define ALICEO2_MCH_PADSPEM_H_
 
 #include "MCHClustering/dataStructure.h"
+
+typedef int PadIdx_t;    // Pad index type
+typedef short Groups_t;   // Pad index type
 namespace o2
 {
 namespace mch
 {
+
 struct Pads {
   enum padMode {
    xydxdyMode = 0x0,    ///< x, y, dx, dy pad coordinates

@@ -15,9 +15,9 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
 
-#include "PadsPEM.h"
+#include "MCHClustering/PadsPEM.h"
 #include "MCHClustering/dataStructure.h"
-#include "MCHClustering/mathUtil.h"
+#include "mathUtil.h"
 #include "MCHClustering/mathieson.h"
 
 # define VERBOSE 0

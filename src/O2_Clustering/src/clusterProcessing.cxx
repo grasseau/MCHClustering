@@ -4,9 +4,8 @@
 # include <stdexcept>
 
 #include "MCHClustering/dataStructure.h"
-#include "MCHClustering/mathUtil.h"
 #include "MCHClustering/padProcessing.h"
-#include "MCHClustering/mathUtil.h"
+#include "mathUtil.h"
 #include "MCHClustering/clusterProcessing.h"
 #include "MCHClustering/mathieson.h"
 #include "gaussianEM.h"

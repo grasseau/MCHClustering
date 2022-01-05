@@ -16,7 +16,7 @@
 #include <gsl/gsl_blas.h>
 
 #include "MCHClustering/dataStructure.h"
-#include "MCHClustering/mathUtil.h"
+#include "mathUtil.h"
 #include "gaussianEM.h"
 
 //

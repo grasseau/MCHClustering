@@ -17,7 +17,8 @@
 #include <stdexcept>
 #include <cstring>
 
-#include "PadsPEM.h"
+#include "MCHClustering/PadsPEM.h"
+#include "mathUtil.h"
 
 namespace o2
 {

@@ -12,7 +12,12 @@
 #include <cstdio>
 
 #include "MCHClustering/dataStructure.h"
+#include "mathUtil.h"
 
+namespace o2
+{
+namespace mch
+{
 // theta
 double* getVarX(double* theta, int K) { return &theta[0 * K]; };
 double* getVarY(double* theta, int K) { return &theta[1 * K]; };
@@ -229,3 +234,6 @@ void printXYdXY(const char* str, const double* xyDxy, int NMax, int N, const dou
     }
   }
 }
+
+} // namespace mch
+} // namespace o2

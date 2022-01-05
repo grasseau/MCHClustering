@@ -14,9 +14,13 @@
 #include <stdexcept>
 
 #include "MCHClustering/dataStructure.h"
-#include "MCHClustering/mathUtil.h"
+#include "mathUtil.h"
 #include "MCHClustering/mathieson.h"
 
+namespace o2
+{
+namespace mch
+{
 // Chamber 1, 2
 const double sqrtK3x1_2 = 0.7000; // Pitch= 0.21 cm
 const double sqrtK3y1_2 = 0.7550; // Pitch= 0.21 cm
@@ -156,10 +160,6 @@ void computeCij( const double *xyInfSup0, const double *theta,
     }
 }
 
-namespace o2
-{
-namespace mch
-{
 void computeCij( const Pads &pads, const Pads &theta,double Cij[] ) {
     // ??? Rewrite the comments
     // Returning array: Charge Integral on all the pads
