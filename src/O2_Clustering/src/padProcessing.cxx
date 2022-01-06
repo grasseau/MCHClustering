@@ -154,6 +154,7 @@ int getNbrProjectedPads() { return nbrOfProjPads; };
 void setNbrProjectedPads( int n) { nbrOfProjPads = n; maxNbrOfProjPads= n; };
 
 void storeProjectedPads ( const double *xyDxyProj, const double *z, int nPads) {
+  if (nPads == 0 ) return;
   projected_xyDxy = new double[nPads*4];
   projCh0 = new double[nPads];
   projCh1 = new double[nPads];
@@ -332,6 +333,7 @@ int getIndexByColumns( PadIdx_t *matrix, PadIdx_t N, PadIdx_t M, PadIdx_t *JIdx)
 PadIdx_t *getFirstNeighbors( const double *X, const double *Y, const double *DX, const double *DY, int N, int verbose) {
   const double eps = 1.0e-5;
   const double relEps = (1.0 + 1.0e-7);
+  if( N == 0 ) return nullptr;
   PadIdx_t *neighbors_ = new PadIdx_t[MaxNeighbors*N];
   for( PadIdx_t i=0; i<N; i++) {
     PadIdx_t *i_neigh = getNeighborsOf(neighbors_, i);
@@ -378,7 +380,7 @@ PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN, int ver
 
 /// Used ???
 void computeAndStoreFirstNeighbors( const double *xyDxy, int N, int allocatedN) {
-  neighbors = getFirstNeighbors( xyDxy, N, allocatedN, VERBOSE);
+  if( N != 0) neighbors = getFirstNeighbors( xyDxy, N, allocatedN, VERBOSE);
 }
 
 int buildProjectedPads(
@@ -505,9 +507,11 @@ o2::mch::Pads *addBoundaryPads( const double *x_, const double *y_, const double
   std::vector<int> bCath;
   int n1 = vectorSumShort(cath_, N);
   int nPads_[2] = {N-n1, n1};
+  printf("??? n0=%d n1=%d N=%d\n", nPads_[0], nPads_[1], N);
 
   for (int c=0; c < 2; c++) {
     int nc = nPads_[c];
+    if (nc == 0 ) continue;
     Mask_t mask[N];
     double x[nc], y[nc], dx[nc], dy[nc], q[nc], sat[nc];
     vectorBuildMaskEqualShort( cath_, c, N, mask);
@@ -517,6 +521,7 @@ o2::mch::Pads *addBoundaryPads( const double *x_, const double *y_, const double
     vectorGather(dy_, mask, N, dy);
 
     PadIdx_t *neighC = getFirstNeighbors( x, y, dx, dy, nc, VERBOSE );
+    printf("??? neighC=%p\n", neighC);
 
     for (int i=0; i < nc; i++) {
       bool east = true, west = true, north = true, south = true;
@@ -569,7 +574,9 @@ o2::mch::Pads *addBoundaryPads( const double *x_, const double *y_, const double
         bCath.push_back( c );
       }
     }
-    delete neighC;
+    printf("??? neighC=%p\n", neighC);
+    printNeighbors( neighC, nc);
+    delete [] neighC;
   }
 
   int nPadToAdd = bX.size();
@@ -2365,8 +2372,8 @@ int renumberGroups( short *grpToGrp, int nGrp ) {
 }
 
 int assignGroupToCathPads( short *projPadGroup, int nProjPads, int nGrp, int nCath0, int nCath1, short *cath0ToGrp, short *cath1ToGrp) {
-  cath0ToGrpFromProj = new short[nCath0];
-  cath1ToGrpFromProj = new short[nCath1];
+  if (nCath0 != 0) cath0ToGrpFromProj = new short[nCath0];
+  if (nCath1 != 0) cath1ToGrpFromProj = new short[nCath1];
   vectorSetZeroShort( cath0ToGrpFromProj, nCath0);
   vectorSetZeroShort( cath1ToGrpFromProj, nCath1);
   vectorSetZeroShort( cath0ToGrp, nCath0);
@@ -2792,15 +2799,15 @@ void freeMemoryPadProcessing() {
   //
   // Intersection matrix
   if( IInterJ != 0) {
-    delete IInterJ;
+    delete [] IInterJ;
     IInterJ = 0;
   }
   if( JInterI != 0) {
-    delete JInterI;
+    delete [] JInterI;
     JInterI = 0;
   }
   if( intersectionMatrix != 0) {
-    delete intersectionMatrix;
+    delete [] intersectionMatrix;
     intersectionMatrix = 0;
   }
   // Isolated pads
@@ -2819,27 +2826,27 @@ void freeMemoryPadProcessing() {
   //
   // Maps
   if( mapKToIJ != 0) {
-    delete mapKToIJ;
+    delete [] mapKToIJ;
     mapKToIJ = 0;
   }
   if( mapIJToK != 0) {
-    delete mapIJToK;
+    delete [] mapIJToK;
     mapIJToK = 0;
   }
   //
   // Neighbors
   if( neighbors != 0) {
-    delete neighbors;
+    delete [] neighbors;
     neighbors = 0;
   }
   // Neighbors
   if( neighborsCath0 != 0) {
-    delete neighborsCath0;
+    delete [] neighborsCath0;
     neighborsCath0 = 0;
   }
   // Neighbors
   if( neighborsCath1 != 0) {
-    delete neighborsCath1;
+    delete [] neighborsCath1;
     neighborsCath1 = 0;
   }
   // Grp Neighbors
@@ -2855,40 +2862,40 @@ void freeMemoryPadProcessing() {
   */
   // Projected Pads
   if( projected_xyDxy != 0) {
-    delete projected_xyDxy;
+    delete [] projected_xyDxy;
     projected_xyDxy = 0;
   }
   // Charge on the projected pads
   if( projCh0 != 0) {
-    delete projCh0;
+    delete [] projCh0;
     projCh0 = 0;
   }
   if( projCh1 != 0) {
-    delete projCh1;
+    delete [] projCh1;
     projCh1 = 0;
   }
   if( minProj != 0) {
-    delete minProj;
+    delete [] minProj;
     minProj = 0;
   }
   if( maxProj != 0) {
-    delete maxProj;
+    delete [] maxProj;
     maxProj = 0;
   }
   if( cath0ToGrpFromProj != 0) {
-    delete cath0ToGrpFromProj;
+    delete [] cath0ToGrpFromProj;
     cath0ToGrpFromProj = 0;
   }
   if( cath1ToGrpFromProj != 0) {
-    delete cath1ToGrpFromProj;
+    delete [] cath1ToGrpFromProj;
     cath1ToGrpFromProj = 0;
   }
   if( cath0ToTGrp != 0) {
-    delete cath0ToTGrp;
+    delete [] cath0ToTGrp;
     cath0ToTGrp = 0;
   }
   if( cath1ToTGrp != 0) {
-    delete cath1ToTGrp;
+    delete [] cath1ToTGrp;
     cath1ToTGrp = 0;
   }
 

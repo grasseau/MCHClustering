@@ -278,9 +278,9 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   selected = True if nbrHits > 10 else False
   selected = diffNbrOfSeeds and chId > 8
   selected = diffNbrOfSeeds 
-  selected = True
   selected = (nbrOfGroups > 1)
   selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
+  selected = True
   
   if display and selected:
     nFigRow = 2; nFigCol = 4
@@ -477,7 +477,7 @@ if __name__ == "__main__":
   RecoTracks = IOTracks.Tracks("/home/grasseau/TracksReco.dat")
   RecoTracks.read()
   
-  if 1:
+  if 0:
     for pc in reco:
       # processPreCluster ( pc, display=True, displayBefore=False )
       processPreCluster ( pc, display=True, displayBefore=False )
@@ -526,10 +526,11 @@ if __name__ == "__main__":
       if (orbit == 0) and (irof in PCList):
         processPreCluster ( pc, display=True, displayBefore=True )
       """
-      if (orbit==3) and (irof==329):
-        processPreCluster ( pc, display=True, displayBefore=True )
-      if (orbit==7) and (irof==319):
-        processPreCluster ( pc, display=True, displayBefore=True )
+      #if (orbit==6) and (irof in [80, 81, 82,83, 84, 85 ]):
+      #  processPreCluster ( pc, display=True, displayBefore=False )
+      # if (orbit==2) and (irof in [365, 366, 367 ]):
+      if (orbit==22) and (irof in [1100, 1101, 1102 ]):
+        processPreCluster ( pc, display=True, displayBefore=False )
   # reco.read(verbose=True)
   # nPreClusters = len(reco.padX )
   # for ipc in range(0, nPreClusters ):
