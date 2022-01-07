@@ -488,132 +488,6 @@ void getIndexInPadProjGrp( const Mask_t *maskThetaGrp, const int *thetaPadProjId
   }
 }
 
-int kOptimizer( double *xyDxy, Mask_t *saturated, double *z,
-                double *theta, int K, int N,
-                int    *mapThetaToPadIdx,
-                double *thetaOpt, Mask_t *thetaOptMask ) {
-  // ??? Do something for thetaOptMask or take w[k] = 0
-  //
-  const double relEps = (1.0 + 1.0e-4);
-  // theta
-  double *w    = getW   ( theta, K);
-  double *muX  = getMuX ( theta, K);
-  double *muY  = getMuY ( theta, K);
-  // dx, dy pads
-  double *projX = getX( xyDxy, N);
-  double *projY = getY( xyDxy, N);
-  double *projDX = getDX( xyDxy, N);
-  double *projDY = getDY( xyDxy, N);
-  // Local allocation
-  Mask_t proximityMatrix[K*K];
-  short sumRow[K];
-  // short done[K];
-  vectorSetZeroShort( proximityMatrix, K*K);
-
-  if (VERBOSE) printf("kOptimizer K=%d\n", K);
-  // vectorPrintInt("  pad associated with a max", mapThetaToPadIdx, K);
-  //
-  // Build the proximityMatrix (parameter's neighbors)
-  //
-  for( int k0=0; k0 < K; k0++ ) {
-    double x0 = muX[ k0 ];
-    double y0 = muY[ k0 ];
-    double dx0 = projDX[ mapThetaToPadIdx[k0] ];
-    double dy0 = projDY[ mapThetaToPadIdx[k0] ];
-    int rowCumul = 0;
-    for( int k1=k0+1; k1 < K; k1++ ) {
-      double x1 = muX[ k1 ];
-      double y1 = muY[ k1 ];
-      double dx1 = projDX[ mapThetaToPadIdx[k1] ];
-      double dy1 = projDY[ mapThetaToPadIdx[k1] ];
-      // printf(" x ... %g %g %g %g\n", x0, x1, dx0, dx1 );
-      // printf(" y ... %g %g %g %g\n", y0, y1, dy0, dy1 );
-      // printf(" dx, dx0+dx1,  dy, dy0+dy1,... %g %g %g %g\n", fabs (x0 - x1), ( dx0 + dx1), fabs (y0 - y1),  ( dy0 + dy1));
-      Mask_t maskX = fabs (x0 - x1) < relEps * ( dx0 + dx1);
-      Mask_t maskY = fabs (y0 - y1) < relEps * ( dy0 + dy1);
-      proximityMatrix[ k0*K + k1] = maskX && maskY;
-      // Not used proximityMatrix[ k1*K + k0] = maskX && maskY;
-      if( maskX && maskY ) rowCumul += 1;
-    }
-    sumRow[k0] = rowCumul;
-  }
-  if (VERBOSE) printMatrixShort( "  proximity Matrix", proximityMatrix, K, K);
-  //
-  // EM on all k's
-  double thetaTest[5*K];
-  vectorCopy( theta, 5*K, thetaTest);
-  // Mask_t thetaMaskOpt[K];
-  vectorSetShort( thetaOptMask, 1, K);
-  double minBIC = weightedEMLoop( xyDxy, saturated, z,
-              theta, thetaOptMask, K, N,
-              EMmode, EMConvergence, EMverbose, thetaOpt);
-  if (VERBOSE) {
-    printTheta( "Config with all theta", theta, K);
-    printf("  BIC %8g.3\n", minBIC);
-  }
-  //
-  // Try to fusion k's
-  int betterConfig = 0;
-  Mask_t thetaTestMask[K];
-  double thetaTestResult[5*K];
-  for( int k0=0; k0 < K; k0++ ) {
-    // printf(" ??? sumRow[%d] %d\n", k0, sumRow[k0]);
-    if ( sumRow[k0] > 0 ) {
-      // Theta to test
-      vectorCopy( thetaOpt, 5*K, thetaTest);
-      double *wTest  = getW   ( thetaTest, K);
-      double *xTest  = getMuX ( thetaTest, K);
-      double *yTest  = getMuY ( thetaTest, K);
-      vectorCopyShort( thetaOptMask, K, thetaTestMask);
-      double wSum = w[k0];
-      double xSum = muX[ k0 ];
-      double ySum = muY[ k0 ];
-      int n = 1;
-      for( int k1=k0+1; k1 < K; k1++ ) {
-        if ( proximityMatrix[ k0*K + k1] ) {
-          xSum += muX[ k1 ];
-          ySum += muY[ k1 ];
-          wSum += w[k1];
-          wTest[k1] = 0.;
-          thetaTestMask[k1] = 0;
-          n++;
-        }
-      }
-      xTest[k0] = xSum / n;
-      yTest[k0] = ySum / n;
-      wTest[k0] = wSum ;
-      if (VERBOSE) {
-        printTheta("  Config theta", thetaTest, K);
-        vectorPrintShort("  thetaTestMask", thetaTestMask, K);
-      }
-      double BIC = weightedEMLoop( xyDxy, saturated, z,
-              thetaTest, thetaTestMask, K, N,
-              EMmode, EMConvergence, EMverbose, thetaTestResult);
-      if (VERBOSE) {
-        printf(" kOptimizer BIC %10.5g\n", BIC );
-      }
-      // if ( BIC < minBIC) {
-      printf(" kOptimizer BIC Test %10.5g > %10.5g \n", fabs( BIC - minBIC),  0.04 * fabs( minBIC));
-      if ( (BIC > minBIC) && fabs( BIC - minBIC) > 0.04 * fabs( minBIC) ) {
-        minBIC = BIC;
-        // Copy Configuration
-        vectorCopy( thetaTestResult, 5*K, thetaOpt );
-        vectorCopyShort( thetaTestMask, K, thetaOptMask);
-        betterConfig = 1;
-        if (VERBOSE) {
-          printTheta("New best theta config.", thetaOpt, K);
-        }
-      }
-    }
-  }
-  //
-  int newK = K;
-  if ( betterConfig) {
-    newK = vectorSumShort( thetaOptMask, K );
-  }
-  return newK;
-}
-
 void computeMathiesonResidual( const double *xyDxy, const Mask_t *cath, const double *zObs, const double *theta, int chId, int K, int N, double *residual) {
 
   // GG duplicated code with EM module ???
@@ -762,6 +636,10 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
   //
   double xy0InfSup[nbrCath0*4];
   double xy1InfSup[nbrCath1*4];
+
+  // ???????????????????????????????????????
+  // nProjPads = cluster.buildProjectedGeometry(includeAlonePads);
+
   if ( uniqueCath == -1) {
     //
     // 2 planes of cathodes
