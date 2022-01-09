@@ -1417,6 +1417,7 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
       // pError (output)
       double pError[3*filteredK*3*filteredK];
       if (VERBOSE > 0) {
+        printf( "\n");
         printf( "Starting the fitting\n");
         printf( "- # cath0, cath1 for fitting: %2d %2d\n", n0, n1);
         printTheta("- thetaEMFinal", thetaEMFinal, filteredK);
@@ -1428,8 +1429,8 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
                          thetaFit, khi2, pError
                   );
       } else {
-        printf("---> Fitting parameters to large : k=%d, 3k-1=%d, nFit=%d\n", filteredK, filteredK * 3 -1, nFit);
-        printf("     keep the EM solution\n");
+        printf("- Fitting parameters to large : k=%d, 3k-1=%d, nFit=%d\n", filteredK, filteredK * 3 -1, nFit);
+        printf("  keep the EM solution\n");
         vectorCopy( thetaEMFinal, filteredK*5, thetaFit);
       }
       if (VERBOSE) {
@@ -1442,10 +1443,12 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
       double *thetaFitFinal = new double[5*finalK];
       if ( (finalK != filteredK) && (nFit >= finalK ) ) {
         if (VERBOSE) {
-          printf("Filtering the fitting K=%d >= filteredK=%d\n", nFit, finalK);
-          printTheta("- thetaFitFinal", thetaFitFinal, finalK);
+          printf("- Filtering the fitting nFit=%d >= finalK=%d, filteredK=%d\n", nFit, finalK, filteredK);
         }
         if( finalK > 0) {
+          if (VERBOSE) {
+            printf("- Filter the hits & do again a fitting K=%d\n", filteredK);
+          }
           maskedCopyTheta( thetaFit, filteredK, maskFilterFit, filteredK, thetaFitFinal, finalK);
           fitMathieson( thetaFitFinal, xyDxyFit, zFit, cath, notSaturatedFit,
                       zCathTotalCharge, finalK, nFit,
@@ -1453,16 +1456,24 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
                       thetaFitFinal, khi2, pError
                     );
         } else {
-           // No hit with the fitting
-           vectorCopy( thetaEMFinal, filteredK*5, thetaFit);
-           finalK = filteredK;
+           // No hit with the fitting, keep the EM hits
+          if (VERBOSE) {
+            printf("- Keep the EM Result K=%d\n", filteredK);
+          }
+          vectorCopy( thetaEMFinal, filteredK*5, thetaFit);
+          finalK = filteredK;
         }
       } else {
+        if (VERBOSE) {
+          printf("- Keep the first fitting K=%d\n", filteredK);
+        }
         vectorCopy( thetaFit, filteredK*5, thetaFitFinal);
         finalK = filteredK;
       }
       nbrOfHits += finalK;
-
+      if (VERBOSE) {
+        printTheta("- thetaFitFinal", thetaFitFinal, finalK);
+      }
       // Store result (hits/seeds)
       appendInThetaList( thetaFitFinal, finalK, subClusterThetaList);
       deleteDouble( thetaEMFinal );

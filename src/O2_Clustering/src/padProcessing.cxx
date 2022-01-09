@@ -521,7 +521,6 @@ o2::mch::Pads *addBoundaryPads( const double *x_, const double *y_, const double
     vectorGather(dy_, mask, N, dy);
 
     PadIdx_t *neighC = getFirstNeighbors( x, y, dx, dy, nc, VERBOSE );
-    printf("??? neighC=%p\n", neighC);
 
     for (int i=0; i < nc; i++) {
       bool east = true, west = true, north = true, south = true;
@@ -574,8 +573,6 @@ o2::mch::Pads *addBoundaryPads( const double *x_, const double *y_, const double
         bCath.push_back( c );
       }
     }
-    printf("??? neighC=%p\n", neighC);
-    printNeighbors( neighC, nc);
     delete [] neighC;
   }
 
