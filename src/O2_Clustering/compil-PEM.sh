@@ -8,7 +8,7 @@ g++ -c -fPIC $OPT -Iinclude -Isrc src/Cluster.cxx
 g++ -c -fPIC $OPT -Iinclude -Isrc src/dataStructure.cxx 
 g++ -c -fPIC $OPT -Iinclude -Isrc src/mathieson.cxx 
 g++ -c -fPIC $OPT -Iinclude -Isrc src/poissonEM.cxx 
-g++ -c -fPIC $OPT -Iinclude -Isrc src/newPadProcessing.cxx
+g++ -c -fPIC $OPT -Iinclude -Isrc src/padProcessing.cxx
 # g++ -c -fPIC $OPT -Iinclude -Isrc src/padProcessing.cxx
 g++ -c -fPIC $OPT -Iinclude -Isrc src/mathiesonFit.cxx
 g++ -c -fPIC $OPT -Iinclude -Isrc src/mathUtil.cxx

@@ -19,7 +19,7 @@
 
 #include "MCHClustering/PadsPEM.h"
 #include "MCHClustering/Cluster.h"
-#include "newPadProcessing.h"
+#include "padProcessing.h"
 #include "mathUtil.h"
 
 #define VERBOSE 1
@@ -424,8 +424,10 @@ int Cluster::getConnectedComponentsOfProjPadsWOIsolatedPads(  ) {
 }
 
 ///??????????????????
-void Cluster::assignOneCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup) {
-  cath0ToGrpFromProj = 0;
+/*
+void Cluster::assignSingleCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1) {
+  Group_t cath0ToGrpFromProj[nCath0];
+  Group_t cath1ToGrpFromProj[nCath1];
   cath1ToGrpFromProj = 0;
   if ( nCath0 != 0) {
     cath0ToGrpFromProj = new short[nCath0];
@@ -436,10 +438,10 @@ void Cluster::assignOneCathPadsToGroup( short *padGroup, int nPads, int nGrp, in
   }
   vectorSetShort( wellSplitGroup, 1, nGrp+1);
 }
-
+*/
 
 // Assign a group to the original pads
-int assignPadsToGroupFromProj( short *projPadToGrp, int nProjPads,
+int Cluster::assignPadsToGroupFromProj( short *projPadToGrp, int nProjPads,
         const PadIdx_t *cath0ToPadIdx, const PadIdx_t *cath1ToPadIdx,
         int nGrp, int nPads, short *padMergedGrp ) {
 // cath0ToPadIdx : pad indices of cath0 (cath0ToPadIdx[0..nCath0] -> i-pad

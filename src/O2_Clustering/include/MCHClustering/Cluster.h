@@ -63,8 +63,12 @@ class Cluster
             PadIdx_t *aloneIPads, PadIdx_t *aloneJPads, PadIdx_t *aloneKPads, int includeAlonePads);
   
   int getConnectedComponentsOfProjPadsWOIsolatedPads( );
-  void assignOneCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup);
-  
+  // Used ???
+  void assignSingleCathPadsToGroup( short *padGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup);
+  // Used ???
+  int assignPadsToGroupFromProj( short *projPadToGrp, int nProjPads,
+        const PadIdx_t *cath0ToPadIdx, const PadIdx_t *cath1ToPadIdx,
+        int nGrp, int nPads, short *padMergedGrp );
 };
 
 } // namespace mch
