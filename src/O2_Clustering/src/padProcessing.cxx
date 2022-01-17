@@ -2636,11 +2636,15 @@ int addIsolatedPadInGroups( const double *xyDxy, Mask_t *cathToGrp, int nbrCath,
   }
 
   // Finish the Fusion
+  vectorPrintShort("-- grpToGrp", grpToGrp, nGroups+1);
   for (int g=0; g < (nGroups+1); g++) {
     Mask_t gBar = g;
+    std::cout << "Fusion (nGroups=" << nGroups <<") :" << gBar;
     while ( gBar != grpToGrp[gBar]) {
+        std::cout<<", "<< gBar;
         gBar = grpToGrp[gBar];
     }
+    std::cout<<std::endl;
     // Terminal Grp :  gBar = grpToGrp[gBar]
     grpToGrp[g] = gBar;
   }

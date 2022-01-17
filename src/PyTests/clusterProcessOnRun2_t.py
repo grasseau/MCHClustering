@@ -477,7 +477,7 @@ if __name__ == "__main__":
   RecoTracks = IOTracks.Tracks("/home/grasseau/TracksReco.dat")
   RecoTracks.read()
   
-  if 1:
+  if 0:
     for pc in reco:
       # processPreCluster ( pc, display=True, displayBefore=False )
       processPreCluster ( pc, display=False, displayBefore=False )
@@ -530,8 +530,9 @@ if __name__ == "__main__":
       #if (orbit==6) and (irof in [80, 81, 82,83, 84, 85 ]):
       #  processPreCluster ( pc, display=True, displayBefore=False )
       # if (orbit==2) and (irof in [365, 366, 367 ]):
-      if (orbit==22) and (irof in [1100, 1101, 1102 ]):
+      # if (orbit==22) and (irof in [1100, 1101, 1102 ]):
       # if (orbit==0) and (irof in [641,642 ]):
+      if (orbit==80) and (irof in [755 ]):
         processPreCluster ( pc, display=True, displayBefore=False )
   # reco.read(verbose=True)
   # nPreClusters = len(reco.padX )
