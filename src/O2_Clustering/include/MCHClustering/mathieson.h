@@ -17,7 +17,11 @@
 
 #include "PadsPEM.h"
 
-extern "C" {
+// ??? extern "C" {
+namespace o2
+{
+namespace mch
+{
 void initMathieson();
 void compute2DPadIntegrals(const double* xInf, const double* xSup, const double* yInf, const double* ySup,
                            int N, int chamberId,
@@ -27,16 +31,21 @@ void compute2DMathiesonMixturePadIntegrals(const double* xyInfSup0, const double
                                            int N, int K, int chamberId,
                                            double Integrals[]);
 
-void computeCij( const double *xyInfSup0, const double *theta,
-                            int N, int K, int chamberId, double Cij[] );
-}
-
-namespace o2
-{
-namespace mch
-{
 void computeCij( const Pads &pads, const Pads &theta,
                             double Cij[] );
 } // namespace mch
 } // namespace o2
+
+extern "C" {
+  void o2_mch_initMathieson();
+  void o2_mch_compute2DPadIntegrals(const double* xInf, const double* xSup, const double* yInf, const double* ySup,
+                           int N, int chamberId,
+                           double Integrals[]);
+  void o2_mch_compute2DMathiesonMixturePadIntegrals(const double* xyInfSup0, const double* theta,
+                                           int N, int K, int chamberId,
+                                           double Integrals[]);
+  void o2_mch_computeCij( const double *xyInfSup0, const double *theta,
+                            int N, int K, int chamberId, double Cij[] );
+}
+
 #endif

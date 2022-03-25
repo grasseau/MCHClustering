@@ -132,6 +132,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   
   (xProj, dxProj, yProj, dyProj, chA, chB) = PCWrap.copyProjectedPads()
   chProj = (chA + chB)*0.5
+  # chProj = chA +1
   res = aTK.matchingThetaWithMC(thetaf, preClusters, ev, pc, mcObj)
   (pc_, match, nbrOfHits, TP, FP,FN, dMin, dxMin, dyMin, tfMatrix, mcHitsInvolved ) = res
   # Ratio
@@ -228,10 +229,16 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   nRecoSeeds = preClusters.rClusterX[ev][pc].size
   xyDxy0 = dUtil.asXYdXY(  x0, y0, dx0, dy0 )
   xyDxy1 = dUtil.asXYdXY(  x1, y1, dx1, dy1 )
+  # Local Max in python
+  """
   print("[python] Find local max with laplacian")
   xl, yl = geom.findLocalMax( xyDxy0, xyDxy1, z0, z1 )
   nNewSeeds = xl.size
+  """
   
+  # Local max in C++
+  # LocalMax of both cathodes
+  thetaLocalMax = PCWrap.collectThetaExtra()
   
   # Compute the max of the Reco and EM seeds/hits
   maxDxMinREM, maxDyMinREM = aTK.minDxDy( muX, muY, preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc])
@@ -257,8 +264,8 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   drawPlot = display and nbrHits==1 and (match > 0.33) and (maxDxMin > 0.07 or maxDyMin > 0.07) and (chId > 6)
   drawPlot = display and nbrHits==1 and (match > 0.33) and (maxDxMin > 0.07 or maxDyMin > 0.07) 
   drawPlot = display and (nRecoSeeds != nbrHits) and (chId > 6)
-  drawPlot = display 
   drawPlot = display and ((nRecoSeeds != nbrHits) or (maxDxMinREM > 0.07 or maxDyMinREM > 0.07)) 
+  drawPlot = display 
   #
   """
   if (padCathGrpMax != thetaMaxGrp):
@@ -313,7 +320,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     """
     #
     # EM Final
-    thetaEMFinal = PCWrap.collectThetaEMFinal()
+    thetaEMFinal = PCWrap.collectThetaEMFinal()    
     uPlt.setLUTScale( 0.0, 1.2)
     # uPlt.drawPads( fig, ax[0,3], xProj, yProj, dxProj, dyProj, laplacian, doLimits=False, alpha=1.0 )
     uPlt.setLUTScale( 0.0, np.max(chProj))
@@ -352,6 +359,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(0)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
+      print("??????????????????? qPix0 max", np.max(qPix0))
       uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
       uPlt.drawPads( fig, ax[1,0], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
@@ -361,7 +369,8 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(1)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
-      uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
+      uPlt.setLUTScale( 0.0, np.max(qPix0) )
+      print("??????????????????? qPix0 max", np.max(qPix0))
       uPlt.drawPads( fig, ax[1,1], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
     uPlt.drawMCHitsInFrame( ax[1,1], frame, mcObj, ev, DEIds )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
@@ -371,6 +380,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
       uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
+      print("??????????????????? qPix0 max", np.max(qPix0))
       uPlt.drawPads( fig, ax[1,2], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
     uPlt.drawMCHitsInFrame( ax[1,2], frame, mcObj, ev, DEIds )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
@@ -380,6 +390,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
       uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
+      print("??????????????????? qPix0 max", np.max(qPix0))
       uPlt.drawPads( fig, ax[1,3], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0)
     uPlt.drawMCHitsInFrame( ax[1,3], frame, mcObj, ev, DEIds )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
@@ -409,10 +420,14 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     xSat = x1[ saturate1==1 ]
     ySat = y1[ saturate1==1 ]
     uPlt.drawPoints( ax[1,4], xSat, ySat, color='white', pattern='o', markerSize=4)
-    #
+    # Local Max with laplacian
+    """
     uPlt.drawPoints( ax[0,4], xl, yl, color='black', pattern='+')
     uPlt.drawPoints( ax[1,4], xl, yl, color='black', pattern='+')
-
+    """
+    uPlt.drawModelComponents( ax[0,4], thetaLocalMax, color="black", pattern='x', markersize=4)
+    uPlt.drawModelComponents( ax[1,4], thetaLocalMax, color="black", pattern='x', markersize=4)
+    
     ax[0,4].set_title("Cathode 0 & max Laplacian")
     ax[1,4].set_title("Cathode 1 & max Laplacian")
     
@@ -430,7 +445,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
 
   #
   # free memory in Pad-Processing
-  PCWrap.freeMemoryPadProcessing()
+  # PCWrap.freeMemoryPadProcessing()
 
   #
   return thetaf
@@ -477,7 +492,7 @@ def inspectEvent( preClusters,  ev, mcObj, startPCluster=-1, endPCluster=-1, dis
 if __name__ == "__main__":
     
   pcWrap = PCWrap.setupPyCWrapper()
-  pcWrap.initMathieson()
+  pcWrap.o2_mch_initMathieson()
   
   # Read MC data
   mcData = IO.MCData(fileName="../MCData/MCDataDump.dat")
@@ -506,7 +521,7 @@ if __name__ == "__main__":
         inspectPreCluster( recoData, ev, pc, mcData, display=True)
     """
     # Saturate Fit
-   
+    """
     for ev in [0]:
       # for pc in [212, 250, 270, 285, 310]:
       # for pc in [285, 135, 250, 285, 286]:
@@ -515,12 +530,26 @@ if __name__ == "__main__":
       # for pc in [21, 81, 103, 131, 140, 152, 163, 243, 285, 286]:   
       for pc in [286]:   
         inspectPreCluster( recoData, ev, pc, mcData, display=True)
-    
+    """
+    # Debug findLoccalMaxWtithBothCathodes
+    for ev in [0]:
+      # for pc in [212, 250, 270, 285, 310]:
+      # for pc in [285, 135, 250, 285, 286]:
+      # for pc in [15, 49, 84, 121, 131, 197, 243,251, 285, 286]:
+      # Test set for bbr of parameters
+      # for pc in [21, 81, 103, 131, 140, 152, 163, 243, 285, 286]:   
+      for pc in range(14,300):   
+        inspectPreCluster( recoData, ev, pc, mcData, display=True, displayBefore=True)
+        
     # for ev in range(39, nEvents):
     # for ev in range(39, nEvents):
     # inspectEvent( recoData, 0, mcData, startPCluster=40, display=True, displayBefore=False )
     # inspectEvent( recoData, 0, mcData, startPCluster=5, display=True, displayBefore=True )
-  else:
+  elif 1:
+    for ev in range(0, nEvents):
+      inspectEvent( recoData, ev, mcData, display=True, displayBefore=False )    
+     
+  else :
     for ev in range(0, nEvents):
       emMeasure.append( inspectEvent( recoData, ev, mcData, display=False, displayBefore=False ) )    
 

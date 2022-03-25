@@ -12,7 +12,7 @@
 #include "MCHClustering/PadsPEM.h"
 // ??? #include "MCHClustering/dataStructure.h"
 #include "mathUtil.h"
-#include "newPadProcessing.h"
+#include "padProcessing.h"
 // ???#include "MCHClustering/clusterProcessing.h"
 
 // ??? #include "poissonEM.h"
@@ -353,6 +353,7 @@ PadIdx_t *buildFirstNeighbors( const Pads &pads, int verbose) {
   return neighbors_;
 }
 
+/* Put in PadsEM.h
 // Build the neighbor list
 PadIdx_t *getFirstNeighbors( const double *X, const double *Y, const double *DX, const double *DY, int N, int verbose) {
   const double eps = 1.0e-5;
@@ -362,12 +363,7 @@ PadIdx_t *getFirstNeighbors( const double *X, const double *Y, const double *DX,
     PadIdx_t *i_neigh = getNeighborsOf(neighbors_, i);
     // Search neighbors of i
     for( PadIdx_t j=0; j<N; j++) {
-      /*
-      int xMask0 = ( fabs( X[i] - X[j]) < relEps * (DX[i] + DX[j]) );
-      int yMask0 = ( fabs( Y[i] - Y[j]) < relEps * (DY[i]) );
-      int xMask1 = ( fabs( X[i] - X[j]) < relEps * (DX[i]) );
-      int yMask1 = ( fabs( Y[i] - Y[j]) < relEps * (DY[i] + DY[j]) );
-      */
+
       int xMask0 = ( fabs( X[i] - X[j]) < (DX[i] + DX[j]) + eps);
       int yMask0 = ( fabs( Y[i] - Y[j]) < (DY[i] + eps) );
       int xMask1 = ( fabs( X[i] - X[j]) < (DX[i] + eps) );
@@ -400,6 +396,7 @@ PadIdx_t *getFirstNeighbors( const double *xyDxy, int N, int allocatedN, int ver
   PadIdx_t *neighbors_ = getFirstNeighbors( X, Y, DX, DY, N, verbose);
   return neighbors_;
 }
+*/
 
 /// Used ???
 /*
@@ -544,7 +541,7 @@ o2::mch::Pads *addBoundaryPads( const double *x_, const double *y_, const double
     vectorGather(dx_, mask, N, dx);
     vectorGather(dy_, mask, N, dy);
 
-    PadIdx_t *neighC = getFirstNeighbors( x, y, dx, dy, nc, VERBOSE );
+    PadIdx_t *neighC = Pads::buildFirstNeighbors( x, y, dx, dy, nc, VERBOSE );
 
     for (int i=0; i < nc; i++) {
       bool east = true, west = true, north = true, south = true;
@@ -1834,7 +1831,8 @@ int findLocalMaxWithLaplacianV0( const double *xyDxy, const double *z, const Pad
 }
 */
 
-
+// ??? Unused
+/*
 void assignCathPadsToGroupFromProj( short *projPadGroup, int nPads, int nGrp, int nCath0, int nCath1, short *wellSplitGroup, short *matGrpGrp) {
   cath0ToGrpFromProj = new short[nCath0];
   cath1ToGrpFromProj = new short[nCath1];
@@ -1899,6 +1897,7 @@ void assignCathPadsToGroupFromProj( short *projPadGroup, int nPads, int nGrp, in
   }
   if (VERBOSE) printMatrixShort("Group/Group matrix", matGrpGrp, nGrp+1, nGrp+1);
 }
+*/
 
 int renumberGroupsV2( Mask_t *cath0Grp, int nbrCath0, Mask_t *cath1Grp, int nbrCath1, Mask_t *grpToGrp, int nGrp ) {
   int currentGrp=0;
@@ -1961,6 +1960,7 @@ int renumberGroups( short *grpToGrp, int nGrp ) {
   return curGrp;
 }
 
+/* Unused ???
 int assignGroupToCathPads( short *projPadGroup, int nProjPads, int nGrp, int nCath0, int nCath1, short *cath0ToGrp, short *cath1ToGrp) {
   cath0ToGrpFromProj = new short[nCath0];
   cath1ToGrpFromProj = new short[nCath1];
@@ -2050,51 +2050,10 @@ int assignGroupToCathPads( short *projPadGroup, int nProjPads, int nGrp, int nCa
   }
   return nNewGrp;
 }
+*/
 
-int assignCathPadsToGroup( short *matGrpGrp, int nGrp, int nCath0, int nCath1, short *grpToGrp ) {
-// Merge the ovelaping groups, renumber them
-// and give the mapping OldGrp -> newMergedGroup in grpToGrp array
-  cath0ToTGrp = new short[nCath0];
-  cath1ToTGrp = new short[nCath1];
-  vectorSetZeroShort(grpToGrp, nGrp+1);
-  int newGroupID = 0;
-  //
-  int iNewGroup = 1;
-  while ( iNewGroup < (nGrp+1)) {
-    // Define the new group
-    newGroupID++;
-    grpToGrp[iNewGroup] = newGroupID;
-    // printf("new Group idx=%d, newGroupID=%d\n", iNewGroup, newGroupID);
 
-    for (int i=iNewGroup; i < (nGrp+1); i++) {
-      // New Group
-      int ishift = i*(nGrp+1);
-      for (int j=i+1; j < (nGrp+1); j++) {
-        if ( matGrpGrp[ishift+j] ) {
-          // Merge the groups
-          grpToGrp[j] = newGroupID;
-        }
-      }
-    }
-    // Go to the next index which have not a group
-    int k;
-    for( k = iNewGroup; k < (nGrp+1) && (grpToGrp[k] > 0); k++);
-    iNewGroup = k;
-  }
-  // vectorPrintShort( "grpToGrp", grpToGrp, nGrp+1);
-  //
-  // Perform the mapping group -> mergedGroups
-  for (int c=0; c < nCath0; c++) {
-    cath0ToTGrp[c] = grpToGrp[ abs( cath0ToGrpFromProj[c] ) ];
-  }
-  for (int c=0; c < nCath1; c++) {
-    cath1ToTGrp[c] = grpToGrp[ abs( cath1ToGrpFromProj[c] ) ];
-  }
-  // vectorPrintShort( "cath0ToTGrp", cath0ToTGrp, nCath0);
-  // vectorPrintShort( "cath1ToTGrp", cath1ToTGrp, nCath1);
-  return newGroupID;
-}
-
+/* ??? Unused
 void updateProjectionGroups ( short *projPadToGrp, int nProjPads, const short *cath0ToGrp, const short *cath1ToGrp
                             ) {
 //                             const PadIdx_t *mapPadToCathIdx, const short *grpToGrp) {
@@ -2144,23 +2103,20 @@ void updateProjectionGroups ( short *projPadToGrp, int nProjPads, const short *c
         }
     }
 }
+*/
 
-int addIsolatedPadInGroups( const double *xyDxy, Mask_t *cathToGrp, int nbrCath, int cath, Mask_t *grpToGrp, int nGroups) {
+// int addIsolatedPadInGroups( const double *xyDxy, Mask_t *cathToGrp, int nbrCath, int cath, Mask_t *grpToGrp, int nGroups) {
+/* Unused
+int addIsolatedPadInGroups( const Pads &pads, Group_t *padToGrp, Mask_t *mapGrpToGrp, int nGroups) {
   PadIdx_t *neigh;
   int nNewGroups = 0;
+  int nbrCath = pads.nPads;
   if (nbrCath == 0) return nGroups;
   if ( VERBOSE >0 ) {
-    printf("[addIsolatedPadInGroups] cath=%d nGroups=%d\n", cath, nGroups);
-    vectorPrintShort("  cathToGrp input", cathToGrp, nbrCath);
+    printf("[addIsolatedPadInGroups] cath=%d nGroups=%d\n", nbrCath, nGroups);
+    vectorPrintShort("  cathToGrp input", mapGrpToGrp, nbrCath);
   }
-  if (cath == 0 ) {
-    neighborsCath0 = getFirstNeighbors( xyDxy, nbrCath, nbrCath, VERBOSE);
-    neigh = neighborsCath0;
-  } else {
-    neighborsCath1 = getFirstNeighbors( xyDxy, nbrCath, nbrCath, VERBOSE );
-    neigh = neighborsCath1;
-  }
-
+  neigh = getFirstNeighbors( xyDxy, nbrCath, nbrCath, VERBOSE );
   for ( int p=0; p < nbrCath; p++) {
     if( cathToGrp[p] == 0 ) {
       // Neighbors
@@ -2229,107 +2185,9 @@ int addIsolatedPadInGroups( const double *xyDxy, Mask_t *cathToGrp, int nbrCath,
   // Inv ?? return vectorMaxShort( cathToGrp, nbrCath);
   return nNewGroups;
 }
+*/
 
-int addIsolatedPadInGroups0( const double *xyDxy, Mask_t *cathToGrp, int nbrCath, int cath, Mask_t *grpToGrp, int nGroups) {
-  PadIdx_t *neigh;
-  if (nbrCath == 0) return nGroups;
-  printf("[addIsolatedPadInGroups] cath=%d nGroups=%d\n", cath, nGroups);
-  vectorPrintShort("  cathToGrp input", cathToGrp, nbrCath);
-  if (cath == 0 ) {
-    neighborsCath0 = getFirstNeighbors( xyDxy, nbrCath, nbrCath, VERBOSE);
-    neigh = neighborsCath0;
-  } else {
-    neighborsCath1 = getFirstNeighbors( xyDxy, nbrCath, nbrCath, VERBOSE );
-    neigh = neighborsCath1;
-  }
-
-  short newCathToGrp[nbrCath];
-  vectorSetShort(newCathToGrp, 0, nbrCath );
-  for ( int p=0; p < nbrCath; p++) {
-    if( cathToGrp[p] == 0 ) {
-      // Neighbors
-      //
-      int q = -1;
-      for( PadIdx_t *neigh_ptr = getNeighborsOf(neigh, p); *neigh_ptr != -1; neigh_ptr++) {
-        q = *neigh_ptr;
-        if (0 || VERBOSE) printf("  Neigh of %d: %d\n", p, q);
-        if ( cathToGrp[q] != 0) {
-            if ( newCathToGrp[q] == 0 ) {
-              // Propagate grp
-
-              newCathToGrp[p] = cathToGrp[q];
-              if (0||VERBOSE) printf("    Propagate the old grp=%d to the isolated pad p=%d grp\n", cathToGrp[q], p);
-            } else {
-              // neighbour already assigned to a group
-              // Grp fusion
-              Mask_t gMin = std::min( cathToGrp[q], newCathToGrp[p] );
-              Mask_t gMax = std::max( cathToGrp[q], newCathToGrp[p] );
-              grpToGrp[ gMax ] = gMin;
-              newCathToGrp[p] = gMin;
-              if (0||VERBOSE) printf("    Neighbour q=%d  with a newgrp=%d, take this grp for p=%d\n", q, gMin, p);
-
-            }
-        } else if ( newCathToGrp[q] != 0 ) {
-          // The grp of the neigbour is 0,
-          // cathToGrp[q] == 0,  ie is an "Alone Pad"
-          // But the neighbor pad  has
-          // just been assigned to a group
-          if ( newCathToGrp[p] == 0 ) {
-              // Propagate grp
-              newCathToGrp[p] = cathToGrp[q];
-              if (0||VERBOSE) printf("    propagate the new grp=%d of the neighbor to p=%d\n", cathToGrp[q], p);
-          } else {
-              // neighbour already assigned to a group
-              // Grp fusion
-              Mask_t gMin = std::min( newCathToGrp[q], newCathToGrp[p] );
-              Mask_t gMax = std::max( cathToGrp[q], newCathToGrp[p] );
-              grpToGrp[ gMax ] = gMin;
-              newCathToGrp[p] = gMin;
-              if (0||VERBOSE) printf("    Neighbour q=%d with a newgrp=%d, take this grp for p=%d\n", q, gMin, p);
-          }
-        } else {
-          if ( newCathToGrp[p] == 0 ) {
-            // The grp of the neigbour is 0,
-            // cathToGrp[q] == 0,  ie is an "Alone Pad"
-            // and  no grp assigne to the neighbours
-            // newCathToGrp[q] == 0
-            // Create a new grp
-            nGroups++;
-            // Take care to not overwrite memeory
-            grpToGrp[nGroups] = nGroups;
-            newCathToGrp[p] = nGroups;
-            newCathToGrp[q] = nGroups;
-            if (0||VERBOSE) printf("    No group already assign to p and q pad, create a new group=%d and set it to p=%d, q=%d\n", nGroups, p, q);
-          } else {
-            // Propagate the new p-group to q
-            newCathToGrp[q] = newCathToGrp[p];
-            if (0||VERBOSE) printf("    propagate the new grp=%d of p=%d to the neighbor q=%d\n", newCathToGrp[p], p, q);
-          }
-        }
-      }
-      if ((newCathToGrp[p] == 0)) {
-          // No neighbours with a group
-          // New group
-          nGroups++;
-          grpToGrp[nGroups] = nGroups;
-          newCathToGrp[p] = nGroups;
-          if (0||VERBOSE) printf("    Create a new group=%d and set it to p=%d\n", nGroups, p);
-
-      }
-    }
-  }
-  printf("  ..................................;;;;\n");
-  vectorPrintShort("  cathToGrp", cathToGrp, nbrCath);
-  vectorPrintShort("  newCathToGrp", newCathToGrp, nbrCath);
-  for( int p=0; p < nbrCath; p++) {
-      if( cathToGrp[p] == 0) {
-        cathToGrp[p] = newCathToGrp[p];
-      }
-  }
-  vectorPrintShort("  grpToGrp before renumbering", grpToGrp, nGroups+1);
-  return vectorMaxShort( cathToGrp, nbrCath);
-}
-
+/*
 void copyCathToGrpFromProj( short *cath0Grp, short *cath1Grp, int nCath0, int nCath1) {
   vectorCopyShort( cath0ToGrpFromProj, nCath0, cath0Grp);
   vectorCopyShort( cath1ToGrpFromProj, nCath1, cath1Grp);
@@ -2339,7 +2197,8 @@ void getMaskCathToGrpFromProj( short g, short* mask0, short *mask1, int nCath0, 
     vectorBuildMaskEqualShort( cath0ToGrpFromProj, g, nCath0, mask0);
     vectorBuildMaskEqualShort( cath1ToGrpFromProj, g, nCath1, mask1);
 }
-
+*/
+/*
 void freeMemoryPadProcessing() {
   //
   // Intersection matrix
@@ -2435,11 +2294,13 @@ void freeMemoryPadProcessing() {
   }
 
 }
-
+*/
+/*
 namespace o2
 {
 namespace mch
 {
+ */
   // Build the neighbor list
   PadIdx_t *getFirstNeighbors( const Pads &pads) {
   const double eps = 1.0e-5;

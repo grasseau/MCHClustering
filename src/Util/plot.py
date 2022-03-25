@@ -97,7 +97,7 @@ def getMCHitsInFrame( frame, mcObj, ev, DEIds ):
     
 def drawMCHitsInFrame ( ax, frame, mcObj, ev, DEIds ):
     (x, y) = getMCHitsInFrame( frame, mcObj, ev, DEIds )
-    drawPoints( ax, x, y, color='black', pattern='cross')
+    drawPoints( ax, x, y, color='red', pattern='o', markerSize=4)
     #
     return
 

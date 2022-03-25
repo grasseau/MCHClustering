@@ -13,13 +13,12 @@
 #include <gsl/gsl_multifit_nlin.h>
 
 #include "MCHClustering/dataStructure.h"
-#include "MCHClustering/mathUtil.h"
+#include "mathUtil.h"
 #include "mathiesonFit.h"
 #include "MCHClustering/mathieson.h"
-#include "PadsPEM.h"
-#include "MCHClustering/padProcessing.h"
+#include "MCHClustering/PadsPEM.h"
 
-
+using namespace o2::mch;
 
 int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* residuals)
 {
@@ -49,7 +48,7 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* res
   // Set constrain: sum_(w_k) = 1
   // Rewriten ??? w[K-1] = 1.0 - vectorSum( w, K-1 );
   double lastW = 1.0 - vectorSum(w, K - 1);
-  if (verbose > 1) {
+  if (verbose > 0) {
     printf("  Function evaluation at:\n");
     for (int k = 0; k < K; k++) {
       printf("    mu_k[%d] = %g %g \n", k, mu[k], mu[K + k]);
@@ -101,6 +100,8 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* res
     // vectorMaskedMult( zTmp, notSaturated, N, zTmp);
     vectorAddVector(z, wTmp, zTmp, N, z);
   }
+  vectorPrint("z", z, N);
+  vectorPrint("zObs", zObs, N);
   // Normalize each cathode with unsaturated pads
   // Not used ???
   double sumNormalizedZ[2];
@@ -128,6 +129,9 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* res
   // Normalization coef
   double coefNorm[2] = {cathMax[0]/maxThZ[0], cathMax[1]/maxThZ[1] };
   double meanCoef = (coefNorm[0] + coefNorm[1]) / ((coefNorm[0] > 1.0e-6) + (coefNorm[1] > 1.0e-6));
+  printf("maxCath: %f %f\n", cathMax[0], cathMax[1]);
+  printf("coefNorm: %f %f\n", coefNorm[0], coefNorm[1]);
+  printf("meaCoef: %f \n", meanCoef);
   //
   for (int i=0; i < N; i++) {
     z[i] = z[i] * coefNorm[cath[i]];
@@ -385,9 +389,292 @@ void printState(int iter, gsl_multifit_fdfsolver* s, int K)
 // Notes :
 //  - the intitialization of Mathieson module must be done before (initMathieson)
 // zCathTotalCharge = sum excludind saturated pads
-void fitMathieson(double* thetai,
-                  double* xyDxy, double* z, Mask_t* cath, Mask_t* notSaturated,
+namespace o2
+{
+namespace mch
+{
 
+void fitMathieson( const Pads &iPads, double *thetaInit, int kInit, int mode, double *thetaFinal, double* khi2, double* pError) {
+  int status;
+
+  // process / mode
+  int p = mode;
+  int verbose = p & 0x3;
+  p = p >> 2;
+  int doJacobian = p & 0x1;
+  p = p >> 1;
+  int computeKhi2 = p & 0x1;
+  p = p >> 1;
+  int computeStdDev = p & 0x1;
+  if (verbose) {
+    printf("Fitting \n");
+    printf("  mode: verbose, doJacobian, computeKhi2, computeStdDev %d %d %d %d\n", verbose, doJacobian, computeKhi2, computeStdDev);
+  }
+  //
+  int N = iPads.nPads;
+  //
+  double* muAndWi = getMuAndW(thetaInit, kInit);
+  //
+  // Check if fitting is possible
+  double* muAndWf = getMuAndW(thetaFinal, kInit);
+  if (3 * kInit - 1 > N) {
+    muAndWf[0] = NAN;
+    muAndWf[kInit] = NAN;
+    muAndWf[2 * kInit] = NAN;
+    return;
+  }
+
+
+  funcDescription_t mathiesonData;
+  double cathMax[2] = { 0.0, 0.0};
+  double *cathWeights;
+  o2::mch::Pads *pads = nullptr;
+
+  vectorPrintShort("  iPads->cath", iPads.cath, iPads.nPads);
+  vectorPrint("  iPads->q", iPads.q, iPads.nPads);
+
+  if( 1 ) {
+  // Add boundary Pads
+  pads = Pads::addBoundaryPads( iPads.x, iPads.y, iPads.dx, iPads.dy,
+          iPads.q, iPads.cath, iPads.saturate, iPads.chamberId, iPads.nPads );
+  vectorPrint("  q", pads->q, pads->nPads);
+
+  // inspectSavePixels( 3, *pads);
+  N = pads->nPads;
+  // Function description (extra data nor parameters)
+  mathiesonData.N = N;
+  mathiesonData.K = kInit;
+  mathiesonData.x_ptr = pads->x;
+  mathiesonData.y_ptr = pads->y;
+  mathiesonData.dx_ptr = pads->dx;
+  mathiesonData.dy_ptr = pads->dy;
+  mathiesonData.cath_ptr = pads->cath;
+  mathiesonData.zObs_ptr = pads->q;
+  Mask_t notSaturated[N];
+  vectorCopyShort( pads->saturate, N, notSaturated);
+  vectorNotShort( notSaturated, N, notSaturated );
+  mathiesonData.notSaturated_ptr = notSaturated;
+  } else {
+  // Function description (extra data nor parameters)
+  mathiesonData.N = N;
+  mathiesonData.K = kInit;
+  mathiesonData.x_ptr = iPads.x;
+  mathiesonData.y_ptr = iPads.y;
+  mathiesonData.dx_ptr = iPads.dx;
+  mathiesonData.dy_ptr = iPads.dy;
+  mathiesonData.cath_ptr = iPads.cath;
+  mathiesonData.zObs_ptr = iPads.q;
+  Mask_t notSaturated[N];
+  vectorCopyShort( iPads.saturate, N, notSaturated);
+  vectorNotShort( notSaturated, N, notSaturated );
+  mathiesonData.notSaturated_ptr = notSaturated;
+  }
+  // Total Charge per cathode plane
+  double zCathTotalCharge[2];
+  Mask_t mask[N];
+  // Cath 1
+  vectorCopyShort(mathiesonData.cath_ptr, N, mask);
+  // Logic And operation
+  vectorMultVectorShort( mathiesonData.notSaturated_ptr, mask, N, mask);
+  zCathTotalCharge[0] = vectorMaskedSum( mathiesonData.zObs_ptr, mask, N);
+  // cath 0
+  vectorCopyShort(mathiesonData.cath_ptr, N, mask);
+  vectorNotShort( mask, N, mask);
+   // Logic And operation
+  vectorMultVectorShort( mathiesonData.notSaturated_ptr, mask, N, mask);
+  zCathTotalCharge[1] = vectorMaskedSum( mathiesonData.zObs_ptr, mask, N);
+
+  // Init the weights
+  cathWeights = new double[N];
+  for (int i = 0; i < N; i++) {
+    cathWeights[i] = (mathiesonData.cath_ptr[i] == 0) ? zCathTotalCharge[0] : zCathTotalCharge[1];
+    cathMax[mathiesonData.cath_ptr[i]] = std::fmax( cathMax[mathiesonData.cath_ptr[i]], mathiesonData.notSaturated_ptr[i]*mathiesonData.zObs_ptr[i] );
+  }
+  vectorPrintShort("mathiesonData.cath_ptr", mathiesonData.cath_ptr, N);
+  vectorPrintShort("mathiesonData.notSaturated_ptr", mathiesonData.notSaturated_ptr, N);
+  vectorPrint("mathiesonData.zObs_ptr", mathiesonData.zObs_ptr, N);
+
+  mathiesonData.cathWeights_ptr = cathWeights;
+  mathiesonData.cathMax_ptr = cathMax;
+  mathiesonData.chamberId = iPads.chamberId;
+  mathiesonData.zCathTotalCharge_ptr = zCathTotalCharge;
+  mathiesonData.verbose = verbose;
+  //
+  // Define Function, jacobian
+  gsl_multifit_function_fdf f;
+  f.f = &f_ChargeIntegral;
+  f.df = nullptr;
+  f.fdf = nullptr;
+  f.n = N;
+  f.p = 3 * kInit - 1;
+  f.params = &mathiesonData;
+
+  bool doFit = true;
+  // K test
+  int K = kInit;
+  // Sort w
+  int maxIndex[kInit];
+  for( int k=0; k<kInit; k++) { maxIndex[k]=k; }
+  double *w = &muAndWi[2 * kInit];
+  std::sort( maxIndex, &maxIndex[kInit], [=](int a, int b){ return(w[a] > w[b]); });
+
+  while (doFit) {
+    // Select the best K's
+    // Copy kTest max
+    double muAndWTest [3*K];
+    // Mu part
+    for (int k=0; k < K; k++) {
+      // Respecttively mux, muy, w
+      muAndWTest[k] = muAndWi[maxIndex[k]];
+      muAndWTest[k+K] = muAndWi[maxIndex[k]+kInit];
+      muAndWTest[k+2*K] = muAndWi[maxIndex[k]+2*kInit];
+    }
+    if( verbose > 0) {
+      vectorPrint( "  Selected w", &muAndWTest[2*K], K);
+      vectorPrint( "  Selected mux", &muAndWTest[0], K);
+      vectorPrint( "  Selected muy", &muAndWTest[K], K);
+    }
+    mathiesonData.K = K;
+    f.p = 3 * K - 1;
+    // Set initial parameters
+    // Inv ??? gsl_vector_view params0 = gsl_vector_view_array(muAndWi, 3 * K - 1);
+    gsl_vector_view params0 = gsl_vector_view_array( muAndWTest, 3 * K - 1);
+
+    // Fitting method
+    gsl_multifit_fdfsolver* s = gsl_multifit_fdfsolver_alloc(gsl_multifit_fdfsolver_lmsder, N, 3 * K - 1);
+    // associate the fitting mode, the function, and the starting parameters
+    gsl_multifit_fdfsolver_set(s, &f, &params0.vector);
+
+    if (verbose > 1) {
+      printState(-1, s, K);
+    }
+    // double initialResidual = gsl_blas_dnrm2(s->f);
+    double initialResidual = 0.0;
+    // Fitting iteration
+    status = GSL_CONTINUE;
+    double residual = DBL_MAX;;
+    double prevResidual = DBL_MAX;;
+    double prevTheta[3*K-1];
+    // ??? for (int iter = 0; (status == GSL_CONTINUE) && (iter < 500); iter++) {
+    for (int iter = 0; (status == GSL_CONTINUE) && (iter < 50); iter++) {
+      // TODO: to speed if possible
+      for (int k = 0; k < (3 * K - 1); k++) {
+        prevTheta[k] = gsl_vector_get(s->x, k);
+      }
+      // printf("  Debug Fitting iter=%3d |f(x)|=%g\n", iter, gsl_blas_dnrm2(s->f));
+      status = gsl_multifit_fdfsolver_iterate(s);
+      if (verbose > 1) {
+        printf("  Solver status = %s\n", gsl_strerror(status));
+      }
+      if (verbose > 0) {
+        printState(iter, s, K);
+      }
+      /* ???? Inv
+      if (status) {
+        printf("  ???? End fitting \n");
+        break;
+      };
+      */
+      // GG TODO ???: adjust error in fct of charge
+      status = gsl_multifit_test_delta(s->dx, s->x, 1e-4, 1e-4);
+      if (verbose > 1) {
+        printf("  Status multifit_test_delta = %d %s\n", status, gsl_strerror(status));
+      }
+      // Residu
+      prevResidual = residual;
+      residual = gsl_blas_dnrm2(s->f);
+      // vectorPrint(" prevtheta", prevTheta, 3*K-1);
+      // vectorPrint(" theta", s->dx->data, 3*K-1);
+      // printf(" prevResidual, residual %f %f\n", prevResidual, residual );
+      if (fabs(prevResidual - residual) < 1.0e-2) {
+        // Stop iteration
+        // Take the previous value of theta
+        if ( verbose > 0) {
+          printf("  Stop iteration (dResidu~0), prevResidual=%f residual=%f\n", prevResidual, residual );
+        }
+        for (int k = 0; k < (3 * K - 1); k++) {
+          gsl_vector_set(s->x, k, prevTheta[k]);
+        }
+        status = GSL_SUCCESS;
+      }
+    }
+    double finalResidual=gsl_blas_dnrm2(s->f);
+    bool keepInitialTheta = fabs(finalResidual - initialResidual) / initialResidual < 1.0e-1;
+
+          // Khi2
+      if (computeKhi2 && (khi2 != nullptr)) {
+        // Khi2
+        double chi = gsl_blas_dnrm2(s->f);
+        double dof = N - (3 * K - 1);
+        double c = fmax(1.0, chi / sqrt(dof));
+        if (verbose > 0) {
+          printf("K=%d, chi=%f, chisq/dof = %g\n",  K, chi*chi, chi*chi / dof);
+        }
+        khi2[0] = chi * chi / dof;
+      }
+
+    // ???? if (keepInitialTheta) {
+    if (0) {
+      // Keep the result of EM (GSL bug when no improvemebt)
+      copyTheta( thetaInit, kInit, thetaFinal, kInit, kInit);
+    } else {
+      // Fitted parameters
+      /* Invalid ???
+      for (int k = 0; k < (3 * K - 1); k++) {
+        muAndWf[k] = gsl_vector_get(s->x, k);
+      }
+      */
+
+      // Mu part
+      for (int k=0; k < K; k++) {
+        muAndWf[k] = gsl_vector_get(s->x, k);
+        muAndWf[k+kInit] = gsl_vector_get(s->x, k+K);
+      }
+      // w part
+      double sumW = 0;
+      for (int k=0; k < K - 1; k++) {
+        double w = gsl_vector_get(s->x, k+2*K);
+        sumW += w;
+        muAndWf[k+2*kInit] = w;
+      }
+      // Last w : 1.0 - sumW
+      muAndWf[3 * kInit - 1] = 1.0 - sumW;
+
+
+
+      // Parameter error
+      if (computeStdDev && (pError != nullptr)) { //
+        // Covariance matrix an error
+        gsl_matrix* covar = gsl_matrix_alloc(3 * K - 1, 3 * K - 1);
+        gsl_multifit_covar(s->J, 0.0, covar);
+        for (int k = 0; k < (3 * K - 1); k++) {
+          pError[k] = sqrt(gsl_matrix_get(covar, k, k));
+        }
+        gsl_matrix_free(covar);
+      }
+    }
+    if (verbose >= 2) {
+      printf("  status parameter error = %s\n", gsl_strerror(status));
+    }
+    gsl_multifit_fdfsolver_free(s);
+    K = K-1;
+    // doFit = (K < 3) && (K > 0);
+    doFit = false;
+  } // while(doFit)
+  // Release memory
+  delete [] cathWeights;
+  if (pads != nullptr) delete pads;
+  //
+  return;
+}
+} // namespace mch
+} // namespace o2
+
+// Notes :
+//  - the intitialization of Mathieson module must be done before (initMathieson)
+// zCathTotalCharge = sum excludind saturated pads
+void fitMathieson0(double* thetai,
+                  double* xyDxy, double* z, Mask_t* cath, Mask_t* notSaturated,
                   double* zCathTotalCharge,
                   int KMax, int N, int chamberId, int process,
                   double* thetaf,
@@ -429,7 +716,7 @@ void fitMathieson(double* thetai,
 
   if( 1 ) {
   // Add boundary Pads
-  pads = addBoundaryPads( getX(xyDxy, N), getY(xyDxy, N), getDX(xyDxy, N), getDY(xyDxy, N),
+  pads = Pads::addBoundaryPads( getX(xyDxy, N), getY(xyDxy, N), getDX(xyDxy, N), getDY(xyDxy, N),
           z, cath, notSaturated, chamberId, N);
   // inspectSavePixels( 3, *pads);
   N = pads->nPads;

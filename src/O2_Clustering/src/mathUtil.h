@@ -129,6 +129,14 @@ inline static void vectorMultVector(const double* u, const double* v, int N, dou
   return;
 }
 
+inline static void vectorMultVectorShort(const short* u, const short* v, int N, short* res)
+{
+  for (int i = 0; i < N; i++) {
+    res[i] = u[i] * v[i];
+  }
+  return;
+}
+
 inline static void vectorMultScalar(const double* u, double cst, int N, double* res)
 {
   for (int i = 0; i < N; i++) {
@@ -449,6 +457,27 @@ inline static void vectorMapShort(short* array, const short* map, int N)
 {
   for (int i = 0; i < N; i++) {
     array[i] = map[array[i]];
+  }
+}
+
+inline void deleteDouble( double *ptr) {
+  if( ptr != nullptr) {
+    delete[] ptr;
+    ptr = nullptr;
+  }
+}
+
+inline void deleteInt( int *ptr) {
+  if( ptr != nullptr) {
+    delete[] ptr;
+    ptr = nullptr;
+  }
+}
+
+inline void deleteShort( short *ptr) {
+  if( ptr != nullptr) {
+    delete[] ptr;
+    ptr = nullptr;
   }
 }
 

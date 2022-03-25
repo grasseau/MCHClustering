@@ -130,7 +130,7 @@ void ClusterFinderGEM::reset()
     delete[] saturated;
     saturated = nullptr;
   };
-  freeMemoryPadProcessing();
+  // Inv ??? freeMemoryPadProcessing();
   mClusters.clear();
   mUsedDigits.clear();
 }

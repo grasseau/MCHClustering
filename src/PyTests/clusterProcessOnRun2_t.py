@@ -234,6 +234,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   #
   #  Do Clustering
   #
+  nbrOfGroups = 0
   try:
     nbrHits = PCWrap.clusterProcess( xyDxy, cathi, saturated, chi, chId )
     print("[python] nbrHits", nbrHits)
@@ -273,7 +274,9 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   else : selected = False
   
    # Compute the max of the Reco and EM seeds/hits
-  maxDxMinREM, maxDyMinREM = aTK.minDxDy( muX, muY, xr, yr)
+  maxDxMinREM, maxDyMinREM  = (0.0, 0.0 )
+  if nbrHits != 0 :
+    maxDxMinREM, maxDyMinREM = aTK.minDxDy( muX, muY, xr, yr)
   
   selected = True if nbrHits > 10 else False
   selected = diffNbrOfSeeds and chId > 8
@@ -281,7 +284,8 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   selected = True
   selected = (nbrOfGroups > 1)
   selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
-  
+  # select good ones
+  selected = (nbrOfGroups > 1) 
   if display and selected:
     nFigRow = 2; nFigCol = 4
     fig, ax = plt.subplots(nrows=nFigRow, ncols=nFigCol, figsize=(15, 7))
@@ -448,7 +452,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
 
   #
   # free memory in Pad-Processing
-  PCWrap.freeMemoryPadProcessing()
+  # PCWrap.freeMemoryPadProcessing()
 
   #
   return
@@ -462,7 +466,7 @@ def processEvent( preClusters,  ev):
 if __name__ == "__main__":
     
   pcWrap = PCWrap.setupPyCWrapper()
-  pcWrap.initMathieson()
+  pcWrap.o2_mch_initMathieson()
   
   # Read MC data
   reco = IO.Run2PreCluster(fileName="../Run2Data/recoRun2-100.dat")
@@ -481,7 +485,10 @@ if __name__ == "__main__":
     for pc in reco:
       # processPreCluster ( pc, display=True, displayBefore=False )
       processPreCluster ( pc, display=True, displayBefore=False )
-  else:
+  elif 0:
+    pc = reco.readPreCluster( 0, 0, 44)
+    processPreCluster ( pc, display=True, displayBefore=True )
+  else :
     # pc = reco.readPreCluster( 0, 1, 757)
     # pc = reco.readPreCluster( 0, 1, 627)
     # pc = reco.readPreCluster( 0, 2, 1137)

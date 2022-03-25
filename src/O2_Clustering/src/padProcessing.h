@@ -42,6 +42,8 @@ inline static PadIdx_t getTheFirstNeighborOf(PadIdx_t* neigh, PadIdx_t i) { retu
 inline static const PadIdx_t* getNeighborsOf(const PadIdx_t* neigh, PadIdx_t i) { return &neigh[MaxNeighbors * i]; };
 inline static PadIdx_t* getNeighborsOf( PadIdx_t* neigh, PadIdx_t i) { return &neigh[MaxNeighbors * i]; };
 
+ int addIsolatedPadInGroups( const Pads &pads, Group_t *padToGrp, Mask_t *mapGrpToGrp, int nGroups);
+
 } // namespace mch
 } // namespace o2
 
@@ -80,7 +82,7 @@ int projectChargeOnOnePlane(
 void buildProjectedSaturatedPads(const Mask_t* saturated0, const Mask_t* saturated1, Mask_t* saturatedProj);
 
 int getConnectedComponentsOfProjPads(short* padGrp);
-  int getConnectedComponentsOfProjPadsWOIsolatedPads( short *padGrp );
+int getConnectedComponentsOfProjPadsWOIsolatedPads( short *padGrp );
 
 int findLocalMaxWithLaplacian(const double* xyDxy, const double* z,
                               Group_t* padToGrp,

@@ -16,8 +16,13 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multifit_nlin.h>
 
-#include "MCHClustering/mathUtil.h"
+#include "MCHClustering/PadsPEM.h"
+#include "mathUtil.h"
 
+namespace o2
+{
+namespace mch
+{
 typedef struct dataFit {
   int N;
   int K;
@@ -35,10 +40,14 @@ typedef struct dataFit {
   int verbose;
 } funcDescription_t;
 
+void fitMathieson( const Pads &iPads, double *thetaInit, int kInit, int mode, double *thetaFinal, double* khi2, double* pError);
 // Notes :
 //  - the intitialization of Mathieson module must be done before (initMathieson)
+} // namespace mch
+} // namespace o2
+
 extern "C" {
-void fitMathieson(double* muAndWi,
+void fitMathieson0(double* muAndWi,
                   double* xyAndDxy, double* z, Mask_t* cath, Mask_t* notSaturated,
                   double* zCathTotalCharge,
                   int K, int N, int chamberId, int jacobian,

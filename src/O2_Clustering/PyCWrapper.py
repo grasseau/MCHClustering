@@ -32,23 +32,23 @@ def setupPyCWrapper():
   #  
   # Setup Mathieson functions
   #
-  extCLib.initMathieson.restype  = None
-  extCLib.initMathieson.argtypes = None
+  extCLib.o2_mch_initMathieson.restype  = None
+  extCLib.o2_mch_initMathieson.argtypes = None
   #
-  extCLib.compute2DPadIntegrals.resType = None
-  extCLib.compute2DPadIntegrals.argtypes = [ array_1d_double,
+  extCLib.o2_mch_compute2DPadIntegrals.resType = None
+  extCLib.o2_mch_compute2DPadIntegrals.argtypes = [ array_1d_double,
                                              c_int, c_int, array_1d_double]
   #
-  extCLib.compute2DMathiesonMixturePadIntegrals.resType = 0
-  extCLib.compute2DMathiesonMixturePadIntegrals.argtypes = [ 
+  extCLib.o2_mch_compute2DMathiesonMixturePadIntegrals.resType = 0
+  extCLib.o2_mch_compute2DMathiesonMixturePadIntegrals.argtypes = [ 
                                                 array_1d_double,     # xyInfSup 
                                                 array_1d_double,     # theta,
                                                 c_int, c_int, c_int, #  N, K, chamberId, 
                                                 array_1d_double      # Integrals[]
                                                 ]
   #
-  extCLib.computeCij.resType = 0
-  extCLib.computeCij.argtypes = [ 
+  extCLib.o2_mch_computeCij.resType = 0
+  extCLib.o2_mch_computeCij.argtypes = [ 
                                                 array_1d_double,     # xyInfSup 
                                                 array_1d_double,     # theta,
                                                 c_int, c_int, c_int, #  N, K, chamberId, 
@@ -57,6 +57,7 @@ def setupPyCWrapper():
   #
   # Setup Mathieson fitting functions
   #
+  """
   extCLib.fitMathieson.resType = None
   extCLib.fitMathieson.argtypes = [ array_1d_double,  # thetai
                                     array_1d_double,  # xyAndDxy
@@ -69,10 +70,12 @@ def setupPyCWrapper():
                                     array_1d_double,  # Khi2
                                     array_1d_double   # pError
                                 ]
+  """
   #
   # Setup Gaussian EM functions
   #
-
+  
+  """ Not used
   extCLib.computeDiscretizedGaussian2D.resType = None
   extCLib.computeDiscretizedGaussian2D.argtypes = [ 
                                     array_1d_double,  # xyInfSup
@@ -112,6 +115,7 @@ def setupPyCWrapper():
                                     c_int, c_int,     # K, N 
                                     array_1d_double   # residual
                                 ]
+  """ # Not used
   #
   #
   extCLib.computeMathiesonResidual.resType = None
@@ -127,6 +131,7 @@ def setupPyCWrapper():
   #
   # Setup Pad Processing functions
   #
+  """ Used ???
   extCLib.projectChargeOnOnePlane.resType = None
   extCLib.projectChargeOnOnePlane.argtypes = [
                                                 array_1d_double,  # xy0Dxy
@@ -147,14 +152,16 @@ def setupPyCWrapper():
                                                 c_int, c_int,     # N0, N1
                                                 c_int             # includeAlonePads
                                             ]
+  """
   #
-  extCLib.copyProjectedPads.resType = None
-  extCLib.copyProjectedPads.argtypes = [
+  extCLib.collectProjectedPads.resType = None
+  extCLib.collectProjectedPads.argtypes = [
                                         array_1d_double,  # xyDxy
                                         array_1d_double,  # chA
                                         array_1d_double,  # chB
                                        ]
   #
+  """ Unused ???
   extCLib.collectProjectedMinMax.resType = None
   extCLib.collectProjectedMinMax.argtypes = [
                                         array_1d_double,  # Max Ch
@@ -169,10 +176,12 @@ def setupPyCWrapper():
                                                 array_1d_double,  # Laplacian
                                                 array_1d_double,  # Theta
                                                 ]
+  """
   #
-  extCLib.getConnectedComponentsOfProjPads.resType = c_int
-  extCLib.getConnectedComponentsOfProjPads.argtypes = [ array_1d_short ]  # Pad Groups
+  extCLib.collectProjGroups.resType = c_int
+  extCLib.collectProjGroups.argtypes = [ array_1d_short ]  # Pad Groups
   #
+  """
   extCLib.assignCathPadsToGroupFromProj.resType = None
   extCLib.assignCathPadsToGroupFromProj.argtypes = [
                                             array_1d_short,     # padGroup
@@ -180,6 +189,8 @@ def setupPyCWrapper():
                                             c_int, c_int,       # nCath0, nCath1
                                             array_1d_short,     # well split groups
                                             ]
+  """
+  """
   #                                            
   extCLib.copyCathToGrpFromProj.resType = None
   extCLib.copyCathToGrpFromProj.argtypes =  [
@@ -187,6 +198,7 @@ def setupPyCWrapper():
                                     array_1d_short,     # cath1Grp
                                     c_int, c_int,       # nCath0, nCath1
                                     ]
+  """
   #
   extCLib.clusterProcess.resType = c_int
   extCLib.clusterProcess.argtypes = [
@@ -198,12 +210,14 @@ def setupPyCWrapper():
                                     c_int               # nPads
                                     ] 
   #
+  """
   extCLib.setMathiesonVarianceApprox.resType = None
   extCLib.setMathiesonVarianceApprox.argtypes = [
                                                 c_int,              # chId
                                                 array_1d_double,    # theta
                                                 c_int               # K
-                                                ]
+                                             ]
+  """
   #
   extCLib.collectTheta.resType  = None
   extCLib.collectTheta.argtypes = [
@@ -232,11 +246,13 @@ def setupPyCWrapper():
   extCLib.getKThetaInit.resType = c_int
   extCLib.getKThetaInit.argtypes = None
   #
+  """
   extCLib.collectLaplacian.resType  = None
   extCLib.collectLaplacian.argtypes = [
                                     array_1d_double,    # Laplacian
                                     c_int               # nTot
                                     ] 
+  """
   #
   extCLib.collectPadToCathGroup.resType  = None
   extCLib.collectPadToCathGroup.argtypes = [
@@ -244,11 +260,13 @@ def setupPyCWrapper():
                                     c_int              # nPads
                                     ] 
   #
+  """
   extCLib.collectResidual.resType  = None
   extCLib.collectResidual.argtypes = [
                                     array_1d_double,    # Residual
                                     c_int               # nTot
                                     ] 
+  """
   #  
   extCLib.collectThetaInit.resType  = None
   extCLib.collectThetaInit.argtypes = [
@@ -262,6 +280,12 @@ def setupPyCWrapper():
                                           c_int               # K
                                          ]  
   #
+  extCLib.collectThetaExtra.resType  = None
+  extCLib.collectThetaExtra.argtypes = [
+                                          array_1d_double,    # theta Extra
+                                          c_int               # K
+                                         ]  
+  #
   extCLib.collectPixels.resType  = c_int
   extCLib.collectPixels.argtypes = [
                                         c_int,              # which
@@ -270,8 +294,10 @@ def setupPyCWrapper():
                                         array_1d_double    # q
                                     ]  
   #
+  """
   extCLib.freeMemoryPadProcessing.resType = c_int
   extCLib.freeMemoryPadProcessing.argtypes = None
+  """
   #
   global CLib
   CLib = extCLib
@@ -358,7 +384,7 @@ def copyProjectedPads( ):
   chA = np.zeros( nbrOfProjPads, dtype=np.float64 )
   chB = np.zeros( nbrOfProjPads, dtype=np.float64 )
   #
-  CLib.copyProjectedPads( xyDxyProj, chA, chB )
+  CLib.collectProjectedPads( xyDxyProj, chA, chB )
   npj = nbrOfProjPads
   xProj = np.zeros(npj)
   yProj = np.zeros(npj)
@@ -371,11 +397,14 @@ def copyProjectedPads( ):
   #
   return (xProj, dxProj, yProj, dyProj, chA, chB)
 
+
+""" unused ???
 def collectProjectedMinMax(nProj):
   minCh = np.zeros( nProj)
   maxCh = np.zeros( nProj)
   CLib.collectProjectedMinMax( minCh, maxCh )
   return minCh, maxCh
+"""
 
 def projectChargeOnOnePlane( x0, dx0, y0, dy0, x1, dx1, y1, dy1, ch0, ch1):
   N0 = x0.size
@@ -426,9 +455,10 @@ def projectChargeOnOnePlaneWithTheta( x0, dx0, y0, dy0, x1, dx1, y1, dy1, ch0, c
 def getConnectedComponentsOfProjPads():
   nbrOfProjPads = CLib.getNbrProjectedPads()
   padGrp = np.zeros( (nbrOfProjPads), dtype=np.int16 )
-  nbrGroups = CLib.getConnectedComponentsOfProjPads( padGrp )
+  nbrGroups = CLib.collectProjGroups( padGrp )
   return nbrGroups, padGrp
 
+""" Not used
 def findLocalMaxWithLaplacian( xyDxy, z, laplacian=None):
   N = int( xyDxy.size / 4)
   if laplacian is None:
@@ -442,12 +472,14 @@ def findLocalMaxWithLaplacian( xyDxy, z, laplacian=None):
   theta[3*K:4*K] = theta0[3*N:3*N+K]
   theta[4*K:5*K] = theta0[4*N:4*N+K]
   return theta
-
+"""
+"""
 def assignCathPadsToGroup( padGroup, nGroup, nCath0, nCath1 ):
   nPads = padGroup.size
   wellSplitGroup = np.zeros( nGroup, dtype=np.int16 )
   CLib.assignCathPadsToGroup( padGroup, nPads, nGroup, nCath0, nCath1, wellSplitGroup )
   return wellSplitGroup
+"""
 
 def copyCathToGrp( nCath0, nCath1):
   cath0Grp = np.zeros( nCath0, dtype=np.int16)
@@ -525,6 +557,12 @@ def collectThetaEMFinal():
   CLib.collectThetaEMFinal( thetaf, K)
   return thetaf
 
+def collectThetaExtra():
+  K = CLib.getNbrOfThetaExtra()
+  theta = np.zeros( 5*K)
+  CLib.collectThetaExtra( theta, K)
+  return theta
+
 def collectPixels( which ):
   N = CLib.collectPixels( which, 0, np.zeros(1), np.zeros(1))
   xyDxy = np.zeros( 4*N)
@@ -532,7 +570,8 @@ def collectPixels( which ):
   N = CLib.collectPixels( which, N, xyDxy, q)
   return (N, xyDxy, q)
   
-  
+"""  
 def freeMemoryPadProcessing():
   CLib.freeMemoryPadProcessing()
   return
+"""
