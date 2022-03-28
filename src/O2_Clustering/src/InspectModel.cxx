@@ -125,6 +125,7 @@ void cleanInspectModel( ) {
   inspectModel.totalNbrOfSubClusterThetaEMFinal = 0;
   inspectModel.totalNbrOfSubClusterThetaExtra = 0;
 
+  cleanPixels();
   // Cath group
   delete [] inspectModel.padToCathGrp;
   inspectModel.padToCathGrp = 0;
@@ -327,13 +328,14 @@ static InspectPadProcessing_t inspectPadProcess; //={.xyDxyQPixels ={{0,nullptr}
 //.laplacian=0, .residualProj=0, .thetaInit=0, .kThetaInit=0,
 //  .totalNbrOfSubClusterPads=0, .totalNbrOfSubClusterThetaEMFinal=0, .nCathGroups=0, .padToCathGrp=0};
 
-void cleanInspectPadProcess() {
-  for (int i=0; i<inspectPadProcess.nStorage; i++) {
+void cleanPixels() {
+  for (int i=0; i<inspectPadProcess.nPixelStorage; i++) {
     int G = inspectPadProcess.xyDxyQPixels[i].size();
     for (int g=0; g<G; g++) {
       if (inspectPadProcess.xyDxyQPixels[i][g].first != 0 ) delete[] inspectPadProcess.xyDxyQPixels[i][g].second;
       inspectPadProcess.xyDxyQPixels[i][g].first = 0;
     }
+    inspectPadProcess.xyDxyQPixels[i].clear();
   }
 }
 

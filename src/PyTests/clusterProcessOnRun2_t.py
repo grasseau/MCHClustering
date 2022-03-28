@@ -282,8 +282,8 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   selected = diffNbrOfSeeds and chId > 8
   selected = diffNbrOfSeeds 
   selected = True
-  selected = (nbrOfGroups > 1)
   selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
+  selected = (nbrOfGroups > 1)
   # select good ones
   selected = (nbrOfGroups > 1) 
   if display and selected:
@@ -375,6 +375,10 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     if (nPix >0 ):
       (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
       # qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
+      print("????????????????? maxQPixel", pEnd-1, " ", np.max(qPix))
+      print( "????????????????? QPixel", nPix, " ", qPix)
+      print("xPix.size", xPix.size)
+      
       uPlt.setLUTScale( 0.0, np.max(qPix))
       uPlt.drawPads( fig, ax[1,1], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
       #uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')

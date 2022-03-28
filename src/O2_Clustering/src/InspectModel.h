@@ -52,8 +52,8 @@ typedef struct dummy_t {
 // PadProcessing
 typedef struct dummyPad_t {
     // Data on Pixels
-    const static int nStorage = 8;
-    std::vector<DataBlock_t> xyDxyQPixels[nStorage];
+    const static int nPixelStorage = 8;
+    std::vector<DataBlock_t> xyDxyQPixels[nPixelStorage];
 } InspectPadProcessing_t;
 
 
@@ -87,7 +87,7 @@ extern "C" {
   void collectThetaInit( double *thetai, int N);
   void collectThetaEMFinal( double *thetaEM, int K);
   void collectThetaExtra( double *thetaExtra, int K);
-  void cleanInspectPadProcess();
+  void cleanPixels();
   int collectPixels( int which, int N, double *xyDxy, double *q);
   void inspectSavePixels( int which, o2::mch::Pads &pixels);
   int getNbrProjectedPads();

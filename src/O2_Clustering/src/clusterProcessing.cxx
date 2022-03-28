@@ -1180,6 +1180,36 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
   return nbrOfHits;
 }
 
+/* Not Used ???
+void finalizeSolution( &seedList ) {
+  if ( seedList.size() == 1) return;
+
+  double sumCharge = 0;
+  for (int g=0;  < seedList.size(); g++) {
+    int k = seedList[g].first;
+    double theta = getW( seedList[g].second, k);
+    double *w = getW(theta, k )
+    for( int l=0; l<k; l++) {
+      // w[k] contains the charge
+      sumCharge += w[l];
+    }
+  }
+  // Filter on relative weight (Charge)
+  for (int g=0;  < seedList.size(); g++) {
+    int k = seedList[g].first;
+    double theta = getW( seedList[g].second, k);
+    double *w = getW(theta, k )
+    for( int l=0; l<k; l++) {
+      // w[k] contains the charge
+      w[l] = w[l]/sumCharge;
+    }
+    // Buid Mask
+    vectorBuidMaskGreater( w, 0)
+  }
+  maskedCopyTheta(const double* theta, int K, const Mask_t* mask, int nMask, double* maskedTheta, int maskedK)
+}
+*/
+
 void cleanClusterProcessVariables( ) {
     // To verify the alloc/dealloc ????
     // if (uniqueCath == -1) {

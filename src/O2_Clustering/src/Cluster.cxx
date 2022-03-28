@@ -76,20 +76,25 @@ Cluster::Cluster( const double *x, const double *y, const double *dx, const doub
   int nbrCath0 = nPads - nbrCath1;
 
   // Build the pads for each cathode
-  int nextCath=0;
+  int nCath=0;
   if (nbrCath0 != 0) {
     mapCathPadIdxToPadIdx[0] = new PadIdx_t[nbrCath0];
     pads[0] = new Pads( x, y, dx, dy, q, cathodes, saturated, 0, chId, mapCathPadIdxToPadIdx[0], nPads);
     singleCathPlaneID = 0;
-    nextCath = 1;
+    nCath += 1;
   }
   if (nbrCath1 != 0) {
+    /* Inv ???
     mapCathPadIdxToPadIdx[nextCath] = new PadIdx_t[nbrCath1];
     pads[nextCath] = new Pads( x, y, dx, dy, q, cathodes, saturated, 1, chId, mapCathPadIdxToPadIdx[nextCath], nPads);
+    */
+    mapCathPadIdxToPadIdx[1] = new PadIdx_t[nbrCath1];
+    pads[1] = new Pads( x, y, dx, dy, q, cathodes, saturated, 1, chId, mapCathPadIdxToPadIdx[1], nPads);
     singleCathPlaneID = 1;
+    nCath += 1;
   }
   // Number of cathodes & alone cathode
-  nbrOfCathodePlanes = nextCath+1;
+  nbrOfCathodePlanes = nCath;
   if ( nbrOfCathodePlanes == 2) {
     singleCathPlaneID = -1;
   }
@@ -121,25 +126,32 @@ Cluster::Cluster( const double *x, const double *y, const double *dx, const doub
     printf("-----------------------------\n");
     printf("Starting CLUSTER PROCESSING\n");
     printf("# cath0=%2d, cath1=%2d\n", nbrCath0, nbrCath1);
-    printf("# sum Q0=%7.3g, sum Q1=%7.3g\n", pads[0]->totalCharge, pads[1]->totalCharge);
+    printf("# sum Q0=%7.3g, sum Q1=%7.3g\n", (pads[0]) ? pads[0]->totalCharge:0, (pads[1]) ? pads[1]->totalCharge:0);
     printf("# singleCathPlaneID=%2d\n", singleCathPlaneID);
   }
 }
 
+// Extract the subcluster g
 Cluster::Cluster( Cluster &cluster, Groups_t g) {
     chamberId = cluster.chamberId;
+    int nbrCath[2] = {0,0};
+    nbrCath[0] = (cluster.pads[0]) ? cluster.pads[0]->nPads: 0;
+    nbrCath[1] = (cluster.pads[1]) ? cluster.pads[1]->nPads: 0;
     //
     // Extract the pads of group g
     //
-    Mask_t maskGrpCath0[cluster.pads[0]->nPads];
-    Mask_t maskGrpCath1[cluster.pads[1]->nPads];
+    Mask_t maskGrpCath0[nbrCath[0]];
+    Mask_t maskGrpCath1[nbrCath[1]];
     Mask_t *maskGrpCath[2] = {maskGrpCath0, maskGrpCath1};
     int nbrCathPlanes_ = 0;
     int singleCathPlaneID_ = -1;
     for ( int c=0; c<2; c++) {
       // Build the mask mapping the group g
       // ??? Inv int nbr =
-      int nbrPads = vectorBuildMaskEqualShort( cluster.cathGroup[c], g, cluster.pads[c]->nPads, maskGrpCath[c]);
+      int nbrPads = 0;
+      if( nbrCath[c] ) {
+        nbrPads = vectorBuildMaskEqualShort( cluster.cathGroup[c], g, cluster.pads[c]->nPads, maskGrpCath[c]);
+      }
       if (nbrPads != 0 ) {
         // Create the pads of the group g
         pads[c] = new Pads( *cluster.pads[c], maskGrpCath[c]);
@@ -320,7 +332,7 @@ void Cluster::computeProjectedPads(
             const Pads &pad0InfSup, const Pads &pad1InfSup,
             PadIdx_t *aloneIPads, PadIdx_t *aloneJPads, PadIdx_t *aloneKPads, int includeAlonePads) {
   // Use positive values of the intersectionMatrix
-  // negative ones are isolated pads
+  // negative ones are single pads
   // Compute the new location of the projected pads (projected_xyDxy)
   // and the mapping mapKToIJ which maps k (projected pads)
   // to i, j (cathode pads)
@@ -442,7 +454,7 @@ int Cluster::buildProjectedGeometry( int includeSingleCathodePads) {
     computeAndStoreFirstNeighbors(xyDxyProj, nPads, nPads);
     if (INSPECTMODEL) storeProjectedPads ( xyDxyProj, zi, nPads);
     */
-    projectedPads = new Pads( *pads[0], Pads::xydxdyMode);
+    projectedPads = new Pads( *pads[singleCathPlaneID], Pads::xydxdyMode);
     projNeighbors = projectedPads->buildFirstNeighbors();
     return projectedPads->nPads;
   }
@@ -746,8 +758,8 @@ int Cluster::buildGroupOfPads() {
   // Inv ??? short *grpToCathGrp = 0;
   int nCathGroups = 0;
   int nGroups = 0;
-  int nbrCath0 = pads[0]->nPads;
-  int nbrCath1 = pads[1]->nPads;
+  int nbrCath0 = (pads[0]) ? pads[0]->nPads : 0;
+  int nbrCath1 = (pads[1]) ? pads[1]->nPads : 0;
   //
   // Build the "proj-groups"
   // The pads which have no recovery with the other cathode plane
@@ -820,12 +832,10 @@ int Cluster::buildGroupOfPads() {
 
     // Merge Groups or cathode group
     //
-    // Inv ??? padToMergedGrp = new short[nPads];
     int nPads = pads[0]->nPads + pads[1]->nPads;
-    short padToMergedGrp[nPads];
     // Over allocated array
     // ??? short projGrpToMergedGrp[nGroups+1];
-    if (1) {
+
     // TODO ???
     // Some alone pads in one cathode plane form a group but are
     // not set as a group (0), ex: Run2 orbit 0, ROF=7, cluster=319
@@ -837,7 +847,6 @@ int Cluster::buildGroupOfPads() {
       // vectorPrintShort( "  projPadToGrp", projPadToGrp, nProjPads);
       // vectorPrintShort( "  cath0ToGrp", cath0ToGrp, nbrCath0);
       // vectorPrintShort( "  cath1ToGrp", cath1ToGrp, nbrCath1);
-    }
     }
 
     // Take care the number of Gropu nGrp increase ???????????????????????????????
@@ -881,13 +890,9 @@ int Cluster::buildGroupOfPads() {
       printf("# addIsolatedPadInGroups cath-0 nNewGroups =%d\n", nGroups);
       vectorPrintShort( "  mapGrpToGrp", mapGrpToGrp, nGroups+1);
     }
-    // nGroups = nNewGroups;
-    // int nNewGrpCath1 = addIsolatedPadInGroups( xy1Dxy, cath1ToGrp, nbrCath1, 1, projGrpToMergedGrp, nNewGrpCath0);
-    /// int nNewGrpCath1 = addIsolatedPadInGroups( xy1Dxy, cath1ToGrp, nbrCath1, 1, mapGrpToGrp, nGroups);
-    // ??? Inv int nNewGrpCath1 = addIsolatedPadInGroups( *pads[1], cathGroup[1], mapGrpToGrp, nGroups);
 
     // Do the same on cath1
-    // Add single pads of cath-0 and modyfy the groups
+    // Add single pads of cath-0 and modify the groups
     int nNewGrpCath1 = pads[1]->addIsolatedPadInGroups( cathGroup[1], mapGrpToGrp, nGroups);
     nGroups += nNewGrpCath1;
     // Apply the new Groups on cath1
@@ -898,12 +903,10 @@ int Cluster::buildGroupOfPads() {
     for ( int p=0; p < nProjPads; p++) {
       projPadToGrp[p] = mapGrpToGrp[ projPadToGrp[p]];
     }
-    // int nNewGroups = renumberGroups( projGrpToMergedGrp, nNewGrpCath1);
-    /// Inv ???? int nNewGroups = renumberGroupsV2( cath0ToGrp, nbrCath0, cath1ToGrp, nbrCath1, mapGrpToGrp, std::max( nNewGrpCath0, nNewGrpCath1));
 
     // Some groups may be merged, others groups may diseappear
     // So the final groups must be renumbered
-    int nNewGroups = renumberGroupsV2( cathGroup[0], pads[0]->nPads, cathGroup[1], pads[1]->nPads, mapGrpToGrp, nGroups);
+    int nNewGroups = renumberGroups( cathGroup[0], pads[0]->nPads, cathGroup[1], pads[1]->nPads, mapGrpToGrp, nGroups);
     if (VERBOSE > 1) {
       printf("Groups after renumbering %d\n", nGroups);
       vectorPrintShort( "  projPadToGrp", projPadToGrp, nProjPads);
@@ -1262,23 +1265,24 @@ int Cluster::assignPadsToGroupFromProj(
   return newGroupID;
 }
 
+// Propagate the proj-groups to the cath-pads
 int Cluster::assignGroupToCathPads( ) {
-// old arg short *projPadGroup, int nProjPads, int nGrp, int nCath0, int nCath1, short *cath0ToGrp, short *cath1ToGrp) {
-  // From the cathode group found with the projection,
   //
-  int nCath0 = pads[0]->nPads;
-  int nCath1 = pads[1]->nPads;
+  // From the cathode group found with the projection,
+  int nCath0 = (pads[0]) ? pads[0]->nPads : 0;
+  int nCath1 = (pads[1]) ? pads[1]->nPads : 0;
   int nGrp = nbrOfProjGroups;
-  // Group obtain with the projection
+  // Groups obtain with the projection
   Group_t cath0ToGrpFromProj[nCath0];
   Group_t cath1ToGrpFromProj[nCath1];
   vectorSetZeroShort( cath0ToGrpFromProj, nCath0);
   vectorSetZeroShort( cath1ToGrpFromProj, nCath1);
   vectorSetZeroShort( cathGroup[0], nCath0);
   vectorSetZeroShort( cathGroup[1], nCath1);
+  // Mapping proj-groups to cath-groups
   Group_t projGrpToCathGrp[nGrp+1];
   vectorSetZeroShort( projGrpToCathGrp, nGrp+1);
-  int nCathGrp = 0; // return value, ... avoid a sum ... ????
+  int nCathGrp = 0;
   //
   if (VERBOSE > 0) {
     printf("  assignGroupToCathPads\n");
@@ -1287,12 +1291,15 @@ int Cluster::assignGroupToCathPads( ) {
   PadIdx_t i, j;
   short g, prevGroup0, prevGroup1;
   if (nbrOfCathodePlanes == 1) {
+    // Single cathode plane
     vectorCopyShort( projPadToGrp, pads[singleCathPlaneID]->nPads, cathGroup[singleCathPlaneID]);
     return nGrp;
   }
   int nProjPads = projectedPads->nPads;
   for( int k=0; k < nProjPads; k++) {
+    // Group of the projection k
     g = projPadToGrp[k];
+    // Intersection indexes of the 2 cath
     i = mapKToIJ[k].i; j = mapKToIJ[k].j;
     if (VERBOSE > 1) {
       printf("map k=%d g=%d to i=%d/%d, j=%d/%d\n", k, g, i, nCath0, j, nCath1);
@@ -1301,6 +1308,7 @@ int Cluster::assignGroupToCathPads( ) {
     // Cathode 0
     //
     if ( (i >= 0) && (nCath0 != 0) ) {
+      // if the pad has already been set
       prevGroup0 = cath0ToGrpFromProj[i];
       if ( (prevGroup0 == 0) ) {
         if( (projGrpToCathGrp[g] == 0 ) && (g !=0 )) {
@@ -1334,17 +1342,22 @@ int Cluster::assignGroupToCathPads( ) {
     vectorPrintShort( "  cath1ToGrpFromProj ??? ",cath1ToGrpFromProj,nCath1);
     vectorPrintShort( "  projGrpToCathGrp ??? ", projGrpToCathGrp, nGrp+1);
   }
-  // Renumering cathodes groups
-  // Inv ??? int nNewGrp = renumberGroups( projGrpToCathGrp, nGrp);
-  int nNewGrp = renumberGroups( projGrpToCathGrp, nGrp);
-
-  // vectorPrintShort("  projGrpToCathGrp renumbered", projGrpToCathGrp, nGrp+1);
   //
-  vectorMapShort( cath0ToGrpFromProj, projGrpToCathGrp, nCath0);
+  // Renumering cathodes groups
+  // Desactivated ???
+  // int nNewGrp = renumberGroups( projGrpToCathGrp, nGrp);
+  // Test if renumbering is necessary
+  // if( nNewGrp != nGrp) throw std::overflow_error("Divide by zero exception");
+  // vectorMapShort( cath0ToGrpFromProj, projGrpToCathGrp, nCath0);
+  // vectorMapShort( cath1ToGrpFromProj, projGrpToCathGrp, nCath1);
+  //
+  //
+  int nNewGrp = nGrp;
+  //
+  // Set/update the cath/proj Groups
   vectorCopyShort( cath0ToGrpFromProj, nCath0, cathGroup[0]);
-  vectorMapShort( cath1ToGrpFromProj, projGrpToCathGrp, nCath1);
   vectorCopyShort( cath1ToGrpFromProj, nCath1, cathGroup[1]);
-
+  //
   for( i=0; i<nProjPads; i++) {
     projPadToGrp[i] = projGrpToCathGrp[ projPadToGrp[i] ];
   }
@@ -1353,6 +1366,7 @@ int Cluster::assignGroupToCathPads( ) {
     vectorPrintShort("  cath0ToGrp", cathGroup[0], nCath0);
     vectorPrintShort("  cath1ToGrp", cathGroup[1], nCath1);
   }
+  //
   return nNewGrp;
 }
 
@@ -1686,6 +1700,27 @@ DataBlock_t Cluster::fit(  double *thetaInit, int kInit) {
       vectorCopy( thetaInit, kInit*5, thetaFit);
       finalK = kInit;
     }
+    // Replace w by charge proportion
+    // Unsused
+    /*
+    // Theta
+    double totalCharge = 0;
+    if( nbrCath0 ) {
+      totalCharge += vectorSum( pads[0]->q, nbrCath0 );
+    }
+    if( nbrCath1 ) {
+      totalCharge += vectorSum( pads[1]->q, nbrCath1 );
+    }
+    if ( nbrOfCathodePlanes == 2 ) {
+        totalCharge = totalCharge * 0.5;
+    }
+    printf("??????????????? Total Charge %f \n", totalCharge);
+    double *w = getW( thetaFit, finalK);
+    for (int k =0; k<finalK; k++) {
+      w[k] = w[k] * totalCharge;
+    }
+    printTheta( "????????????????", thetaFit, finalK);
+    */
     return  std::make_pair(finalK, thetaFit);
 }
 
@@ -1698,6 +1733,7 @@ double *Cluster::getProjPadsAsXYdXY( Groups_t group, const Mask_t* maskGrp, int 
     //maskedCopy(qProject)
     return xyDxyGProj;
 }
+// Invalid, Should be removed
 // ??????????? Try to do the same with renumberV2
 int Cluster::renumberGroups( short *grpToGrp, int nGrp ) {
   // short renumber[nGrp+1];
@@ -1727,7 +1763,7 @@ int Cluster::renumberGroups( short *grpToGrp, int nGrp ) {
   return curGrp;
 }
 
-int Cluster::renumberGroupsV2( Mask_t *cath0Grp, int nbrCath0, Mask_t *cath1Grp, int nbrCath1, Mask_t *grpToGrp, int nGrp ) {
+int Cluster::renumberGroups( Mask_t *cath0Grp, int nbrCath0, Mask_t *cath1Grp, int nbrCath1, Mask_t *grpToGrp, int nGrp ) {
   int currentGrp=0;
   for (int g=0; g < (nGrp+1); g++) {
     grpToGrp[g] = 0;
@@ -2121,8 +2157,18 @@ int Cluster::laplacian2D( const Pads &pads_, PadIdx_t *neigh, int chId, PadIdx_t
 // Just to check hit results
 int Cluster::findLocalMaxWithBothCathodes( double *thetaOut, int kMax, int verbose ) {
 
-  int N0 = pads[0]->nPads;
-  int N1 = pads[1]->nPads;
+  int N0=0, N1=0;
+  if ( nbrOfCathodePlanes != 2) {
+    if ( singleCathPlaneID == 0 ) {
+      N0 = pads[0]->nPads;
+    } else {
+      N1 = pads[1]->nPads;
+    }
+  } else {
+    N0 = pads[0]->nPads;
+    N1 = pads[1]->nPads;
+
+  }
   int kMax0 = N0;
   int kMax1 = N1;
 
@@ -2142,14 +2188,17 @@ int Cluster::findLocalMaxWithBothCathodes( double *thetaOut, int kMax, int verbo
   }
   PadIdx_t *grpNeighborsCath0 = nullptr;
   PadIdx_t *grpNeighborsCath1 = nullptr;
+  // Number of local max
+  int K0=0, K1=0;
   if ( N0 ) {
     grpNeighborsCath0 = pads[0]->buildFirstNeighbors( );
+    K0 = laplacian2D( *pads[0], grpNeighborsCath0, chamberId, localMax0, kMax0, smoothQ0);
   }
   if ( N1 ) {
     grpNeighborsCath1 = pads[1]->buildFirstNeighbors( );
+    K1 = laplacian2D( *pads[1], grpNeighborsCath1, chamberId, localMax1, kMax1, smoothQ1);
   }
-  int K0 = laplacian2D( *pads[0], grpNeighborsCath0, chamberId, localMax0, kMax0, smoothQ0);
-  int K1 = laplacian2D( *pads[1], grpNeighborsCath1, chamberId, localMax1, kMax1, smoothQ1);
+
   // Seed allocation
   double localXMax[K0+K1];
   double localYMax[K0+K1];
@@ -2174,20 +2223,31 @@ int Cluster::findLocalMaxWithBothCathodes( double *thetaOut, int kMax, int verbo
     mapJToGrpIdx[ j] = j;
     mapGrpIdxToJ[ j] = j;
   }
+  const double *x0 ;
+  const double *y0 ;
+  const double *dx0;
+  const double *dy0;
+  const double *q0 ;
 
-
-  const double *x0  = pads[0]->x;
-  const double *y0  = pads[0]->y;
-  const double *dx0 = pads[0]->dx;
-  const double *dy0 = pads[0]->dy;
-  const double *q0  = pads[0]->q;
-
-  const double *x1  = pads[1]->x;
-  const double *y1  = pads[1]->y;
-  const double *dx1 = pads[1]->dx;
-  const double *dy1 = pads[1]->dy;
-  const double *q1  = pads[1]->q;
-
+  const double *x1 ;
+  const double *y1 ;
+  const double *dx1;
+  const double *dy1;
+  const double *q1 ;
+  if (N0) {
+    x0  = pads[0]->x;
+    y0  = pads[0]->y;
+    dx0 = pads[0]->dx;
+    dy0 = pads[0]->dy;
+    q0  = pads[0]->q;
+  }
+  if (N1) {
+    x1  = pads[1]->x;
+    y1  = pads[1]->y;
+    dx1 = pads[1]->dx;
+    dy1 = pads[1]->dy;
+    q1  = pads[1]->q;
+  }
   const double *xProj  = projectedPads->x;
   const double *yProj  = projectedPads->y;
   const double *dxProj = projectedPads->dx;

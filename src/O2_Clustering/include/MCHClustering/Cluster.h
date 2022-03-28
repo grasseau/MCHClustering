@@ -109,7 +109,7 @@ class Cluster
         double *xyDxyFit, double *zFit, Mask_t *cathFit, Mask_t *notSaturatedFit, double *zCathTotalCharge, int nFits[2]);
   void updateProjectionGroups ();
   int renumberGroups( short *grpToGrp, int nGrp );
-  int renumberGroupsV2( Mask_t *cath0Grp, int nbrCath0, Mask_t *cath1Grp, int nbrCath1, Mask_t *grpToGrp, int nGrp );
+  int renumberGroups( Mask_t *cath0Grp, int nbrCath0, Mask_t *cath1Grp, int nbrCath1, Mask_t *grpToGrp, int nGrp );
   int getIndexByRow( const char *matrix, PadIdx_t N, PadIdx_t M, PadIdx_t *IIdx);
   int getIndexByColumns( const char *matrix, PadIdx_t N, PadIdx_t M, PadIdx_t *JIdx);
   int checkConsistencyMapKToIJ( const char *intersectionMatrix, const MapKToIJ_t *mapKToIJ, const PadIdx_t *mapIJToK, const PadIdx_t *aloneIPads, const PadIdx_t *aloneJPads, int N0, int N1, int nbrOfProjPads);
