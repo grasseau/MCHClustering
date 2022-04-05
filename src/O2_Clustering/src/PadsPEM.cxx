@@ -211,7 +211,7 @@ Pads *Pads::addBoundaryPads( const double *x_, const double *y_, const double *d
     return padsWithBoundaries;
 }
 
-Pads *Pads::addBoundaryPads( PadIdx_t *neigh  ) {
+Pads *Pads::addBoundaryPads( ) {
 
     // TODO: Remove duplicate pads
     double eps = 1.0e-4;
@@ -222,6 +222,8 @@ Pads *Pads::addBoundaryPads( PadIdx_t *neigh  ) {
     std::vector<double> bdX;
     std::vector<double> bdY;
     int N = nPads;
+    // Build neigbours if required
+    PadIdx_t *neigh = buildFirstNeighbors();
     for (int i=0; i < N; i++) {
       bool east = true, west = true, north = true, south = true;
       for( const PadIdx_t *neigh_ptr = getTheFirtsNeighborOf(neigh, i); *neigh_ptr != -1; neigh_ptr++) {
@@ -519,7 +521,6 @@ Pads::Pads( const Pads *pads1, const Pads *pads2, int mode_) {
   nPads = nPads-1;
 }
 
-
 void Pads::allocate() {
   // Note: Must be deallocated/releases if required
   x = nullptr;
@@ -532,6 +533,7 @@ void Pads::allocate() {
   ySup = nullptr;
   saturate = nullptr;
   q = nullptr;
+  neighbors = nullptr;
   int N = nPads;
   if (mode == xydxdyMode ) {
     x = new double[N];
@@ -572,7 +574,7 @@ void Pads::setToZero() {
 // Build the neighbor list
 PadIdx_t *Pads::buildFirstNeighbors() {
   int N = nPads;
-  neighbors = buildFirstNeighbors( x, y, dx, dy, N, VERBOSE );
+  if ( neighbors == nullptr ) neighbors = buildFirstNeighbors( x, y, dx, dy, N, VERBOSE );
   return neighbors;
 }
 

@@ -74,10 +74,6 @@ static short *wellSplitGroup = 0;
 using namespace o2::mch;
 
 
-// Invalid
-// static InspectModel_t inspectModel={.nbrOfProjPads=0, .laplacian=0, .residualProj=0, .thetaInit=0, .kThetaInit=0,
-//  .totalNbrOfSubClusterPads=0, .totalNbrOfSubClusterThetaEMFinal=0, .nCathGroups=0, .padToCathGrp=0};
-
 // Total number of hits/seeds in the precluster;
 static int nbrOfHits = 0;
 // Storage of the seeds found
@@ -889,12 +885,16 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
     // Used only to give insights of the cluster
     if (INSPECTMODEL) {
       int nProjPads = subCluster->buildProjectedGeometry(includeAlonePads);
+      printf("findLocalMaxWithBothCathodes ??? \n");
       kEM = subCluster->findLocalMaxWithBothCathodes( thetaL, nbrOfPadsInTheGroup, 2 );
       double thetaExtra[kEM*5];
       copyTheta( thetaL, nbrOfPadsInTheGroup, thetaExtra, kEM, kEM);
-      saveThetaExtraInGroupList( thetaExtra, kEM );
+      // printNeighbors(subCluster->getPads(1)->printNeighbors() );
       printTheta("Theta findLocalMaxWithBothCathodes", thetaExtra, kEM);
     }
+    //
+    subCluster->addBoundaryPads();
+    //
     kEM = subCluster->findLocalMaxWithPET( thetaL, nbrOfPadsInTheGroup );
     if (kEM != 0) {
     double thetaEM[kEM*5];

@@ -17,12 +17,15 @@
 
 #include "PadsPEM.h"
 
-// ??? extern "C" {
 namespace o2
 {
 namespace mch
 {
 void initMathieson();
+
+void compute1DPadIntegrals( const double *xInf, const double *xSup,
+                           int N, int chamberId, bool xAxe, double Integrals[]);
+
 void compute2DPadIntegrals(const double* xInf, const double* xSup, const double* yInf, const double* ySup,
                            int N, int chamberId,
                            double Integrals[]);
@@ -31,11 +34,14 @@ void compute2DMathiesonMixturePadIntegrals(const double* xyInfSup0, const double
                                            int N, int K, int chamberId,
                                            double Integrals[]);
 
+void computeFastCij( const Pads &pads, const Pads &theta,
+                            double Cij[] );
 void computeCij( const Pads &pads, const Pads &theta,
                             double Cij[] );
 } // namespace mch
 } // namespace o2
 
+// For InspectModel (if required)
 extern "C" {
   void o2_mch_initMathieson();
   void o2_mch_compute2DPadIntegrals(const double* xInf, const double* xSup, const double* yInf, const double* ySup,

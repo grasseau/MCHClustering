@@ -22,6 +22,7 @@
 #include "padProcessing.h"
 #include "poissonEM.h"
 #include "mathiesonFit.h"
+#include "MCHClustering/mathieson.h"
 #include "mathUtil.h"
 #include "InspectModel.h"
 
@@ -1265,6 +1266,17 @@ int Cluster::assignPadsToGroupFromProj(
   return newGroupID;
 }
 
+// Add boundary pads with q charge equal 0
+void Cluster::addBoundaryPads( ) {
+  for( int c=0; c <2 ; c++) {
+    if( pads[c] ) {
+      Pads *bPads = pads[c]->addBoundaryPads();
+      delete pads[c];
+      pads[c] = bPads;
+    }
+  }
+}
+
 // Propagate the proj-groups to the cath-pads
 int Cluster::assignGroupToCathPads( ) {
   //
@@ -1806,48 +1818,42 @@ int Cluster::findLocalMaxWithPET( double *thetaL, int nbrOfPadsInTheGroupCath) {
     Pads *cath1 = pads[1];
     Pads *projPads = projectedPads;
     int chId = chamberId;
-    PadIdx_t *neighCath0 = nullptr, *neighCath1 = nullptr;
-    Pads *bPads0 = nullptr, *bPads1 = nullptr;
-    if( cath0 ) {
-      neighCath0 = cath0->buildFirstNeighbors();
-      bPads0 = cath0->addBoundaryPads( neighCath0);
-      delete [] neighCath0;
-    }
-    if( cath1 ) {
-      neighCath1 = cath1->buildFirstNeighbors();
-      bPads1 = cath1->addBoundaryPads( neighCath1);
-      delete [] neighCath1;
-    }
-    // Pads *bPads0 = addBoundaryPads( cath0, neighborsCath0);
-    //Pads displayPads = Pads( *bPads0, Pads::xydxdyMode);
-    // bPads0->display("bPads0");
-    // Pads *bPads1 = addBoundaryPads( cath1, neighborsCath1);
     int nMaxPads = std::fmax( getNbrOfPads(0), getNbrOfPads(1));
     Pads *pixels = Pads::refinePads( *projPads );
     printf("projPads->nPads=%d, pixel->nPads=%d", projPads->nPads, pixels->nPads);
-
-    Pads *pads;
-    if (1) {
-      // Merge the pads & describe them on the boundaries
-      pads = new Pads( bPads0, bPads1, Pads::xyInfSupMode);
-    } else {
-      pads = new Pads( *bPads0, Pads::xyInfSupMode);
-    }
-    if ( bPads0==nullptr ) delete bPads0;
-    if ( bPads1==nullptr ) delete bPads1;
-
+    int nPixels = pixels->nPads;
+    // Merge pads of the 2 cathodes
+    // TODO ??? : see if it can be once with Fitting (see fitPads)
+    Pads *mPads = new Pads( pads[0], pads[1], Pads::xyInfSupMode);
+    int nPads = mPads->nPads;
     Pads *localMax = nullptr;
     Pads *saveLocalMax = nullptr;
     double chi2=0;
     int dof, nParameters;
 
     // Pixel initilization
-    // ??? Overxrite the the projection
-    if (1) {
-      for (int i=0; i<pixels->nPads; i++) {
-          pixels->q[i] = 1.0;
-      }
+    // Rq: the charge projection is not used
+    for (int i=0; i<pixels->nPads; i++) {
+      pixels->q[i] = 1.0;
     }
+    // Init Cij
+    double *Cij = new double[nPads*nPixels];
+    // Compute pad charge xyInfSup induiced by a set of charge (the pixels)
+    computeFastCij( *mPads, *pixels, Cij);
+    // Test
+    double *CijTmp = new double[nPads*nPixels];
+    computeCij( *mPads, *pixels, CijTmp);
+    vectorAddVector( Cij, -1, CijTmp, nPads*nPixels, CijTmp);
+    vectorAbs( CijTmp, nPads*nPixels, CijTmp);
+    double minDiff = vectorMin(CijTmp, nPads*nPixels);
+    double maxDiff = vectorMax(CijTmp, nPads*nPixels);
+    int argMax = vectorArgMax(CijTmp, nPads*nPixels);
+    printf("\n\n nPads, nPixels %d %d\n", nPads, nPixels);
+    printf("\n\n min/max(FastCij-Cij)=%f %f nPads*i+j %d %d\n", minDiff, maxDiff, argMax / nPads, argMax % nPads);
+    delete [] CijTmp;
+    // MaskCij: Used to disable Cij contribution (disable pixels)
+    Mask_t  *maskCij = new Mask_t[nPads*nPixels];
+    // Init loop
     int nMacroIterations=8;
     int nIterations[nMacroIterations] = {5, 10, 10, 10, 10, 10, 10, 30 };
     double minPadResidues[nMacroIterations] = { 2.0, 2.0, 1.5, 1.5, 1.0, 1.0, 0.5, 0.5};
@@ -1858,8 +1864,8 @@ int Cluster::findLocalMaxWithPET( double *thetaL, int nbrOfPadsInTheGroupCath) {
     while ( goon ) {
       if( localMax != nullptr) saveLocalMax = new Pads( *localMax, o2::mch::Pads::xydxdyMode);
       previousCriteriom = criteriom;
-      chi2 = PoissonEMLoop( *pads, *pixels,  0, minPadResidues[macroIt], nIterations[macroIt], verbose );
-      // PoissonEMLoop( *pads, *pixels, 0, 1.5, 1 );
+      chi2 = PoissonEMLoop( *mPads, *pixels,  Cij, maskCij, 0, minPadResidues[macroIt], nIterations[macroIt], verbose );
+      // PoissonEMLoop( *mPads, *pixels, 0, 1.5, 1 );
       localMax = Pads::clipOnLocalMax( *pixels, true);
       nParameters = localMax->nPads;
       dof = nMaxPads - 3*nParameters +1;
@@ -1927,11 +1933,13 @@ int Cluster::findLocalMaxWithPET( double *thetaL, int nbrOfPadsInTheGroupCath) {
     if ( localMax->nPads > 1) {
       Pads copyLocalMax( *localMax, o2::mch::Pads::xydxdyMode );
       printf("Quality test\n");
-      PoissonEMLoop( *pads, copyLocalMax, 0, 0.5, 60, 1 );
+      // Cij must be recomputed with copyLocMax or use the mask
+      // PoissonEMLoop( *mPads, copyLocalMax, 0, 0.5, 60, 1 );
       Pads *testLocalMax = new Pads( copyLocalMax, Pads::xydxdyMode);
       int qMinIdx = vectorArgMin( copyLocalMax.q, copyLocalMax.nPads );
       testLocalMax->removePad( qMinIdx );
-      PoissonEMLoop( *pads, *testLocalMax, 0, 0.5, 60, 1 );
+      // Cij must be recomputed with copyLocMax or use the mask
+      // PoissonEMLoop( *mPads, *testLocalMax, 0, 0.5, 60, 1 );
       delete testLocalMax;
      }
     }
@@ -1964,6 +1972,8 @@ int Cluster::findLocalMaxWithPET( double *thetaL, int nbrOfPadsInTheGroupCath) {
       varY[k] = localMax->dy[k];
     }
     delete localMax;
+    delete [] Cij;
+    delete [] maskCij;
     return K;
 }
 
@@ -2545,8 +2555,10 @@ int Cluster::findLocalMaxWithBothCathodes( double *thetaOut, int kMax, int verbo
      printf("  w=%6.3f, mux=%7.3f, muy=%7.3f\n", w[k_], muX[k_], muY[k_]);
    }
   }
+  /* Obsolete
   if ( N0 ) delete [] grpNeighborsCath0;
   if ( N1 ) delete [] grpNeighborsCath1;
+  */
   return k;
 }
 

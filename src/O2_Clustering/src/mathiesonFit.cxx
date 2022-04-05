@@ -46,8 +46,9 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* res
   double* w = (double*)&params[2 * K];
 
   // Set constrain: sum_(w_k) = 1
-  // Rewriten ??? w[K-1] = 1.0 - vectorSum( w, K-1 );
   double lastW = 1.0 - vectorSum(w, K - 1);
+  //
+  // Display paramameters (w, mu_x, mu_x
   if (verbose > 0) {
     printf("  Function evaluation at:\n");
     for (int k = 0; k < K; k++) {
@@ -62,18 +63,19 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* res
 
   // Charge Integral on Pads
   double z[N];
-  // Not used
-  double z_k[N];
+  vectorSetZero(z, N);
   double zTmp[N];
-  // TODO: optimize compute before
-  double xyInfSup[4 * N];
   //
+  double xyInfSup[4 * N];
   double* xInf = getXInf(xyInfSup, N);
   double* xSup = getXSup(xyInfSup, N);
   double* yInf = getYInf(xyInfSup, N);
   double* ySup = getYSup(xyInfSup, N);
 
-  vectorSetZero(z, N);
+  // Compute the pads charge considering the
+  // Mathieson set w_k, mu_x, mu_y
+  // TODO: Minor optimization  avoid to
+  // compute  x[:] - dx[:]  i.E use xInf / xSup
   for (int k = 0; k < K; k++) {
     // xInf[:] = x[:] - dx[:] - muX[k]
     vectorAddVector(x, -1.0, dx, N, xInf);
@@ -87,34 +89,31 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* res
     // ySup = yInf + 2.0 * dxy[0]
     vectorAddVector(yInf, 2.0, dy, N, ySup);
     //
-    // z[:] +=  w[k] * cathWeight
-    //       * computeMathieson2DIntegral( xInf[:], xSup[:], yInf[:], ySup[:], N )
-    // Inv. ??? compute2DPadIntegrals(xyInfSup, N, chamberId, zTmp);
     compute2DPadIntegrals(xInf, xSup, yInf, ySup, N, chamberId, zTmp);
-    // GG Note: if require compute the charge of k-th component
-    // z_k[k] = vectorSum( zTmp, N )
-    // Done after the loop: vectorMultVector( zTmp, cathWeights, N, zTmp);
+    // Multiply by the weight w[k]
     double wTmp = (k != K - 1) ? w[k] : lastW;
-    // saturated pads
-    // ??? ?
-    // vectorMaskedMult( zTmp, notSaturated, N, zTmp);
     vectorAddVector(z, wTmp, zTmp, N, z);
   }
-  vectorPrint("z", z, N);
-  vectorPrint("zObs", zObs, N);
-  // Normalize each cathode with unsaturated pads
-  // Not used ???
+  // ??? vectorPrint("z", z, N);
+  // ??? vectorPrint("zObs", zObs, N);
+
+  //
+  // To Normalize each cathode with the charge sum
+  // of unsaturated pads
+  // Not used in residual computation
   double sumNormalizedZ[2];
-  for (int i = 0; i < N; i++) {
-    if (cath[i] == 0) {
-      sumNormalizedZ[0] += notSaturated[i] * z[i];
-    } else {
-      sumNormalizedZ[1] += notSaturated[i] * z[i];
+  if (verbose >0 ) {
+    for (int i = 0; i < N; i++) {
+      if (cath[i] == 0) {
+        sumNormalizedZ[0] += notSaturated[i] * z[i];
+      } else {
+        sumNormalizedZ[1] += notSaturated[i] * z[i];
+      }
     }
   }
 
-  // Normalize with the max
-  // TODO ??? Can be done in fitMatiesson
+  // Get the max charge of unsaturrated pads for each cathodes
+  // Will be used to normalize the charge
   double maxThZ[2] = {0,0};
   for (int i=0; i < N; i++) {
     maxThZ[cath[i]] = fmax( maxThZ[cath[i]], notSaturated[i] * z[i]);
@@ -126,62 +125,78 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* res
       maxThZ[c] = 1.0;
     }
   }
-  // Normalization coef
-  double coefNorm[2] = {cathMax[0]/maxThZ[0], cathMax[1]/maxThZ[1] };
-  double meanCoef = (coefNorm[0] + coefNorm[1]) / ((coefNorm[0] > 1.0e-6) + (coefNorm[1] > 1.0e-6));
-  printf("maxCath: %f %f\n", cathMax[0], cathMax[1]);
-  printf("coefNorm: %f %f\n", coefNorm[0], coefNorm[1]);
-  printf("meaCoef: %f \n", meanCoef);
   //
+  // Normalization coefficient
+  //
+  // Use the max charge cathode for each cathode
+  double coefNorm[2] = {cathMax[0]/maxThZ[0], cathMax[1]/maxThZ[1] };
+  // Use to wheight the penalization
+  double meanCoef = (coefNorm[0] + coefNorm[1]) / ((coefNorm[0] > 1.0e-6) + (coefNorm[1] > 1.0e-6));
+  double chargePerCath[2] = {0.0, 0.0};
+  // Perform the normalization
   for (int i=0; i < N; i++) {
     z[i] = z[i] * coefNorm[cath[i]];
+    chargePerCath[cath[i]] + z[i];
   }
-
+  //
+  // printf("maxCath: %f %f\n", cathMax[0], cathMax[1]);
+  // printf("coefNorm: %f %f\n", coefNorm[0], coefNorm[1]);
+  // printf("meaCoef: %f \n", meanCoef);
+  //
 
   if ( verbose > 1) {
     printf("    Max of unsaturated (observed) pads (cathMax0/1)= %f, %f, maxThZ (computed)  %f, %f\n", cathMax[0], cathMax[1], maxThZ[0], maxThZ[1]);
   }
-  // double cathPenal = fabs(zCathTotalCharge[0] - zCath0) + fabs(zCathTotalCharge[1] - zCath1);
-  double cathPenal = 0;
-  // ??? vectorAdd( zObs, -1.0, residual );
-  // TODO Optimize (elementwise not a good solution)
-  double wPenal = 0.0;
-  // ??? why abs value for penalties
-  for (int k = 0; k < (K-1); k++) {
-      if (w[k] < 0.0 ) {
-        wPenal += (-w[k]);
-      }
-      else if (w[k] > 1.0) {
-        wPenal += (w[k] - 1.0);
-      }
+  //
+  // Cathode Penalization
+  //
+  // Consider the charge sum for each cathode
+  // Tested but Not used
+  double cathPenal=0;
+  if ( verbose > 1 ) {
+    double cathPenal = fabs(zCathTotalCharge[0] - chargePerCath[0]) + fabs(zCathTotalCharge[1] - chargePerCath[1]);
   }
-  // printf("    coefNorm ??? %f, %f\n", maxThZ[0], maxThZ[1]);
-  // printf("    coefNorm ??? %f, %f\n", coefNorm[0], coefNorm[1]);
-  // printf("    meanCoef ??? %f\n", meanCoef);
+  //
+  // w-Penalization
+  //
+  // Each w, must be 0 < w < 1
+  double wPenal = 0.0;
+  for (int k = 0; k < (K-1); k++) {
+    if (w[k] < 0.0 ) {
+      wPenal += (-w[k]);
+    }
+    else if (w[k] > 1.0) {
+      wPenal += (w[k] - 1.0);
+    }
+  }
+  // ... and the w-sum must be equal to 1
   wPenal = wPenal + fabs(1.0 - vectorSum(w, K - 1) - lastW);
   if ( verbose > 1) {
     printf("    wPenal: %f\n", wPenal);
   }
+  // Compute residual
   for (int i = 0; i < N; i++) {
-    // gsl_vector_set(residuals, i, (zObs[i] - z[i]) * (1.0 + cathPenal) + wPenal);
+    // Don't consider saturated pads (notSaturated[i] = 0)
     double mask = notSaturated[i];
-    // if ((notSaturated[i] == 0) && (z[i] < zObs[i]) && (z[i] > 1.5 * zObs[i]) ) {
     if ((notSaturated[i] == 0) && (z[i] < zObs[i]) ) {
-      // mask = 1.0;
-      // Test
-      // Don't consider saturated pads
-      // mask = notSaturated[i];
+      // Except those charge < Observed charge
       mask = 1.0;
-
     }
     //
-    // mask = 1.0;
-    gsl_vector_set(residuals, i, mask * ((zObs[i] - z[i]) + meanCoef  * wPenal));
+    // Residuals with penalization
+    //
+    gsl_vector_set(residuals, i, mask * ((zObs[i] - z[i]) + meanCoef  * wPenal) );
+    //
+    // Without penalization
     // gsl_vector_set(residuals, i, mask * (zObs[i] - z[i]) + 0 * wPenal);
+    //
+    // Other studied penalization
+    // gsl_vector_set(residuals, i, (zObs[i] - z[i]) * (1.0 + cathPenal) + wPenal);
+
   }
   if (verbose > 1) {
     printf("    Observed sumCath0=%15.8f, sumCath1=%15.8f,\n", zCathTotalCharge[0], zCathTotalCharge[1]);
-    // printf("  fitted   sumCath0=%15.8f, sumCath1=%15.8f,\n", zCath0, zCath1);
+    // printf("  fitted   sumCath0=%15.8f, sumCath1=%15.8f,\n", chargePerCath, chargePerCath);
     printf("    Penalties cathPenal=%5.4g wPenal=%5.4g \n", 1.0 + cathPenal, wPenal);
     printf("    Residues\n");
     printf("  %15s  %15s  %15s %15s %15s %15s\n", "zObs", "z", "cathWeight", "norm. factor", "notSaturated", "residual");
@@ -194,6 +209,7 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit, gsl_vector* res
   return GSL_SUCCESS;
 }
 
+// Invalid version
 int f_ChargeIntegral0(const gsl_vector* gslParams, void* dataFit, gsl_vector* residuals)
 {
   funcDescription_t* dataPtr = (funcDescription_t*)dataFit;
@@ -424,37 +440,35 @@ void fitMathieson( const Pads &iPads, double *thetaInit, int kInit, int mode, do
     return;
   }
 
-
   funcDescription_t mathiesonData;
   double cathMax[2] = { 0.0, 0.0};
   double *cathWeights;
-  o2::mch::Pads *pads = nullptr;
 
-  vectorPrintShort("  iPads->cath", iPads.cath, iPads.nPads);
-  vectorPrint("  iPads->q", iPads.q, iPads.nPads);
+  vectorPrintShort("  iPads.cath", iPads.cath, iPads.nPads);
+  vectorPrint("  iPads.q", iPads.q, iPads.nPads);
 
-  if( 1 ) {
+  // if( 1 ) {
   // Add boundary Pads
-  pads = Pads::addBoundaryPads( iPads.x, iPads.y, iPads.dx, iPads.dy,
-          iPads.q, iPads.cath, iPads.saturate, iPads.chamberId, iPads.nPads );
-  vectorPrint("  q", pads->q, pads->nPads);
+  // pads = Pads::addBoundaryPads( iPads.x, iPads.y, iPads.dx, iPads.dy,
+  //        iPads.q, iPads.cath, iPads.saturate, iPads.chamberId, iPads.nPads );
 
   // inspectSavePixels( 3, *pads);
-  N = pads->nPads;
+  N = iPads.nPads;
   // Function description (extra data nor parameters)
   mathiesonData.N = N;
   mathiesonData.K = kInit;
-  mathiesonData.x_ptr = pads->x;
-  mathiesonData.y_ptr = pads->y;
-  mathiesonData.dx_ptr = pads->dx;
-  mathiesonData.dy_ptr = pads->dy;
-  mathiesonData.cath_ptr = pads->cath;
-  mathiesonData.zObs_ptr = pads->q;
+  mathiesonData.x_ptr = iPads.x;
+  mathiesonData.y_ptr = iPads.y;
+  mathiesonData.dx_ptr = iPads.dx;
+  mathiesonData.dy_ptr = iPads.dy;
+  mathiesonData.cath_ptr = iPads.cath;
+  mathiesonData.zObs_ptr = iPads.q;
   Mask_t notSaturated[N];
-  vectorCopyShort( pads->saturate, N, notSaturated);
+  vectorCopyShort( iPads.saturate, N, notSaturated);
   vectorNotShort( notSaturated, N, notSaturated );
   mathiesonData.notSaturated_ptr = notSaturated;
-  } else {
+  //} else {
+  /*
   // Function description (extra data nor parameters)
   mathiesonData.N = N;
   mathiesonData.K = kInit;
@@ -469,6 +483,7 @@ void fitMathieson( const Pads &iPads, double *thetaInit, int kInit, int mode, do
   vectorNotShort( notSaturated, N, notSaturated );
   mathiesonData.notSaturated_ptr = notSaturated;
   }
+  */
   // Total Charge per cathode plane
   double zCathTotalCharge[2];
   Mask_t mask[N];
@@ -663,7 +678,6 @@ void fitMathieson( const Pads &iPads, double *thetaInit, int kInit, int mode, do
   } // while(doFit)
   // Release memory
   delete [] cathWeights;
-  if (pads != nullptr) delete pads;
   //
   return;
 }

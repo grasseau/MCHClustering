@@ -94,6 +94,47 @@ void compute2DPadIntegrals(const double *xInf, const double *xSup, const double*
   return;
 }
 
+void compute1DPadIntegrals( const double *xInf, const double *xSup,
+                           int N, int chamberId, bool xAxe, double Integrals[])
+{
+  // Returning array: Charge Integral on all the pads
+  //
+  if (chamberId <= 2) {
+    mathiesonType = 0;
+  } else {
+    mathiesonType = 1;
+  }
+  //
+  // Select Mathieson coef.
+  double curInvPitch = invPitch[mathiesonType];
+  double curK2, curSqrtK3, curK4, cst2;
+  if (xAxe) {
+    curK2 = K2x[mathiesonType];
+    curSqrtK3 = sqrtK3x[mathiesonType];
+    curK4 = K4x[mathiesonType];
+    cst2 = curK2 * curInvPitch;
+  } else {
+    curK2 = K2y[mathiesonType];
+    curSqrtK3 = sqrtK3y[mathiesonType];
+    curK4 = K4y[mathiesonType];
+    cst2 = curK2 * curInvPitch;
+  }
+  double cst4 = 2.0 * curK4;
+
+  double uInf, uSup, vInf, vSup;
+
+  for (int i = 0; i < N; i++) {
+    // x/u
+    uInf = curSqrtK3 * tanh(cst2 * xInf[i]);
+    uSup = curSqrtK3 * tanh(cst2 * xSup[i]);
+    //
+    Integrals[i] = cst4 * (atan(uSup) - atan(uInf));
+    // printf(" xyInfSup %2d  [%10.6g, %10.6g] x [%10.6g, %10.6g]-> %10.6g\n", i, xInf[i], xSup[i], yInf[i], ySup[i], Integrals[i]);
+  }
+  // printf(" I[0..%3ld] = %f, %f, ... %f\n", N-1, Integrals[0], Integrals[1], Integrals[N-1]);
+  return;
+}
+
 void compute2DMathiesonMixturePadIntegrals(const double* xyInfSup0, const double* theta,
                                            int N, int K, int chamberId, double Integrals[])
 {
@@ -128,20 +169,113 @@ void compute2DMathiesonMixturePadIntegrals(const double* xyInfSup0, const double
   }
 }
 
+void computeFastCij( const Pads &pads, const Pads &pixel, double Cij[] ) {
+    // Compute the Charge Integral Cij of pads (j index), considering the
+    // center of the Mathieson fct on a pixel (i index)
+    // Use the fact that the charge integral CI(x,y) = CI(x) * CI(y)
+    // to reduce the computation cost
+    // CI(x) is store in PadIntegralX
+    // CI(y) is store in PadIntegralY
+    // A subsampling of CI(x_i + k*minDx) (or CI(y_i + l*minDY)) is used
+    // by taking the mininimun of pads.dx(pads.dy) to discretize the x/y space
+    //
+    // CI(x)/CI(y) are computed if they are requested.
+    //
+    // Returning array: Charge Integral on all the pads Cij[]
 
-void computeCij( const Pads &pads, const Pads &theta,double Cij[] ) {
-    // ??? Rewrite the comments
-    // Returning array: Charge Integral on all the pads
-    // Remarks:
-    // - This fct is a cumulative one, as a result it should be set to zero
-    //    before calling it
-    if ((pads.mode != Pads::xyInfSupMode) || (theta.mode != Pads::xydxdyMode)) {
-      printf("Warning: bad representation (mode) of pads in computeCij (padMode=%d, pixelMode=%d)\n", pads.mode, theta.mode);
+    if ((pads.mode != Pads::xyInfSupMode) || (pixel.mode != Pads::xydxdyMode)) {
+      printf("Warning: bad representation (mode) of pads in computeCij (padMode=%d, pixelMode=%d)\n", pads.mode, pixel.mode);
       throw std::overflow_error("Bad mode");
       return;
     }
     int N = pads.nPads;
-    int K = theta.nPads;
+    int K = pixel.nPads;
+    // Pads
+    int chId = pads.chamberId;
+    const double *xInf0 = pads.xInf;
+    const double *yInf0 = pads.yInf;
+    const double *xSup0 = pads.xSup;
+    const double *ySup0 = pads.ySup;
+    // Pixels
+    const double *muX = pixel.x;
+    const double *muY = pixel.y;
+    //
+    double xPixMin = vectorMin( pixel.x, K);
+    double xPixMax = vectorMax( pixel.x, K);
+    double yPixMin = vectorMin( pixel.y, K);
+    double yPixMax = vectorMax( pixel.y, K);
+    double dxMinPix = 2*vectorMin( pixel.dx, K);
+    double dyMinPix = 2*vectorMin( pixel.dy, K);
+    // Sampling of PadIntegralX/PadIntegralY
+    int nXPixels =  (int) ( (xPixMax -  xPixMin) / dxMinPix + 0.5) + 1;
+    int nYPixels =  (int) ( (yPixMax -  yPixMin) / dyMinPix + 0.5) + 1;
+    printf(" ??? nXPixels nYPixels %d %d \n", nXPixels, nYPixels);
+    //
+    // PadIntegralX/PadIntegralY allocation and init with -1
+    double PadIntegralX[nXPixels][N];
+    double PadIntegralY[nYPixels][N];
+    vectorSet( (double *) PadIntegralX, -1.0, nXPixels*N );
+    vectorSet( (double *) PadIntegralY, -1.0, nYPixels*N );
+    double zInf[N];
+    double zSup[N];
+    bool xAxe;
+    /*
+    for (int kx=0; kx < nXPixels; kx++) {
+      double x = xPixMin + kx * dxPix;
+      vectorAddScalar( xInf0, - x, N, zInf );
+      vectorAddScalar( xSup0, - x, N, zSup );
+      compute1DPadIntegrals( zInf, zSup, N, chId, xAxe, PadIntegralX[kx] );
+    }
+    xAxe = false;
+    for (int ky=0; ky < nYPixels; ky++) {
+      double y = yPixMin + ky * dyPix;
+      vectorAddScalar( yInf0, - y, N, zInf );
+      vectorAddScalar( ySup0, - y, N, zSup );
+      compute1DPadIntegrals( zInf, zSup, N, chId, xAxe, PadIntegralY[ky] );
+    }
+    */
+
+    // Loop on Pixels
+    for (int k=0; k < K; k++) {
+      // Calculate the indexes in the 1D charge integral
+      // PadIntegralX:PadIntegralY
+      int xIdx = (int) ((muX[k] - xPixMin) / dxMinPix + 0.5 );
+      int yIdx = (int) ((muY[k] - yPixMin) / dyMinPix + 0.5 );
+      // compute2DPadIntegrals( xInf, xSup, yInf, ySup, N, chId, &Cij[N*k] );
+      // Cij[ N*k + p] = PadIntegralX( k, xIdx) * PadIntegralY( k, yIdx);
+      // printf("k=%d, mu[k]=(%f, %f) Sum_pads Ck = %g\n", k, muX[k], muY[k], vectorSum( &Cij[N*k], N) );
+      if ( PadIntegralX[xIdx][0] == -1 ) {
+        // Not yet computed
+        vectorAddScalar( xInf0, - muX[k], N, zInf );
+        vectorAddScalar( xSup0, - muX[k], N, zSup );
+        xAxe = true;
+        compute1DPadIntegrals( zInf, zSup, N, chId, xAxe, PadIntegralX[xIdx] );
+      }
+      if ( PadIntegralY[yIdx][0] == -1 ) {
+        // Not yet computed
+        vectorAddScalar( yInf0, - muY[k], N, zInf );
+        vectorAddScalar( ySup0, - muY[k], N, zSup );
+        xAxe = false;
+        compute1DPadIntegrals( zInf, zSup, N, chId, xAxe, PadIntegralY[yIdx] );
+      }
+      // Compute IC(xy) = IC(x) * IC(y)
+      vectorMultVector( PadIntegralX[xIdx], PadIntegralY[yIdx], N,  &Cij[N*k]);
+    }
+}
+
+void computeCij( const Pads &pads, const Pads &pixel, double Cij[] ) {
+    // Compute the Charge Integral Cij of pads (j index), considering the
+    // center of the Mathieson fct on a pixel (i index)
+    //
+    // Returning array: Charge Integral on all the pads Cij[]
+
+    if ((pads.mode != Pads::xyInfSupMode) || (pixel.mode != Pads::xydxdyMode)) {
+      printf("Warning: bad representation (mode) of pads in computeCij (padMode=%d, pixelMode=%d)\n", pads.mode, pixel.mode);
+      throw std::overflow_error("Bad mode");
+      return;
+    }
+    int N = pads.nPads;
+    int K = pixel.nPads;
     int chId = pads.chamberId;
     const double *xInf0 = pads.xInf;
     const double *yInf0 = pads.yInf;
@@ -149,8 +283,8 @@ void computeCij( const Pads &pads, const Pads &theta,double Cij[] ) {
     const double *ySup0 = pads.ySup;
 
     //
-    const double *muX = theta.x;
-    const double *muY = theta.y;
+    const double *muX = pixel.x;
+    const double *muY = pixel.y;
 
     double xInf[N];
     double yInf[N];
@@ -180,7 +314,7 @@ void o2_mch_compute2DPadIntegrals(const double* xInf, const double* xSup, const 
     o2::mch::compute2DPadIntegrals(xInf, xSup, yInf, ySup, N, chamberId, Integrals);
 }
 
-void o2_mch_computeCij( const double *xyInfSup0, const double *theta,
+void o2_mch_computeCij( const double *xyInfSup0, const double *pixel,
                             int N, int K, int chamberId, double Cij[] ) {
     // Returning array: Charge Integral on all the pads
     // Remarks:
@@ -191,9 +325,9 @@ void o2_mch_computeCij( const double *xyInfSup0, const double *theta,
     const double *xSup0 = o2::mch::getConstXSup( xyInfSup0, N);
     const double *ySup0 = o2::mch::getConstYSup( xyInfSup0, N);
     //
-    const double *muX = o2::mch::getConstMuX( theta, K);
-    const double *muY = o2::mch::getConstMuY( theta, K);
-    const double *w = o2::mch::getConstW( theta, K);
+    const double *muX = o2::mch::getConstMuX( pixel, K);
+    const double *muY = o2::mch::getConstMuY( pixel, K);
+    const double *w = o2::mch::getConstW( pixel, K);
 
     double z[N];
     double xyInfSup[4*N];

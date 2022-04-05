@@ -41,6 +41,7 @@ class Cluster
   Cluster( Cluster &cluster, Groups_t g);
   ~Cluster();
   inline int getNbrOfPads(int c) { return ( pads[c]==nullptr ? 0 : pads[c]->nPads); };
+  inline const Pads *getPads( int c) { return  pads[c];  };
   inline const Groups_t *getCathGroup(int c) { return cathGroup[c]; };
   inline Groups_t *getProjPadGroup( ) { return projPadToGrp; };
   inline int getNbrOfProjectedPads( ) { return (projectedPads==nullptr ? 0 : projectedPads->nPads); };
@@ -52,6 +53,7 @@ class Cluster
   const Pads *getProjectedPads() { return projectedPads;};
   double *projectChargeOnProjGeometry(int includeAlonePads);
   int buildGroupOfPads();
+  void addBoundaryPads( );
   int findLocalMaxWithPET( double *thetaL, int nbrOfPadsInTheGroupCath );
   DataBlock_t fit( double *thetaInit, int K);
   // Not used in the Clustering/fitting

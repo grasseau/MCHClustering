@@ -40,59 +40,68 @@ struct Pads {
    xyInfSupMode = 0x1  ///< xInf, xSup, yInf, ySup pad coordinates
   };
   // Representation mode  (see padMode)
-  int mode;
+  int mode=xydxdyMode;
   // Mode xydxdy
-  double *x;
-  double *y;
-  double *dx;
-  double *dy;
+  double *x = nullptr;
+  double *y = nullptr;
+  double *dx = nullptr;
+  double *dy = nullptr;
   // Mode xyInfSupMode
-  double *xInf, *xSup;
-  double *yInf, *ySup;
-  Mask_t *cath;
-  Mask_t *saturate;
-  double *q;
-  double totalCharge;
-  int nPads;
-  int chamberId;
+  double *xInf = nullptr, *xSup = nullptr;
+  double *yInf = nullptr, *ySup = nullptr;
   
-
-  PadIdx_t *neighbors;
-  // ???
+  Mask_t *cath = nullptr;
+  Mask_t *saturate = nullptr;
+  double *q = nullptr;
+  double totalCharge=0;
+  int nPads=0;
+  int chamberId=-1;
+  PadIdx_t *neighbors = nullptr;
+  
+  // Building Neighbors 
   static PadIdx_t *buildFirstNeighbors( double *X, double *Y, double *DX, double *DY, int N, int verbose);
   static PadIdx_t *buildKFirstsNeighbors( const Pads &pads, int kernelSize );
+  // Add zero-charged pads to the neighboring of the pads (cathode cluster)
   static Pads *addBoundaryPads( const double *x_, const double *y_, const double *dx_, const double *dy_, const double *q_, const Mask_t *cath_, const Mask_t *sat_, int chamberId, int N);
+  // Split each pads in 4 smaller pads with the same sizes
   static Pads *refinePads(const Pads &pads);
+  // Extract local maximima, with of without a neighboring
   static Pads *clipOnLocalMax( const Pads &pixels, bool extractLocalMax );
+  // Utilities
   static void printNeighbors( const PadIdx_t *neigh, int N );
   static void printPads(const char* title, const Pads &pads);
   static inline int getNbrOfPads(const Pads *pads) { return (pads==nullptr) ? 0 : pads->nPads; };
-    
+
+  // Allocation constructor
   Pads( int N, int chId, int mode=xydxdyMode);
-  // Concatenate
+  // Concatenate 2 pads set
   Pads( const Pads *pads0,  const Pads *pads1);
+  // Build a new set of pads 
   Pads( const Pads &pads, int mode_ );
-  // Extract pads
+  // Build a pads set from those selected by "mask"
   Pads( const Pads &pads, const Groups_t *mask);
+  // TO DO ??? must be fused with 
   Pads( const Pads *pads1, const Pads *pads2, int mode);
   Pads( const double *x_, const double *y_, const double *dx_, const double *dy_, 
     const double *q_, const Mask_t *saturate_, int chId, int nPads_);
   Pads( const double *x_, const double *y_, const double *dx_, const double *dy_, 
     const double *q_, const short *cathode, const Mask_t *saturate_, short cathID, 
     int chId, PadIdx_t *mapCathPadIdxToPadIdx, int nAllPads);
-  Pads *addBoundaryPads( PadIdx_t *neigh); 
-  void removePad( int index);
-  ~Pads();
-  void allocate();
-  
-  void setToZero();
-  void display( const char *str);
-  void release();
-  // Pad Neigbors
+  // Add zero-charged pads to the neighboring of the pads (cathode cluster)
+  Pads *addBoundaryPads(); 
+    // Building Neighbors 
   PadIdx_t *buildFirstNeighbors();
   // Groups
   int addIsolatedPadInGroups( Mask_t *cathToGrp, Mask_t *grpToGrp, int nGroups);
-  
+  ~Pads();
+  // Memory allocation/deallocation
+  void allocate(); 
+  void release();
+  // Utilities
+  void removePad( int index);
+  void setToZero();
+  void display( const char *str);
+
 };
 
 

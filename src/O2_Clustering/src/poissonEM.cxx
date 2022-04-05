@@ -87,7 +87,7 @@ double computeChiSquare( const Pads &pads, const double *qPredictedPads) {
   return chi2;
 }
 
-double PoissonEMLoop(const Pads &pads, Pads &pixels,
+double PoissonEMLoop(const Pads &pads, Pads &pixels, const double *Cij, Mask_t *maskCij,
               int qCutMode, double minPadResidu, int nItMax, int verbose)
 {
   // The array pixels return the last state
@@ -98,9 +98,6 @@ double PoissonEMLoop(const Pads &pads, Pads &pixels,
   double qPixMin = 0.5;
   int nPads = pads.nPads;
   int nPixels = pixels.nPads;
-  double Cij[nPads*nPixels];
-  // Compute pad charge xyInfSup induiced by a set of charge (the pixels)
-  computeCij( pads, pixels, Cij);
   //
   double* x = pixels.x;
   double* y = pixels.y;
@@ -111,7 +108,6 @@ double PoissonEMLoop(const Pads &pads, Pads &pixels,
   const double *qPads = pads.q;
   //
   // MaskCij: Used to disable Cij contribution (disable pixels)
-  Mask_t  maskCij[nPads*nPixels];
   vectorSetShort(maskCij, 1, nPads*nPixels);
   // Ci, Cj: sum of Cij by row or by column
   double Ci[nPixels];

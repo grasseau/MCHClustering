@@ -291,10 +291,10 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     uPlt.drawPads( fig, ax[0,0], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=0.5, )
     ax[0,0].set_xlim( xMin, xMax )
     ax[0,0].set_ylim( yMin, yMax )
-    uPlt.drawPoints( ax[0,0],  preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc], color='red', pattern='o')
+    uPlt.drawMCHitsInFrame( ax[0,0], frame, mcObj, ev, DEIds )
+    uPlt.drawPoints( ax[0,0],  preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc], color='black', pattern='+', markersize=5)
     # uPlt.drawPoints( ax[0,0],  preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc], pattern='+')
     # uPlt.drawModelComponents(ax[0,0], thetaf, color="red", pattern='o')
-    uPlt.drawMCHitsInFrame( ax[0,0], frame, mcObj, ev, DEIds )
 
     ax[0,0].set_title("Reco with Cathodes")
     #
@@ -304,8 +304,8 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     # Projection
     uPlt.setLUTScale( 0.0, np.max( chProj) * 1.2 )
     uPlt.drawPads( fig, ax[0,1], xProj, yProj, dxProj, dyProj, chProj, doLimits=False, alpha=1.0 )
-    uPlt.drawModelComponents( ax[0,1], thetaf, color="red", pattern='o')
     uPlt.drawMCHitsInFrame( ax[0,1], frame, mcObj, ev, DEIds )
+    uPlt.drawModelComponents( ax[0,1], thetaf, color="black", pattern='x', markersize=4 )
     ax[0, 1].set_title("Projection & theta final")
     #
     # Laplacian
@@ -325,8 +325,8 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     # uPlt.drawPads( fig, ax[0,3], xProj, yProj, dxProj, dyProj, laplacian, doLimits=False, alpha=1.0 )
     uPlt.setLUTScale( 0.0, np.max(chProj))
     uPlt.drawPads( fig, ax[0,3], xProj, yProj, dxProj, dyProj, chProj, doLimits=False, alpha=1.0 )
-    uPlt.drawModelComponents( ax[0,3], thetaEMFinal, color="lightgrey", pattern='o')
     uPlt.drawMCHitsInFrame( ax[0,3], frame, mcObj, ev, DEIds )
+    uPlt.drawModelComponents( ax[0,3], thetaEMFinal, color="lightgrey", pattern='x', markersize=4)
     ax[0,3].set_title("Proj & theta EM Final.")
     #
     # Residual
@@ -356,45 +356,56 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     # Pixels 
     #
     # Init
-    (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(0)
+    for p in range(7, -1, -1):
+      (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(p)
+      if nPix != 0: pEnd = p; break
+    print("[python] Nbr pixels arrays", pEnd)
+    
+    p = 0
+    (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(p)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
-      print("??????????????????? qPix0 max", np.max(qPix0))
       uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
       uPlt.drawPads( fig, ax[1,0], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
-    uPlt.drawMCHitsInFrame( ax[1,0], frame, mcObj, ev, DEIds )
-    ax[1,0].set_title("Pixel 5 it ")
+    # uPlt.drawMCHitsInFrame( ax[1,0], frame, mcObj, ev, DEIds )
+    uPlt.drawModelComponents( ax[1,0], thetaf, color="black", pattern='x', markersize=4 )
+
+    ax[1,0].set_title("Pixel  {0:d}".format(p)  )
     # After iterating
-    (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(1)
+    p = 1
+    (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(p)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
       uPlt.setLUTScale( 0.0, np.max(qPix0) )
-      print("??????????????????? qPix0 max", np.max(qPix0))
       uPlt.drawPads( fig, ax[1,1], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
-    uPlt.drawMCHitsInFrame( ax[1,1], frame, mcObj, ev, DEIds )
+    # uPlt.drawMCHitsInFrame( ax[1,1], frame, mcObj, ev, DEIds )
+    uPlt.drawModelComponents( ax[1,1], thetaf, color="black", pattern='x', markersize=4 )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
-    ax[1,1].set_title("Pixel 60 it")
-    # After iterating
-    (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(2)
+    ax[1,1].set_title("Pixel  {0:d}".format(p) )
+    #
+    p = pEnd-1
+    (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(p)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
       uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
-      print("??????????????????? qPix0 max", np.max(qPix0))
       uPlt.drawPads( fig, ax[1,2], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
-    uPlt.drawMCHitsInFrame( ax[1,2], frame, mcObj, ev, DEIds )
+    # uPlt.drawMCHitsInFrame( ax[1,2], frame, mcObj, ev, DEIds )
+    uPlt.drawModelComponents( ax[1,2], thetaf, color="black", pattern='x', markersize=4 )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
-    ax[1,2].set_title("Pixel after first cliping")
+    ax[1,2].set_title("Pixel  {0:d}".format(p) )
     # After iterating
-    (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(3)
+    p = pEnd
+    (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(p)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
       uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
-      print("??????????????????? qPix0 max", np.max(qPix0))
       uPlt.drawPads( fig, ax[1,3], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0)
-    uPlt.drawMCHitsInFrame( ax[1,3], frame, mcObj, ev, DEIds )
+    # uPlt.drawMCHitsInFrame( ax[1,3], frame, mcObj, ev, DEIds )
+    uPlt.drawModelComponents( ax[1,3], thetaf, color="black", pattern='x', markersize=4 )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
-    ax[1,3].set_title("Pixel after second cliping")    
+    ax[1,3].set_title("Pixel  {0:d}".format(p) )
+
     # MC versus EM
     if 0:
       uPlt.drawModelComponents( ax[1,2], thetaEMFinal, color="red", pattern='')
@@ -416,17 +427,17 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     # Saturated
     xSat = x0[ saturate0==1 ]
     ySat = y0[ saturate0==1 ]
-    uPlt.drawPoints( ax[0,4], xSat, ySat, color='white', pattern='o', markerSize=4)
+    uPlt.drawPoints( ax[0,4], xSat, ySat, color='white', pattern='o', markersize=4)
     xSat = x1[ saturate1==1 ]
     ySat = y1[ saturate1==1 ]
-    uPlt.drawPoints( ax[1,4], xSat, ySat, color='white', pattern='o', markerSize=4)
+    uPlt.drawPoints( ax[1,4], xSat, ySat, color='white', pattern='o', markersize=4)
     # Local Max with laplacian
     """
     uPlt.drawPoints( ax[0,4], xl, yl, color='black', pattern='+')
     uPlt.drawPoints( ax[1,4], xl, yl, color='black', pattern='+')
     """
-    uPlt.drawModelComponents( ax[0,4], thetaLocalMax, color="black", pattern='x', markersize=4)
-    uPlt.drawModelComponents( ax[1,4], thetaLocalMax, color="black", pattern='x', markersize=4)
+    uPlt.drawModelComponents( ax[0,4], thetaLocalMax, color="black", pattern='o', markersize=4)
+    uPlt.drawModelComponents( ax[1,4], thetaLocalMax, color="black", pattern='o', markersize=4)
     
     ax[0,4].set_title("Cathode 0 & max Laplacian")
     ax[1,4].set_title("Cathode 1 & max Laplacian")
@@ -508,6 +519,14 @@ if __name__ == "__main__":
   nEvents = len( recoData.padX )
   emMeasure = []
   if (0):
+    # Fitting
+     for ev in [0]:
+      # for pc in [57, 87, 94, 95, 103, 135, 139]:   
+      for pc in [135, 139]:   
+          
+        inspectPreCluster( recoData, ev, pc, mcData, display=True)
+        
+  elif (0):
     """
     for ev in [0]:
       # for pc in [3, 56, 64, 66, 73, 81, 103, 112, 125, 130, 131, 132, 135, 140, 145, 147, 152, 153, 163, 172, 173, 176, 179, 186, 189, 190, 191, 199, 206, 212, 235, 238, 240, 243, 245, 248, 249, 250, 251, 252, 257, 262, 265, 266, 269, 270, 271, 273, 275, 276, 278, 282, 285, 286, 296, 303, 304, 305, 306, 308, 323, 328, 333, 336, 337, 338, 339]:
@@ -547,7 +566,7 @@ if __name__ == "__main__":
     # inspectEvent( recoData, 0, mcData, startPCluster=5, display=True, displayBefore=True )
   elif 1:
     for ev in range(0, nEvents):
-      inspectEvent( recoData, ev, mcData, display=True, displayBefore=False )    
+      inspectEvent( recoData, ev, mcData, display=True, displayBefore=True )    
      
   else :
     for ev in range(0, nEvents):

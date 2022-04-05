@@ -97,7 +97,8 @@ def getMCHitsInFrame( frame, mcObj, ev, DEIds ):
     
 def drawMCHitsInFrame ( ax, frame, mcObj, ev, DEIds ):
     (x, y) = getMCHitsInFrame( frame, mcObj, ev, DEIds )
-    drawPoints( ax, x, y, color='red', pattern='o', markerSize=4)
+    drawPoints( ax, x, y, color='white', pattern='o', markersize=4)
+    drawPoints( ax, x, y, color='red', pattern='o', markersize=2)
     #
     return
 
@@ -214,7 +215,7 @@ def drawModelComponentsV0( ax, w, mu, var, color='black', pattern="o" ):
             
     return
 
-def drawPoints( ax, x, y, color='black', pattern="o", markerSize=3 ):
+def drawPoints( ax, x, y, color='black', pattern="o", markersize=3 ):
     if type(x) is not np.ndarray:
       x = np.array( [x])
       y = np.array( [y])
@@ -268,7 +269,7 @@ def drawPoints( ax, x, y, color='black', pattern="o", markerSize=3 ):
             ax.add_patch(circle)
           else:
            # ax.plot( x, y, pattern, color="white", markersize=5 )
-           ax.plot( x, y, pattern, color=color, markersize=markerSize )
+           ax.plot( x, y, pattern, color=color, markersize=markersize )
             
     return
 
