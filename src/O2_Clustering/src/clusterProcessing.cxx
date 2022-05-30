@@ -1,20 +1,18 @@
-# include <string.h>
-# include <vector>
-# include <algorithm>
-# include <stdexcept>
+#include <algorithm>
+#include <stdexcept>
+#include <string.h>
+#include <vector>
 
-#include "MCHClustering/dataStructure.h"
-#include "padProcessing.h"
-#include "mathUtil.h"
 #include "MCHClustering/clusterProcessing.h"
-#include "MCHClustering/mathieson.h"
+#include "mathUtil.h"
+#include "mathieson.h"
 // Used to analyse the clustering/fitting
 #include "InspectModel.h"
 
 // To keep internal data
-# define INSPECTMODEL 1
-# define VERBOSE 1
-# define CHECK 1
+#define INSPECTMODEL 1
+#define VERBOSE 1
+#define CHECK 1
 
 // Type of projection
 // Here add single cathode pads
@@ -28,17 +26,19 @@ using namespace o2::mch;
 // found in the precluster;
 static int nbrOfHits = 0;
 // Storage of the seeds found
-std::vector< DataBlock_t > seedList;
+std::vector<DataBlock_t> seedList;
 
 // Release memory and reset the seed list
-void cleanThetaList( ) {
+void cleanThetaList() {
   for (int i = 0; i < seedList.size(); i++)
     delete[] seedList[i].second;
   seedList.clear();
 }
 
 // Extract hits/seeds of a pre-cluster
-int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *saturated_, const double *zi_, int chId, int nPads) {
+int clusterProcess(const double *xyDxyi_, const Mask_t *cathi_,
+                   const Mask_t *saturated_, const double *zi_, int chId,
+                   int nPads) {
 
   nbrOfHits = 0;
   cleanThetaList();
@@ -57,27 +57,28 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
   Mask_t *cathi__;
   Mask_t *saturated__;
   Mask_t noiseMask[nPads];
-  int nNewPads=0;
+  int nNewPads = 0;
 
   // Pad filter when there are a too large number of pads
   if (nPads > 800) {
     // Remove noisy event
-    if (VERBOSE>0) {
-      printf("WARNING: remove noisy pads <z>=%f, min/max z=%f,%f", vectorSum(zi_, nPads)/ nPads, vectorMin(zi_, nPads), vectorMax(zi_, nPads));
+    if (VERBOSE > 0) {
+      printf("WARNING: remove noisy pads <z>=%f, min/max z=%f,%f",
+             vectorSum(zi_, nPads) / nPads, vectorMin(zi_, nPads),
+             vectorMax(zi_, nPads));
     }
     // Select pads which q > 2.0
-    vectorBuildMaskGreater( zi_, 2.0, nPads, noiseMask );
-    nNewPads = vectorSumShort( noiseMask, nPads);
-    xyDxyi__ = new double[nNewPads*4];
+    vectorBuildMaskGreater(zi_, 2.0, nPads, noiseMask);
+    nNewPads = vectorSumShort(noiseMask, nPads);
+    xyDxyi__ = new double[nNewPads * 4];
     zi__ = new double[nNewPads];
     saturated__ = new Mask_t[nNewPads];
     cathi__ = new Mask_t[nNewPads];
     //
-    vectorGather( zi_, noiseMask, nPads, zi__);
+    vectorGather(zi_, noiseMask, nPads, zi__);
     vectorGatherShort(saturated_, noiseMask, nPads, saturated__);
-    vectorGatherShort( cathi_, noiseMask, nPads, cathi__);
-    maskedCopyXYdXY( xyDxyi_,  nPads, noiseMask,  nPads,
-                      xyDxyi__, nNewPads);
+    vectorGatherShort(cathi_, noiseMask, nPads, cathi__);
+    maskedCopyXYdXY(xyDxyi_, nPads, noiseMask, nPads, xyDxyi__, nNewPads);
     xyDxyi = xyDxyi__;
     zi = zi__;
     cathi = cathi__;
@@ -91,13 +92,15 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
   }
 
   // Build a cluster object
-  Cluster cluster( getConstX(xyDxyi, nPads), getConstY(xyDxyi, nPads), getConstDX(xyDxyi, nPads), getConstDY(xyDxyi, nPads),
-          zi, cathi, saturated, chId, nPads);
+  Cluster cluster(getConstX(xyDxyi, nPads), getConstY(xyDxyi, nPads),
+                  getConstDX(xyDxyi, nPads), getConstDY(xyDxyi, nPads), zi,
+                  cathi, saturated, chId, nPads);
 
   // Compute the underlying geometry (cathode plae superposition
   int nProjPads = cluster.buildProjectedGeometry(includeSinglePads);
 
-  if ( nProjPads == 0 ) throw std::range_error("No projected pads !!!");
+  if (nProjPads == 0)
+    throw std::range_error("No projected pads !!!");
 
   // Build geometric groups of pads
   // which constitute sub-clusters
@@ -108,10 +111,11 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
     // Compute the charge on projected geometry
     double *qProj = cluster.projectChargeOnProjGeometry(includeSinglePads);
     // Save the projection with projected pads
-    saveProjectedPads( cluster.getProjectedPads(), qProj);
+    saveProjectedPads(cluster.getProjectedPads(), qProj);
     // Save the final groups (or cath-groups)
-    savePadToCathGroup( cluster.getCathGroup(0), cluster.getMapCathPadToPad(0), cluster.getNbrOfPads(0),
-            cluster.getCathGroup(1), cluster.getMapCathPadToPad(1), cluster.getNbrOfPads(1) );
+    savePadToCathGroup(cluster.getCathGroup(0), cluster.getMapCathPadToPad(0),
+                       cluster.getNbrOfPads(0), cluster.getCathGroup(1),
+                       cluster.getMapCathPadToPad(1), cluster.getNbrOfPads(1));
   }
   //
   // Sub-Cluster loop
@@ -128,14 +132,14 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
   //
   // Find local maxima (seeds)
   //
-  for( int g=1; g <= nGroups; g++ ) {
+  for (int g = 1; g <= nGroups; g++) {
     //
     //  Exctract the current group
     //
     if (ClusterConfig::groupsLog >= ClusterConfig::info) {
-        printf("----------------\n");
-        printf("Group %d/%d \n", g, nGroups);
-        printf("----------------\n");
+      printf("----------------\n");
+      printf("Group %d/%d \n", g, nGroups);
+      printf("----------------\n");
     }
     //
     // Number of seeds in this group
@@ -143,29 +147,31 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
 
     Cluster *subCluster = nullptr;
     // Extract the sub-cluster
-    if ( nGroups == 1) {
+    if (nGroups == 1) {
       subCluster = &cluster;
     } else {
-      subCluster = new Cluster( cluster, g);
+      subCluster = new Cluster(cluster, g);
     }
     /* ???
     if (VERBOSE > 0) {
       printf("Start findLocalMaxWithPET\n");
     }
     */
-    int nbrOfPadsInTheGroup = subCluster->getNbrOfPads(0) + subCluster->getNbrOfPads(1);
+    int nbrOfPadsInTheGroup =
+        subCluster->getNbrOfPads(0) + subCluster->getNbrOfPads(1);
     // Allocation of possible nbr of seeds
     // (.i.e the nbr of Pads)
-    double thetaL[ nbrOfPadsInTheGroup*5];
+    double thetaL[nbrOfPadsInTheGroup * 5];
 
     if (INSPECTMODEL) {
-    // Compute the local max with laplacian method
-    // Used only to give insights of the cluster
+      // Compute the local max with laplacian method
+      // Used only to give insights of the cluster
       subCluster->buildProjectedGeometry(includeSinglePads);
-      kEM = subCluster->findLocalMaxWithBothCathodes( thetaL, nbrOfPadsInTheGroup);
-      double thetaExtra[kEM*5];
-      copyTheta( thetaL, nbrOfPadsInTheGroup, thetaExtra, kEM, kEM);
-      saveThetaExtraInGroupList( thetaExtra, kEM);
+      kEM =
+          subCluster->findLocalMaxWithBothCathodes(thetaL, nbrOfPadsInTheGroup);
+      double thetaExtra[kEM * 5];
+      copyTheta(thetaL, nbrOfPadsInTheGroup, thetaExtra, kEM, kEM);
+      saveThetaExtraInGroupList(thetaExtra, kEM);
       if (ClusterConfig::inspectModelLog > ClusterConfig::info) {
         printTheta("Theta findLocalMaxWithBothCathodes", thetaExtra, kEM);
       }
@@ -174,10 +180,10 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
     subCluster->addBoundaryPads();
     //
     // Search for seeds on this sub-cluster
-    kEM = subCluster->findLocalMaxWithPET( thetaL, nbrOfPadsInTheGroup );
+    kEM = subCluster->findLocalMaxWithPET(thetaL, nbrOfPadsInTheGroup);
     if (kEM != 0) {
-      double thetaEM[kEM*5];
-      copyTheta( thetaL, nbrOfPadsInTheGroup, thetaEM, kEM, kEM);
+      double thetaEM[kEM * 5];
+      copyTheta(thetaL, nbrOfPadsInTheGroup, thetaEM, kEM, kEM);
 
       if (VERBOSE > 0) {
         printf("Find %2d local maxima : \n", kEM);
@@ -191,13 +197,15 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
       // ??? double *projYc = getY( xyDxyGrp, nbrOfProjPadsInTheGroup);
       /*
       if (VERBOSE > 1) {
-        printf("projPads in the group=%d, Xmin/max = %f %f, min/max = %f %f\n", g, vectorMin( projXc, nbrOfProjPadsInTheGroup),vectorMax( projXc, nbrOfProjPadsInTheGroup),
-                vectorMin( projYc, nbrOfProjPadsInTheGroup), vectorMax( projYc, nbrOfProjPadsInTheGroup));
+        printf("projPads in the group=%d, Xmin/max = %f %f, min/max = %f %f\n",
+      g, vectorMin( projXc, nbrOfProjPadsInTheGroup),vectorMax( projXc,
+      nbrOfProjPadsInTheGroup), vectorMin( projYc, nbrOfProjPadsInTheGroup),
+      vectorMax( projYc, nbrOfProjPadsInTheGroup));
       }
       */
-      if (INSPECTMODEL ) {
+      if (INSPECTMODEL) {
         // Save the seed founds by the EM algorithm
-        saveThetaEMInGroupList( thetaEM, kEM );
+        saveThetaEMInGroupList(thetaEM, kEM);
       }
       //
       //
@@ -206,16 +214,16 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
       // is well separated at the 2 planes level (cath0, cath1)
       // If not the EM result is kept
       //
-      DataBlock_t newSeeds = subCluster->fit( thetaEM, kEM);
+      DataBlock_t newSeeds = subCluster->fit(thetaEM, kEM);
       finalK = newSeeds.first;
       printTheta("- End of fitting ???", newSeeds.second, finalK);
 
       nbrOfHits += finalK;
       //
       // Store result (hits/seeds)
-      seedList.push_back( newSeeds );
+      seedList.push_back(newSeeds);
       if (INSPECTMODEL) {
-        saveThetaFitInGroupList( newSeeds.second, newSeeds.first);
+        saveThetaFitInGroupList(newSeeds.second, newSeeds.first);
       }
     } else {
       // No EM seeds
@@ -223,7 +231,7 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
       nbrOfHits += finalK;
       // Save the result of EM
       DataBlock_t newSeeds = std::make_pair(finalK, nullptr);
-      seedList.push_back( newSeeds );
+      seedList.push_back(newSeeds);
     }
     /*
     if (INSPECTMODEL ) {
@@ -234,20 +242,20 @@ int clusterProcess( const double *xyDxyi_, const Mask_t *cathi_, const Mask_t *s
     // Release pointer for group
     // deleteDouble( xyDxyGrp );
     // deleteDouble( chGrp );
-    if ( nGroups > 1) {
+    if (nGroups > 1) {
       delete subCluster;
     }
   } // next group
 
   // Finalise inspectModel
-  if ( INSPECTMODEL ) finalizeInspectModel();
+  if (INSPECTMODEL)
+    finalizeInspectModel();
 
-  if( nNewPads ) {
-    delete [] xyDxyi__;
-    delete [] cathi__;
-    delete [] saturated__;
-    delete [] zi__;
+  if (nNewPads) {
+    delete[] xyDxyi__;
+    delete[] cathi__;
+    delete[] saturated__;
+    delete[] zi__;
   }
   return nbrOfHits;
 }
-

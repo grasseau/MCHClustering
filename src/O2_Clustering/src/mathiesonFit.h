@@ -1,6 +1,6 @@
 // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
-// See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
-// All rights not expressly granted are reserved.
+// See https://alice-o2.web.cern.ch/copyright for details of the copyright
+// holders. All rights not expressly granted are reserved.
 //
 // This software is distributed under the terms of the GNU General Public
 // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
@@ -12,51 +12,48 @@
 #ifndef _MATHIESONFIT_H
 #define _MATHIESONFIT_H
 
-#include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multifit_nlin.h>
+#include <gsl/gsl_vector.h>
 
 #include "MCHClustering/PadsPEM.h"
 #include "mathUtil.h"
 
-namespace o2
-{
-namespace mch
-{
+namespace o2 {
+namespace mch {
 typedef struct dataFit {
   int N;
   int K;
-  const double* x_ptr;
-  const double* dx_ptr;
-  const double* y_ptr;
-  const double* dy_ptr;
-  const Mask_t* cath_ptr;
-  const double* zObs_ptr;
-  Mask_t* notSaturated_ptr;
-  double* cathWeights_ptr;
+  const double *x_ptr;
+  const double *dx_ptr;
+  const double *y_ptr;
+  const double *dy_ptr;
+  const Mask_t *cath_ptr;
+  const double *zObs_ptr;
+  Mask_t *notSaturated_ptr;
+  double *cathWeights_ptr;
   double *cathMax_ptr;
   int chamberId;
-  double* zCathTotalCharge_ptr;
+  double *zCathTotalCharge_ptr;
   int verbose;
 } funcDescription_t;
 
-void fitMathieson( const Pads &iPads, double *thetaInit, int kInit, int mode, double *thetaFinal, double* khi2, double* pError);
+void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
+                  double *thetaFinal, double *khi2, double *pError);
 // Notes :
-//  - the intitialization of Mathieson module must be done before (initMathieson)
+//  - the intitialization of Mathieson module must be done before
+//  (initMathieson)
 } // namespace mch
 } // namespace o2
 
 extern "C" {
-void fitMathieson0(double* muAndWi,
-                  double* xyAndDxy, double* z, Mask_t* cath, Mask_t* notSaturated,
-                  double* zCathTotalCharge,
-                  int K, int N, int chamberId, int jacobian,
-                  double* muAndWf,
-                  double* khi2,
-                  double* pError);
+void fitMathieson0(double *muAndWi, double *xyAndDxy, double *z, Mask_t *cath,
+                   Mask_t *notSaturated, double *zCathTotalCharge, int K, int N,
+                   int chamberId, int jacobian, double *muAndWf, double *khi2,
+                   double *pError);
 
-int f_ChargeIntegral(const gsl_vector* gslParams, void* data,
-                     gsl_vector* residual);
+int f_ChargeIntegral(const gsl_vector *gslParams, void *data,
+                     gsl_vector *residual);
 }
 
 #endif

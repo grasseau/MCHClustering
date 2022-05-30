@@ -1,6 +1,6 @@
 // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
-// See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
-// All rights not expressly granted are reserved.
+// See https://alice-o2.web.cern.ch/copyright for details of the copyright
+// holders. All rights not expressly granted are reserved.
 //
 // This software is distributed under the terms of the GNU General Public
 // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
@@ -23,15 +23,12 @@
 
 #include <TMath.h>
 
-namespace o2
-{
-namespace mch
-{
+namespace o2 {
+namespace mch {
 
 /// pad for internal use
-class PadOriginal
-{
- public:
+class PadOriginal {
+public:
   enum padStatus {
     kZero = 0x0,       ///< pad "basic" state
     kUseForFit = 0x1,  ///< should be used for fit
@@ -42,14 +39,17 @@ class PadOriginal
 
   PadOriginal() = delete;
   PadOriginal(double x, double y, double dx, double dy, double charge,
-              bool isSaturated = false, int plane = -1, int digitIdx = -1, int status = kZero)
-    : mx(x), my(y), mdx(dx), mdy(dy), mCharge(charge), mIsSaturated(isSaturated), mPlane(plane), mDigitIdx(digitIdx), mStatus(status) {}
+              bool isSaturated = false, int plane = -1, int digitIdx = -1,
+              int status = kZero)
+      : mx(x), my(y), mdx(dx), mdy(dy), mCharge(charge),
+        mIsSaturated(isSaturated), mPlane(plane), mDigitIdx(digitIdx),
+        mStatus(status) {}
   ~PadOriginal() = default;
 
-  PadOriginal(const PadOriginal& cl) = default;
-  PadOriginal& operator=(const PadOriginal& cl) = default;
-  PadOriginal(PadOriginal&&) = default;
-  PadOriginal& operator=(PadOriginal&&) = default;
+  PadOriginal(const PadOriginal &cl) = default;
+  PadOriginal &operator=(const PadOriginal &cl) = default;
+  PadOriginal(PadOriginal &&) = default;
+  PadOriginal &operator=(PadOriginal &&) = default;
 
   /// set position in x (cm)
   void setx(double x) { mx = x; }
@@ -94,7 +94,7 @@ class PadOriginal
   /// return whether this pad is saturated or not
   bool isSaturated() const { return mIsSaturated; }
 
- private:
+private:
   double mx = 0.;            ///< position in x (cm)
   double my = 0.;            ///< position in y (cm)
   double mdx = 0.;           ///< half dimension in x (cm)
@@ -107,13 +107,15 @@ class PadOriginal
 };
 
 //_________________________________________________________________________________________________
-inline auto findPad(std::vector<PadOriginal>& pads, double x, double y, double minCharge)
-{
-  /// find a pad with a position (x,y) and a charge >= minCharge in the array of pads
-  /// return an iterator to the pad or throw an exception if no pad is found
+inline auto findPad(std::vector<PadOriginal> &pads, double x, double y,
+                    double minCharge) {
+  /// find a pad with a position (x,y) and a charge >= minCharge in the array of
+  /// pads return an iterator to the pad or throw an exception if no pad is
+  /// found
 
-  auto match = [x, y, minCharge](const PadOriginal& pad) {
-    return pad.charge() >= minCharge && TMath::Abs(pad.x() - x) < 1.e-3 && TMath::Abs(pad.y() - y) < 1.e-3;
+  auto match = [x, y, minCharge](const PadOriginal &pad) {
+    return pad.charge() >= minCharge && TMath::Abs(pad.x() - x) < 1.e-3 &&
+           TMath::Abs(pad.y() - y) < 1.e-3;
   };
 
   auto itPad = std::find_if(pads.begin(), pads.end(), match);
@@ -126,11 +128,12 @@ inline auto findPad(std::vector<PadOriginal>& pads, double x, double y, double m
 }
 
 //_____________________________________________________________________________
-inline bool areOverlapping(const PadOriginal& pad1, const PadOriginal& pad2, double precision)
-{
+inline bool areOverlapping(const PadOriginal &pad1, const PadOriginal &pad2,
+                           double precision) {
   /// check if the two pads overlap within the given precision (cm):
-  /// positive precision = decrease pad size, i.e. pads touching each other do not overlap
-  /// negative precision = increase pad size, i.e. pads touching each other, including corners, overlap
+  /// positive precision = decrease pad size, i.e. pads touching each other do
+  /// not overlap negative precision = increase pad size, i.e. pads touching
+  /// each other, including corners, overlap
 
   if (pad1.x() - pad1.dx() > pad2.x() + pad2.dx() - precision ||
       pad1.x() + pad1.dx() < pad2.x() - pad2.dx() + precision ||

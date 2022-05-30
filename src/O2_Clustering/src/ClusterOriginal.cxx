@@ -1,6 +1,6 @@
 // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
-// See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
-// All rights not expressly granted are reserved.
+// See https://alice-o2.web.cern.ch/copyright for details of the copyright
+// holders. All rights not expressly granted are reserved.
 //
 // This software is distributed under the terms of the GNU General Public
 // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
@@ -10,7 +10,8 @@
 // or submit itself to any jurisdiction.
 
 /// \file ClusterOriginal.cxx
-/// \brief Implementation of the cluster used by the original cluster finder algorithm
+/// \brief Implementation of the cluster used by the original cluster finder
+/// algorithm
 ///
 /// \author Philippe Pillot, Subatech
 
@@ -23,19 +24,18 @@
 
 #include "PadOriginal.h"
 
-namespace o2
-{
-namespace mch
-{
+namespace o2 {
+namespace mch {
 
 //_________________________________________________________________________________________________
-bool shouldUsePad(const PadOriginal& pad, int plane, int statusMask, bool matchMask)
-{
-  /// return true if the pad should be used according to the plane it belongs to,
-  /// its state and whether its status mask matches (or not) the given mask
+bool shouldUsePad(const PadOriginal &pad, int plane, int statusMask,
+                  bool matchMask) {
+  /// return true if the pad should be used according to the plane it belongs
+  /// to, its state and whether its status mask matches (or not) the given mask
 
   if (pad.plane() == plane && pad.isReal() && !pad.isSaturated()) {
-    bool test = (statusMask != 0) ? ((pad.status() & statusMask) != 0) : (pad.status() == PadOriginal::kZero);
+    bool test = (statusMask != 0) ? ((pad.status() & statusMask) != 0)
+                                  : (pad.status() == PadOriginal::kZero);
     if ((test && matchMask) || (!test && !matchMask)) {
       return true;
     }
@@ -45,8 +45,7 @@ bool shouldUsePad(const PadOriginal& pad, int plane, int statusMask, bool matchM
 }
 
 //_________________________________________________________________________________________________
-void ClusterOriginal::clear()
-{
+void ClusterOriginal::clear() {
   /// clear the content of this cluster
 
   mPads.clear();
@@ -62,13 +61,15 @@ void ClusterOriginal::clear()
 }
 
 //_________________________________________________________________________________________________
-void ClusterOriginal::addPad(double x, double y, double dx, double dy, double charge, bool isSaturated, int plane, int digitIdx, int status)
-{
+void ClusterOriginal::addPad(double x, double y, double dx, double dy,
+                             double charge, bool isSaturated, int plane,
+                             int digitIdx, int status) {
   /// add a new pad to this cluster
 
   assert(plane == 0 || plane == 1);
 
-  mPads.emplace_back(x, y, dx, dy, charge, isSaturated, plane, digitIdx, status);
+  mPads.emplace_back(x, y, dx, dy, charge, isSaturated, plane, digitIdx,
+                     status);
 
   ++mMultiplicity[plane];
   mCharge[plane] += charge;
@@ -78,9 +79,9 @@ void ClusterOriginal::addPad(double x, double y, double dx, double dy, double ch
 }
 
 //_________________________________________________________________________________________________
-void ClusterOriginal::removePad(size_t iPad)
-{
-  /// remove the given pad from the internal list and update the cluster informations
+void ClusterOriginal::removePad(size_t iPad) {
+  /// remove the given pad from the internal list and update the cluster
+  /// informations
 
   assert(iPad < mPads.size());
 
@@ -92,7 +93,7 @@ void ClusterOriginal::removePad(size_t iPad)
   mCharge[1] = 0.;
   mIsSaturated[0] = false;
   mIsSaturated[1] = false;
-  for (const auto& pad : mPads) {
+  for (const auto &pad : mPads) {
     ++mMultiplicity[pad.plane()];
     mCharge[pad.plane()] += pad.charge();
     if (pad.isSaturated()) {
@@ -102,48 +103,53 @@ void ClusterOriginal::removePad(size_t iPad)
 }
 
 //_________________________________________________________________________________________________
-void ClusterOriginal::sortPads(double precision)
-{
-  /// sort the pads per plane then in increasing y-position if same plane then in increasing x-position if same y
-  /// positions within ± precision are considered as equal
-  std::sort(mPads.begin(), mPads.end(), [precision](const PadOriginal& pad1, const PadOriginal& pad2) {
-    return (pad1.plane() < pad2.plane() ||
-            (pad1.plane() == pad2.plane() && (pad1.y() < pad2.y() - precision ||
-                                              (pad1.y() < pad2.y() + precision && pad1.x() < pad2.x() - precision))));
-  });
+void ClusterOriginal::sortPads(double precision) {
+  /// sort the pads per plane then in increasing y-position if same plane then
+  /// in increasing x-position if same y positions within ± precision are
+  /// considered as equal
+  std::sort(mPads.begin(), mPads.end(),
+            [precision](const PadOriginal &pad1, const PadOriginal &pad2) {
+              return (pad1.plane() < pad2.plane() ||
+                      (pad1.plane() == pad2.plane() &&
+                       (pad1.y() < pad2.y() - precision ||
+                        (pad1.y() < pad2.y() + precision &&
+                         pad1.x() < pad2.x() - precision))));
+            });
 }
 
 //_________________________________________________________________________________________________
-size_t ClusterOriginal::multiplicity(int plane) const
-{
-  /// return the number of pads associated to this cluster, in total or in the given plane
+size_t ClusterOriginal::multiplicity(int plane) const {
+  /// return the number of pads associated to this cluster, in total or in the
+  /// given plane
   return (plane == 0 || plane == 1) ? mMultiplicity[plane] : mPads.size();
 }
 
 //_________________________________________________________________________________________________
-PadOriginal& ClusterOriginal::pad(size_t i)
-{
+PadOriginal &ClusterOriginal::pad(size_t i) {
   /// return the ith pad (no bound checking)
   return mPads[i];
 }
 
 //_________________________________________________________________________________________________
-std::pair<double, double> ClusterOriginal::minPadDimensions(int statusMask, bool matchMask) const
-{
+std::pair<double, double>
+ClusterOriginal::minPadDimensions(int statusMask, bool matchMask) const {
   /// Returns the minimum pad dimensions (half sizes), only considering
   /// pads matching (or not, depending matchMask) a given mask
 
   auto dim0(minPadDimensions(0, statusMask, matchMask));
   auto dim1(minPadDimensions(1, statusMask, matchMask));
 
-  return std::make_pair(TMath::Min(dim0.first, dim1.first), TMath::Min(dim0.second, dim1.second));
+  return std::make_pair(TMath::Min(dim0.first, dim1.first),
+                        TMath::Min(dim0.second, dim1.second));
 }
 
 //_________________________________________________________________________________________________
-std::pair<double, double> ClusterOriginal::minPadDimensions(int plane, int statusMask, bool matchMask) const
-{
+std::pair<double, double>
+ClusterOriginal::minPadDimensions(int plane, int statusMask,
+                                  bool matchMask) const {
   /// Returns the minimum pad dimensions (half sizes), only considering
-  /// pads matching (or not, depending matchMask) a given mask, within a given plane
+  /// pads matching (or not, depending matchMask) a given mask, within a given
+  /// plane
 
   assert(plane == 0 || plane == 1);
 
@@ -154,7 +160,7 @@ std::pair<double, double> ClusterOriginal::minPadDimensions(int plane, int statu
     return std::make_pair(xmin, ymin);
   }
 
-  for (const auto& pad : mPads) {
+  for (const auto &pad : mPads) {
     if (shouldUsePad(pad, plane, statusMask, matchMask)) {
       xmin = TMath::Min(xmin, pad.dx());
       ymin = TMath::Min(ymin, pad.dy());
@@ -165,8 +171,7 @@ std::pair<double, double> ClusterOriginal::minPadDimensions(int plane, int statu
 }
 
 //_________________________________________________________________________________________________
-void ClusterOriginal::area(int plane, double area[2][2]) const
-{
+void ClusterOriginal::area(int plane, double area[2][2]) const {
   /// return the geometrical area (cm) covered by the pads on the given plane
   /// area[0][0] = xmin, area[0][1] = xmax, area[1][0] = ymin, area[1][1] = ymax
 
@@ -177,7 +182,7 @@ void ClusterOriginal::area(int plane, double area[2][2]) const
   area[1][0] = std::numeric_limits<float>::max();
   area[1][1] = -std::numeric_limits<float>::max();
 
-  for (const auto& pad : mPads) {
+  for (const auto &pad : mPads) {
     if (pad.plane() == plane) {
       area[0][0] = TMath::Min(area[0][0], pad.x() - pad.dx());
       area[0][1] = TMath::Max(area[0][1], pad.x() + pad.dx());
@@ -188,10 +193,10 @@ void ClusterOriginal::area(int plane, double area[2][2]) const
 }
 
 //_________________________________________________________________________________________________
-std::pair<int, int> ClusterOriginal::sizeInPads(int statusMask) const
-{
-  /// return the size of the cluster in terms of number of pads in x and y directions
-  /// use the pads from the plane in which their minimum size is the smallest in this direction
+std::pair<int, int> ClusterOriginal::sizeInPads(int statusMask) const {
+  /// return the size of the cluster in terms of number of pads in x and y
+  /// directions use the pads from the plane in which their minimum size is the
+  /// smallest in this direction
 
   std::pair<double, double> dim0 = minPadDimensions(0, statusMask, true);
   std::pair<double, double> dim1 = minPadDimensions(1, statusMask, true);
@@ -217,9 +222,10 @@ std::pair<int, int> ClusterOriginal::sizeInPads(int statusMask) const
 }
 
 //_________________________________________________________________________________________________
-std::pair<int, int> ClusterOriginal::sizeInPads(int plane, int statusMask) const
-{
-  /// return the size of the cluster on the given plane in terms of number of pads in x and y directions
+std::pair<int, int> ClusterOriginal::sizeInPads(int plane,
+                                                int statusMask) const {
+  /// return the size of the cluster on the given plane in terms of number of
+  /// pads in x and y directions
 
   assert(plane == 0 || plane == 1);
 
@@ -227,12 +233,13 @@ std::pair<int, int> ClusterOriginal::sizeInPads(int plane, int statusMask) const
     return std::make_pair(0, 0);
   }
 
-  // order pads in x and y directions considering positions closer than 0.01 cm as equal
+  // order pads in x and y directions considering positions closer than 0.01 cm
+  // as equal
   auto cmp = [](double a, double b) { return a < b - 0.01; };
   std::set<double, decltype(cmp)> padx(cmp);
   std::set<double, decltype(cmp)> pady(cmp);
 
-  for (const auto& pad : mPads) {
+  for (const auto &pad : mPads) {
     if (shouldUsePad(pad, plane, statusMask, true)) {
       padx.emplace(pad.x());
       pady.emplace(pad.y());

@@ -1,6 +1,6 @@
 // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
-// See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
-// All rights not expressly granted are reserved.
+// See https://alice-o2.web.cern.ch/copyright for details of the copyright
+// holders. All rights not expressly granted are reserved.
 //
 // This software is distributed under the terms of the GNU General Public
 // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
@@ -17,22 +17,19 @@
 #ifndef ALICEO2_MCH_MATHIESONORIGINAL_H_
 #define ALICEO2_MCH_MATHIESONORIGINAL_H_
 
-namespace o2
-{
-namespace mch
-{
+namespace o2 {
+namespace mch {
 
 /// Original Mathieson function
-class MathiesonOriginal
-{
- public:
+class MathiesonOriginal {
+public:
   MathiesonOriginal() = default;
   ~MathiesonOriginal() = default;
 
-  MathiesonOriginal(const MathiesonOriginal& cl) = default;
-  MathiesonOriginal& operator=(const MathiesonOriginal& cl) = default;
-  MathiesonOriginal(MathiesonOriginal&&) = default;
-  MathiesonOriginal& operator=(MathiesonOriginal&&) = default;
+  MathiesonOriginal(const MathiesonOriginal &cl) = default;
+  MathiesonOriginal &operator=(const MathiesonOriginal &cl) = default;
+  MathiesonOriginal(MathiesonOriginal &&) = default;
+  MathiesonOriginal &operator=(MathiesonOriginal &&) = default;
 
   /// set the inverse of the anode-cathode pitch
   void setPitch(float pitch) { mInversePitch = (pitch > 0.) ? 1. / pitch : 0.; }
@@ -42,7 +39,7 @@ class MathiesonOriginal
 
   float integrate(float xMin, float yMin, float xMax, float yMax) const;
 
- private:
+private:
   float mSqrtKx3 = 0.;      ///< Mathieson Sqrt(Kx3)
   float mKx2 = 0.;          ///< Mathieson Kx2
   float mKx4 = 0.;          ///< Mathieson Kx4 = Kx1/Kx2/Sqrt(Kx3)
