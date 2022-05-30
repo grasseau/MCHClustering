@@ -24,9 +24,18 @@ namespace o2
 {
 namespace mch
 {
-  double PoissonEMLoop(const Pads &pads, Pads &pixels, const double *Cij, Mask_t *maskCij,
-              int qCutMode, double minPadResidu, int nItMax, int verbose);
-  double computeChiSquare( const Pads &pads, const double *qPredictedPads);
+    
+// namespace  PEM {
+// public :
+  constexpr int nMacroIterations=8;
+  static constexpr int nIterations[nMacroIterations] = {5, 10, 10, 10, 10, 10, 10, 30 };
+  static constexpr double minPadResidues[nMacroIterations] = { 2.0, 2.0, 1.5, 1.5, 1.0, 1.0, 0.5, 0.5};
+  
+  std::pair<double, double> PoissonEMLoop(const Pads &pads, Pads &pixels, const double *Cij, Mask_t *maskCij,
+              int qCutMode, double minPadResidu, int nItMax, int n0);
+  // static double computeChiSquare( const Pads &pads, const double *qPredictedPads);
+//};
+
 } // namespace mch
 } // namespace o2
 

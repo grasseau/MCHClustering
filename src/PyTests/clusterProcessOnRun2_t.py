@@ -203,6 +203,9 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   dx1 = dxi[cathi==1]
   dy1 = dyi[cathi==1]
   z1  = chi[cathi==1]
+  twoCath = True
+  if (x0.size ==0) or (x1.size ==0):
+    twoCath = False
 
   if displayBefore:
     fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(10, 7) )
@@ -214,11 +217,11 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     zMax = np.max( chi )
     uPlt.setLUTScale( 0.0, zMax ) 
     uPlt.drawPads( fig, ax[0,0], x0, y0, dx0, dy0, z0,  doLimits=False, alpha=1.0)
-    uPlt.drawPads( fig, ax[0,1], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=1.0, )
-    uPlt.drawPads( fig, ax[1,0], x0, y0, dx0, dy0, z0,  doLimits=False, alpha=0.5, displayLUT=False)
-    uPlt.drawPads( fig, ax[1,0], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=0.5, )
+    uPlt.drawPads( fig, ax[1,0], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=1.0, )
+    uPlt.drawPads( fig, ax[0,1], x0, y0, dx0, dy0, z0,  doLimits=False, alpha=0.5, displayLUT=False)
+    uPlt.drawPads( fig, ax[0,1], x1, y1, dx1, dy1, z1,  doLimits=False, alpha=0.5, )
     # Reco 
-    ax[1,0].plot( xr, yr, "+", color='white', markersize=3 )
+    ax[0,1].plot( xr, yr, "+", color='white', markersize=3 )
     # 
     ax[0,0].set_xlim( xMin, xMax )
     ax[0,0].set_ylim( yMin, yMax )
@@ -282,10 +285,12 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   selected = diffNbrOfSeeds and chId > 8
   selected = diffNbrOfSeeds 
   selected = True
-  selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
-  selected = (nbrOfGroups > 1)
   # select good ones
-  selected = (nbrOfGroups > 1) 
+  selected = (nbrOfGroups > 1)
+  selected = not twoCath
+  selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
+
+  #
   if display and selected:
     nFigRow = 2; nFigCol = 4
     fig, ax = plt.subplots(nrows=nFigRow, ncols=nFigCol, figsize=(15, 7))
@@ -434,15 +439,15 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     xl, yl = geom.findLocalMax( xyDxy0, xyDxy1, z0, z1 )
     zMax = np.max( chi )
     uPlt.setLUTScale( 0.0, zMax ) 
-    uPlt.drawPads( fig, ax[0,3], x0, y0, dx0, dy0, z0,  doLimits=False)
-    uPlt.drawPads( fig, ax[1,3], x1, y1, dx1, dy1, z1,  doLimits=False )
+    uPlt.drawPads( fig, ax[0,3], x0, y0, dx0, dy0, z0,  doLimits=False, showEdges=True)
+    uPlt.drawPads( fig, ax[1,3], x1, y1, dx1, dy1, z1,  doLimits=False, showEdges=True )
     # Saturated
     xSat = x0[ sat0==1 ]
     ySat = y0[ sat0==1 ]
-    uPlt.drawPoints( ax[0,3], xSat, ySat, color='white', pattern='o', markerSize=4)
+    uPlt.drawPoints( ax[0,3], xSat, ySat, color='white', pattern='o', markersize=4)
     xSat = x1[ sat1==1 ]
     ySat = y1[ sat1==1 ]
-    uPlt.drawPoints( ax[1,3], xSat, ySat, color='white', pattern='o', markerSize=4)
+    uPlt.drawPoints( ax[1,3], xSat, ySat, color='white', pattern='o', markersize=4)
     #
     uPlt.drawPoints( ax[0,3], xl, yl, color='black', pattern='o')
     uPlt.drawPoints( ax[1,3], xl, yl, color='black', pattern='o')
@@ -485,12 +490,16 @@ if __name__ == "__main__":
   RecoTracks = IOTracks.Tracks("/home/grasseau/TracksReco.dat")
   RecoTracks.read()
   
-  if 1:
+  # All
+  if 0:    
     for pc in reco:
       # processPreCluster ( pc, display=True, displayBefore=False )
       processPreCluster ( pc, display=True, displayBefore=False )
-  elif 0:
-    pc = reco.readPreCluster( 0, 0, 44)
+  elif 1:
+    # pc = reco.readPreCluster( 0, 0, 44)
+    pc = reco.readPreCluster( 0, 7, 319)
+    # Fig JDL 2022
+    pc = reco.readPreCluster( 0, 0, 673)
     processPreCluster ( pc, display=True, displayBefore=True )
   else :
     # pc = reco.readPreCluster( 0, 1, 757)

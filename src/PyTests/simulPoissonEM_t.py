@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import O2_Clustering.PyCWrapper as PCWrap
 import Util.plot as uPlt
 import Util.dataTools as tUtil
+import Analyses.analyseToolKit as atk
+import Util.geometry as geom
 
 verbose = 1
 # mode : cstVar (1bit)
@@ -238,13 +240,13 @@ def runAdaptEM( event ):
   x0, y0, dx0, dy0, cath0, saturated0, z0 = event.padCath0
   x1, y1, dx1, dy1, cath1, saturated1, z1 = event.padCath1
   print(x0.size, cath0.size, z0.size, saturated0.size)
-  print(x1.size, cath1.size, z1.size, saturated1.size)
+  ## print(x1.size, cath1.size, z1.size, saturated1.size)
   thetai = event.theta
-  ( xyDxy, cath, saturated, z ) = event.getMergedPads()  
-  # Buil the projection
-  (xProj, dxProj, yProj, dyProj, chA, chB) = PCWrap.projectChargeOnOnePlane(
-                        x0, dx0, y0, dy0, x1, dx1, y1, dy1, z0, z1)
-  zProj = chA + chB
+  ## ( xyDxy, cath, saturated, z ) = event.getMergedPads()  
+  ### Buil the projection
+  ## (xProj, dxProj, yProj, dyProj, chA, chB) = PCWrap.projectChargeOnOnePlane(
+  ##                      x0, dx0, y0, dy0, x1, dx1, y1, dy1, z0, z1)
+  # zProj = chA + chB
   x = np.hstack( [x0, x1] )
   dx = np.hstack( [dx0, dx1] )
   y = np.hstack( [y0, y1] )
@@ -502,43 +504,490 @@ def compute2DMathiesonMixturePadIntegrals( xyInfSup, theta, chId ):
   z = PCWrap.compute2DMathiesonMixturePadIntegrals( xyInfSup, theta, chId )
   return z
 
-if __name__ == "__main__":
+def findLocalMax( pixTheta, xyInfSup, q, chId):
+  qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta )
+  xyDxyPix = tUtil.asXYdXY( xPix, yPix, dxPix, dyPix )
+  # visuPix0 = np.copy( pixTheta )
+
+  pixIdx, locMaxIdx, w, locX, locY, dxLoc, dyLoc  = geom.clipOnLocalMax( xyDxyPix, qPix, hard=False)
+  qPix = qPix[pixIdx] 
+  xPix = xPix[pixIdx] 
+  yPix = yPix[pixIdx] 
+  dxPix = dxPix[pixIdx] 
+  dyPix = dyPix[pixIdx] 
+  pixTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix )
+
+  # Only to get coordinates of the local max (w, mu)
+  qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta )
+  xyDxyPix = tUtil.asXYdXY( xPix, yPix, dxPix, dyPix )      
+  pixIdx, idxLocMax, w, locX, locY, dxLoc, dyLoc  = geom.clipOnLocalMax1( xyDxyPix, qPix, hard=True)
+  # visuPix1 = np.copy( pixTheta )
+
+  # 
+  # Select local Max
+  cutRatio = 0.01
+  qCut = cutRatio * np.max( w )
+  initSize = w.size
+  print("[python] last solution (remove solution 1% below the max) qCut=", qCut, "sum w", np.sum( w ))
+  idx = np.where( w > qCut )[0]
+  w = w[idx]
+  locX = locX[ idx ]
+  locY = locY[ idx ]
+  dxLocMax = dxLoc[idx]
+  dyLocMax = dyLoc[idx]
+  refinedTheta = tUtil.asTheta( w, locX, locY, dxLocMax, dyLocMax)
+  print( "[python] --- > w selection: cutOff=", cutRatio, "nbr of removed peaks=", initSize - w.size)
+  chisq = atk.computeChiSq( xyInfSup, q, chId, refinedTheta )
+  print( "[python]---> chisq=", chisq)
+  return refinedTheta
+
+def animationPETAlgorithm( pcWrap):
     
-    pcWrap = PCWrap.setupPyCWrapper()
-    pcWrap.o2_mch_initMathieson()
-    
- 
     chId = 2
-    
     # - Theta  (-1.5 < muX/Y < 1.5)
     # - Max Charge
     # - Min Charge
-    K = 2
+    K = 7
     Nx = 20
-    Ny = 2
+    Ny = 20
     # Nx = 2
     # Ny = 2    
     minCh = 5.0
     maxCh = 600.0
-    readObj = False
+    readObj = True
     if ( not readObj ):
-      simul = tUtil.SimulCluster( Nx, Ny )
+      simul = tUtil.SimulCluster( Nx, Ny, xGrid = [-1.0, 1.0], yGrid = [-1.0, 1.0])
       # Build the pads
       #
-      ( padCath0, padCath1, thetai) = simul.buildCluster( chId, K, minCh, maxCh, 1.1 * maxCh)
+      # ( padCath0, padCath1, thetai) = simul.buildCluster( chId, K, minCh, maxCh, 1.1 * maxCh)
       ( padCath0, padCath1, thetai) = simul.buildCluster( chId, K, minCh, maxCh, 0.9 * maxCh)
 
     else:
       simul = tUtil.SimulCluster.read()
     #
     x0, y0, dx0, dy0, cath0, saturated0, z0 = simul.padCath0
-    x1, y1, dx1, dy1, cath1, saturated1, z1 = simul.padCath1
+    # x1, y1, dx1, dy1, cath1, saturated1, z1 = simul.padCath1
     thetai = simul.theta
     ( xyDxy, cath, saturated, z ) = simul.getMergedPads()  
     simul.write()
     #
+
     nSaturated = np.sum(saturated)
-    print("# cath0", cath0.size, "# cath1", cath1.size)
+    
+    # Event
+    x0, y0, dx0, dy0, cath0, saturated0, q0 = simul.padCath0
+    x1, y1, dx1, dy1, cath1, saturated1, q1 = simul.padCath1
+    xyDxy0 = tUtil.asXYdXY( x0, y0, dx0, dy0)
+    xyDxy1 = tUtil.asXYdXY( x1, y1, dx1, dy1)
+    x0, y0, dx0, dy0 = tUtil.asXYdXdY( xyDxy0 )
+    x1, y1, dx1, dy1 = tUtil.asXYdXdY( xyDxy1 )
+    # Add Pads
+    x0, y0, dx0, dy0, q0 = geom.addBoundaryPads( x0, y0, dx0, dy0, q0 )
+    x1, y1, dx1, dy1, q1 = geom.addBoundaryPads( x1, y1, dx1, dy1, q1 )
+        
+    # Reso  
+    if (x0.size != 0  ):
+      xMin  = np.min( x0 - dx0 )
+      xMax  = np.max( x0 + dx0 )
+      yMin  = np.min( y0 - dy0 )
+      yMax  = np.max( y0 + dy0 )
+      dxMin = np.min( dx0 )
+      dyMin = np.min( dy0 )
+    else:
+      xMin  = x1[0]
+      xMax  = x1[0]
+      yMin  = y1[0]
+      yMax  = y1[0]
+      dxMin = dx1[0]
+      dyMin = dy1[0]        
+    if ( x1.size != 0  ):
+      xMin  = min( xMin, np.min( x1 - dx1 ) )
+      xMax  = max( xMax, np.max( x1 + dx1 ) )
+      yMin  = min( yMin, np.min( y1 - dy1 ) )
+      yMax  = max( yMax, np.max( y1 + dy1 ) )
+      dxMin = min( dxMin, np.min( dx1 ) )
+      dyMin = min( dyMin, np.min( dy1 ) )
+      
+    # reso = 0.5 * min(dxMin, dyMin )
+    reso = min(dxMin, dyMin )
+    xPix, dxPix, yPix, dyPix, qPix = atk.buildPixels( x0, dx0, y0, dy0, x1, dx1, y1, dy1, q0, q1, reso, initQToOne=True, qCutOff=False)
+    #
+
+    
+    
+
+
+    print( "qPix.shape ", qPix.shape, "reso=", reso)
+    print( "min/max x, min dx ", np.min(xPix), np.max(xPix), np.min(dxPix))
+    print( "min/max y, min dy ", np.min(yPix), np.max(yPix), np.min(dyPix))
+    print( "min/max y, min dy ", np.min(yPix), np.max(yPix), np.min(dyPix))
+    
+    input("???")
+    initSize = qPix.size
+    thetaInit = tUtil.asTheta(qPix, xPix, yPix, dxPix, dyPix )
+    x = np.hstack( [x0, x1] )
+    dx = np.hstack( [dx0, dx1] )
+    y = np.hstack( [y0, y1] )
+    dy = np.hstack( [dy0, dy1] )
+    q = np.hstack( [q0, q1] )
+    maxQPad = np.max( q )
+    xyInfSup = tUtil.padToXYInfSup( x, y, dx, dy)
+    # 
+    pixTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix )
+    pixelSeq = []
+    nImages = 4
+    iterations = [1, 10, 100, 1000]
+    iterations = [1, 10, 20, 30]
+    cumulIt = 0
+    nIt = 1
+    for k in range(nImages):
+      # nIt = int( np.exp(k/3) ) + 1
+      nIt = iterations[k] - cumulIt
+      pixTheta = atk.EMPoisson( xyInfSup, q, pixTheta, chId, nIt)
+      pixelSeq.append( np.copy( pixTheta ) )
+      cumulIt += iterations[k]
+
+
+    nFigRow = 1; nFigCol = 1
+    fig, ax = plt.subplots(nrows=nFigRow, ncols=nFigCol, figsize=(8, 7))
+    uPlt.setLUTScale( 0, np.max(q0) )
+    print( "min Q ???", np.format_float_scientific( np.min( q ), unique=False, precision=15))
+    ( wi, _, _, _, _ ) = tUtil.thetaAsWMuVar( thetai )
+    print("wi, sum wi", wi, sum(wi))
+    print("wi min/max", np.min(wi),  np.max(wi), np.min(wi) / np.max(wi) )
+    uPlt.drawPads( fig, ax, x, y, dx, dy, q,  title="Mathieson", doLimits=False )
+    uPlt.drawModelComponents( ax, thetai, color='black', pattern="o", markersize=7 ) 
+    # uPlt.drawModelComponents( ax, thetai, color='black', pattern="x", markersize=7 ) 
+    ax.set_xlim( simul.gridXLimits[0], simul.gridXLimits[1])
+    ax.set_ylim( simul.gridYLimits[0], simul.gridYLimits[1])
+    ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar( pixelSeq[0] )
+    plt.show()
+ 
+    nFigRow = 2; nFigCol = 2
+    fig, ax = plt.subplots(nrows=nFigRow, ncols=nFigCol, figsize=(8, 7))
+    for iRow in range( nFigRow):
+      for iCol in range( nFigCol):
+        ax[iRow,iCol].set_xlim( simul.gridXLimits[0], simul.gridXLimits[1])
+        ax[iRow,iCol].set_ylim( simul.gridYLimits[0], simul.gridYLimits[1])
+        ax[iRow,iCol].axis('off')
+
+    # print( "qPix.shape ", qPix.shape)
+    # ax[0,0].imshow( qPix )
+    #uPlt.drawPads( fig, ax[1,0], x1, y1, dx1, dy1, z1,  title="Mathieson  cath-1", doLimits=False )
+    # ax[0,0].plot( x0[saturated0==1], y0[saturated0==1], "o", color='black', markersize=3 )
+    # ax[1,0].plot( x1[saturated1==1], y1[saturated1==1], "o", color='black', markersize=3 )
+    
+    for k in range(nImages):
+      i = int( (k) / nFigCol) 
+      j = (k) % nFigCol 
+      finalTheta = findLocalMax( pixelSeq[k], xyInfSup, q, chId)
+      ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar( pixelSeq[k] )
+      print( "min Q ???", np.format_float_scientific( np.min( qPix ), unique=False, precision=15))
+      input("???")
+      uPlt.setLUTScale( 0, np.max(qPix) )
+      uPlt.drawPads( fig, ax[i,j], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, displayLUT=False, alpha=1.0, showEdges=False)
+      # uPlt.drawPads( fig, ax[0,1], x1, y1, dx1, dy1, z1,  title="Mathieson  both cath", doLimits=False, alpha=0.5)    
+      ## uPlt.drawPads( fig, ax[1,0], x0r, y0r, dx0r, dy0r, z0r,  title="Mathieson  cath-0 - Removed pads" )
+      ## uPlt.drawPads( fig, ax[1,1], x1r, y1r, dx1r, dy1r, z1r,  title="Mathieson  cath-1 - Removed pads" )
+      #
+      uPlt.drawModelComponents( ax[i,j], finalTheta, color='black', pattern="o", markersize=6 ) 
+      # uPlt.drawModelComponents( ax[i,j], finalTheta, color='black', pattern="x", markersize=5 ) 
+      # uPlt.drawModelComponents( ax[i,j], thetai, color='black', pattern="P", markersize=5 ) 
+      ax[i,j].set_xticks( [-1.0, -0.5, 0, 0.5, 1.0] ) 
+      ax[i,j].set_yticks( [-1.0, -0.5, 0, 0.5, 1.0] ) 
+      # uPlt.drawModelComponents( ax[i,j], thetai, color='black', pattern="show w" ) 
+    """
+    ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar( pixelSeq[nImages-1] )
+    uPlt.setLUTScale( 0, np.max(qPix) )
+    uPlt.drawPads( fig, ax[1,3], xPix, yPix, dxPix, dyPix, qPix, title= r"Mathieson & $\theta_i$", doLimits=False, displayLUT=False, alpha=1.0)
+    uPlt.drawModelComponents( ax[1,3], thetai, color='black', pattern="+" ) 
+    """
+      # uPlt.drawModelComponents( ax[i,j], thetai, color='black', pattern="show w" ) 
+      
+      
+    
+    # PET
+    # EM case : newTheta, pixTheta = runAdaptPET( simul, 400 )
+    #(newTheta, pixInit, pixTheta0, pixTheta1) = findLocalMaxWithPETFromEvent( simul, 400 )
+    """
+    (newTheta, pixInit, pixTheta0, pixTheta1) = PETAlgorithmConvergence( simul, 400 )
+    # Pixels
+    ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar( pixInit )
+    print("???", xPix.size, np.min( xPix), np.max(xPix), np.max(qPix) )
+    uPlt.setLUTScale( 0, 1.0 * np.max( qPix) )
+    uPlt.drawPads( fig, ax[1,1], xPix, yPix, dxPix, dyPix, qPix,  title="Pixels Init",  doLimits=False)
+    #
+    ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar(pixTheta0)
+    uPlt.setLUTScale( 0, 1.0 * np.max( qPix) )
+    uPlt.drawPads( fig, ax[1,2], xPix, yPix, dxPix, dyPix, qPix,  title="Pixels theta0",  doLimits=False)
+    #
+    ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar(pixTheta1)
+    uPlt.setLUTScale( 0, 1.0 * np.max( qPix) )
+    uPlt.drawPads( fig, ax[1,3], xPix, yPix, dxPix, dyPix, qPix,  title="Pixels theta1",  doLimits=False)    
+    #
+    uPlt.drawModelComponents( ax[1,1], thetai, color='black', pattern="+" ) 
+    uPlt.drawModelComponents( ax[1,1], thetai, color='black', pattern="show w" ) 
+    uPlt.drawModelComponents( ax[1,2], thetai, color='white', pattern="o" ) 
+    uPlt.drawModelComponents( ax[1,3], thetai, color='white', pattern="o" ) 
+    uPlt.drawModelComponents( ax[1,2], newTheta, color='black', pattern="+" ) 
+    uPlt.drawModelComponents( ax[1,2], newTheta, color='black', pattern="show w" ) 
+    uPlt.drawModelComponents( ax[1,3], newTheta, color='black', pattern="+" ) 
+    uPlt.drawModelComponents( ax[1,3], newTheta, color='black', pattern="show w" ) 
+    # uPlt.drawModelComponents( ax[1,2], fusedTheta, color='black', pattern="+" ) 
+    # uPlt.drawModelComponents( ax[1,2], fusedTheta, color='black', pattern="show w" ) 
+    """
+    plt.tight_layout()
+    plt.show()
+    return ( refinedTheta )
+
+
+
+def PETAlgorithmConvergence( event, itMax, chId=1 ):
+    # Event
+    x0, y0, dx0, dy0, cath0, saturated0, q0 = event.padCath0
+    x1, y1, dx1, dy1, cath1, saturated1, q1 = event.padCath1
+    xyDxy0 = tUtil.asXYdXY( x0, y0, dx0, dy0)
+    xyDxy1 = tUtil.asXYdXY( x1, y1, dx1, dy1)
+    x0, y0, dx0, dy0 = tUtil.asXYdXdY( xyDxy0 )
+    x1, y1, dx1, dy1 = tUtil.asXYdXdY( xyDxy1 )
+    # Add Pads
+    x0, y0, dx0, dy0, q0 = geom.addBoundaryPads( x0, y0, dx0, dy0, q0 )
+    x1, y1, dx1, dy1, q1 = geom.addBoundaryPads( x1, y1, dx1, dy1, q1 )
+        
+    # Reso  
+    if (x0.size != 0  ):
+      xMin  = np.min( x0 - dx0 )
+      xMax  = np.max( x0 + dx0 )
+      yMin  = np.min( y0 - dy0 )
+      yMax  = np.max( y0 + dy0 )
+      dxMin = np.min( dx0 )
+      dyMin = np.min( dy0 )
+    else:
+      xMin  = x1[0]
+      xMax  = x1[0]
+      yMin  = y1[0]
+      yMax  = y1[0]
+      dxMin = dx1[0]
+      dyMin = dy1[0]        
+    if ( x1.size != 0  ):
+      xMin  = min( xMin, np.min( x1 - dx1 ) )
+      xMax  = max( xMax, np.max( x1 + dx1 ) )
+      yMin  = min( yMin, np.min( y1 - dy1 ) )
+      yMax  = max( yMax, np.max( y1 + dy1 ) )
+      dxMin = min( dxMin, np.min( dx1 ) )
+      dyMin = min( dyMin, np.min( dy1 ) )
+      
+    # reso = 0.5 * min(dxMin, dyMin )
+    reso = min(dxMin, dyMin )
+
+    xPix, dxPix, yPix, dyPix, qPix = atk.buildPixels( x0, dx0, y0, dy0, x1, dx1, y1, dy1, q0, q1, reso, initQToOne=True, qCutOff=False)
+    #
+    initSize = qPix.size
+    thetaInit = tUtil.asTheta(qPix, xPix, yPix, dxPix, dyPix )
+    x = np.hstack( [x0, x1] )
+    dx = np.hstack( [dx0, dx1] )
+    y = np.hstack( [y0, y1] )
+    dy = np.hstack( [dy0, dy1] )
+    q = np.hstack( [q0, q1] )
+    maxQPad = np.max( q )
+    xyInfSup = tUtil.padToXYInfSup( x, y, dx, dy)
+    # 
+    pixTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix ) 
+    # visuPix = np.copy( pixTheta )
+    # pixTheta, _ = atk.EMPoissonSQR( xyInfSup, q, pixTheta, chId, 3.0, 5, qCutMode=0 ) 
+    pixTheta = atk.EMPoisson( xyInfSup, q, pixTheta, chId, 1) 
+    visuPix0 = np.copy( pixTheta )
+    ( qLocMax, xLocMax, yLocMax, dxLocMax, dyLocMax ) = tUtil.thetaAsWMuVar( pixTheta )
+    # pixTheta, _ = atk.EMPoissonSQR( xyInfSup, q, pixTheta, chId, 1.5, 60, qCutMode=1 ) 
+    pixTheta = atk.EMPoisson( xyInfSup, q, pixTheta, chId, 100) 
+    if 0:
+      qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta )
+      xyDxyPix = tUtil.asXYdXY( xPix, yPix, dxPix, dyPix )
+
+      pixIdx, locMaxIdx, w, locX, locY  = geom.clipOnLocalMax( xyDxyPix, qPix, hard=False)
+      qPix = qPix[pixIdx] 
+      xPix = xPix[pixIdx] 
+      yPix = yPix[pixIdx] 
+      dxPix = dxPix[pixIdx] 
+      dyPix = dyPix[pixIdx] 
+      pixTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix )
+
+      pixTheta = atk.EMPoisson( xyInfSup, q, pixTheta, chId, 100) 
+
+      qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta )
+      xyDxyPix = tUtil.asXYdXY( xPix, yPix, dxPix, dyPix )
+      # (qPix, xPix, yPix, dxPix, dyPix) = geom.expandOnLocalMax( xyDxyPix, qPix )
+      pixIdx, idxLocMax, w, locX, locY  = geom.clipOnLocalMax( xyDxyPix, qPix, hard=False)
+      qPix = qPix[pixIdx] 
+      xPix = xPix[pixIdx] 
+      yPix = yPix[pixIdx] 
+      dxPix = dxPix[pixIdx] 
+      dyPix = dyPix[pixIdx] 
+      pixTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix )
+      
+      pixTheta = atk.EMPoisson( xyInfSup, q, pixTheta, chId, 100 )  
+      visuPix1 = np.copy( pixTheta )
+
+      # visuPix1 = np.copy( pixTheta )
+      
+      qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta )
+      xyDxyPix = tUtil.asXYdXY( xPix, yPix, dxPix, dyPix )      
+      pixIdx, idxLocMax, w, locX, locY  = geom.clipOnLocalMax( xyDxyPix, qPix, hard=False)
+
+      print( "Pixel size initSize=", initSize, ", end size=", qPix.size )
+      #
+    elif 1:
+      qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta )
+      xyDxyPix = tUtil.asXYdXY( xPix, yPix, dxPix, dyPix )
+      # visuPix0 = np.copy( pixTheta )
+
+      pixIdx, locMaxIdx, w, locX, locY, dxLoc, dyLoc  = geom.clipOnLocalMax( xyDxyPix, qPix, hard=False)
+      qPix = qPix[pixIdx] 
+      xPix = xPix[pixIdx] 
+      yPix = yPix[pixIdx] 
+      dxPix = dxPix[pixIdx] 
+      dyPix = dyPix[pixIdx] 
+      pixTheta = tUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix )
+
+
+      pixTheta, _ = atk.EMPoissonSQR( xyInfSup, q, pixTheta, chId, 1.0, 60,  qCutMode=0) 
+      # visuPix0 = np.copy( pixTheta )
+
+      # Only to get coordinates of the local max (w, mu)
+      qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta )
+      xyDxyPix = tUtil.asXYdXY( xPix, yPix, dxPix, dyPix )      
+      pixIdx, idxLocMax, w, locX, locY, dxLoc, dyLoc  = geom.clipOnLocalMax1( xyDxyPix, qPix, hard=True)
+      visuPix1 = np.copy( pixTheta )
+      # ??? print( "Pixel size initSize=", initSize, ", end size=", qPix.size )
+
+    else :
+      visuPix = np.copy( pixTheta )    
+      qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta )
+      xyDxyPix = tUtil.asXYdXY( xPix, yPix, dxPix, dyPix )
+      idxLocMax, w, locX, locY  = geom.simpleLaplacian2D( xyDxyPix, qPix)
+    #
+    # Filter position
+    dx = np.max(dxPix) + np.min( dxPix )
+    dy = np.max(dyPix) + np.min( dyPix )
+    """
+    eps = 1.0e-04
+    n = w.size
+    close = [[] for i in range(n)]
+    nClose = np.zeros( n )
+    for i in range(n):
+      xMask = np.abs( locX[i] - locX[0:n]) < ( 3*dxLoc[i] + dxLoc[0:n] +eps) 
+      yMask = np.abs( locY[i] - locY[0:n]) < ( 3*dyLoc[i] + dyLoc[0:n]+eps) 
+      close[i] = np.where ( np.bitwise_and(xMask, yMask))[0]
+      nClose[i] = close[i].size
+    idx = np.argsort( -nClose)
+    mask = np.ones( n )
+    wNew = np.zeros( n )
+    xNew = np.zeros( n )
+    yNew = np.zeros( n )
+    for k in idx:
+      v = close[k] 
+      wNew[k] = np.sum( w[v] * mask[v] )
+      xNew[k] = np.sum( locX[v] * mask[v] * w[v] )
+      yNew[k] = np.sum( locY[v] * mask[v] * w[v] )
+      print( "k, xNew[k], wNew[k]", k, xNew[k], wNew[k] )
+      xNew[k] = xNew[k] / wNew[k] 
+      yNew[k] = yNew[k] / wNew[k] 
+      mask[v] = 0;
+    idx = np.where( mask == 0)[0]
+    w = wNew[idx]
+    locX = xNew[idx]
+    locY = yNew[idx]
+    """
+    # 
+    # Select local Max
+    cutRatio = 0.01
+    qCut = cutRatio * np.max( w )
+    initSize = w.size
+    print("[python] last solution (remove solution 1% below the max) qCut=", qCut, "sum w", np.sum( w ))
+    idx = np.where( w > qCut )[0]
+    w = w[idx]
+    locX = locX[ idx ]
+    locY = locY[ idx ]
+    dxLocMax = dxLocMax[idx]
+    dyLocMax = dyLocMax[idx]
+    refinedTheta = tUtil.asTheta( w, locX, locY, dxLocMax, dyLocMax)
+    print( "[python] --- > w selection: cutOff=", cutRatio, "nbr of removed peaks=", initSize - w.size)
+    chisq = atk.computeChiSq( xyInfSup, q, chId, refinedTheta )
+    print( "[python]---> chisq=", chisq)
+    return ( refinedTheta, thetaInit, visuPix0, visuPix1 )
+
+def findLocalMaxWithPETFromEvent( event, itMax, chId=1 ):
+  x0, y0, dx0, dy0, cath0, saturated0, q0 = event.padCath0
+  x1, y1, dx1, dy1, cath1, saturated1, q1 = event.padCath1
+  xyDxy0 = tUtil.asXYdXY( x0, y0, dx0, dy0)
+  xyDxy1 = tUtil.asXYdXY( x1, y1, dx1, dy1)
+  (theta, pixInit, pixTheta0, pixTheta1) = atk.findLocalMaxWithPET(xyDxy0, xyDxy1, q0, q1, chId )
+  tUtil.printTheta( "Final theta", theta)
+  return ( theta, pixInit, pixTheta0, pixTheta1)
+
+def findLocalMaxWithPETV0( xyDxy0, q0, chId, display=False ):
+    x0, y0, dx0, dy0 = dUtil.asXYdXdY( xyDxy0 )
+    # Add Pads
+    x0, y0, dx0, dy0, q0 = geom.addBoundaryPads( x0, y0, dx0, dy0, q0 )
+    xMin  = np.min( x0 - dx0 )
+    xMax  = np.max( x0 + dx0 )
+    yMin  = np.min( y0 - dy0 )
+    yMax  = np.max( y0 + dy0 )
+    dxMin = np.min( dx0 )
+    dyMin = np.min( dy0 )
+    reso = 0.5 * min(dxMin, dyMin)
+    xPix, dxPix, yPix, dyPix, qPix = buildPixels( x0, dx0, y0, dy0, x1, dx1, y1, dy1, q0, q1, reso)
+    # Inv print("??? qPix", qPix)
+    #
+    initSize = qPix.size
+    thetaInit = dUtil.asTheta(qPix, xPix, yPix, dxPix, dyPix )
+    x = x0
+    dx = dx0
+    y = y0
+    dy = dy0
+    q = q0
+    maxQPad = np.max( q )
+    xyInfSup = dUtil.padToXYInfSup( x, y, dx, dy)
+    # 
+    pixTheta = dUtil.asTheta( qPix, xPix, yPix, dxPix, dyPix ) 
+    # visuPix = np.copy( pixTheta )
+    pixTheta, _ = atk.EMPoisson( xyInfSup, q, pixTheta, chId, 3.0, 5, qCutMode=0 ) 
+    visuPix0 = np.copy( pixTheta )
+    ( qLocMax, xLocMax, yLocMax, dxLocMax, dyLocMax ) = dUtil.thetaAsWMuVar( pixTheta )
+    pixTheta, _ = atk.EMPoisson( xyInfSup, q, pixTheta, chId, 1.5, 60, qCutMode=1 ) 
+
+def singleObservedDataPlane(pcWarp):
+    chId = 2
+    # - Theta  (-1.5 < muX/Y < 1.5)
+    # - Max Charge
+    # - Min Charge
+    K = 7
+    Nx = 20
+    Ny = 20
+    # Nx = 2
+    # Ny = 2    
+    minCh = 5.0
+    maxCh = 600.0
+    readObj = True
+    if ( not readObj ):
+      simul = tUtil.SimulCluster( Nx, Ny )
+      # Build the pads
+      #
+      # ( padCath0, padCath1, thetai) = simul.buildCluster( chId, K, minCh, maxCh, 1.1 * maxCh)
+      ( padCath0, padCath1, thetai) = simul.buildCluster( chId, K, minCh, maxCh, 0.9 * maxCh)
+
+    else:
+      simul = tUtil.SimulCluster.read()
+    #
+    x0, y0, dx0, dy0, cath0, saturated0, z0 = simul.padCath0
+    # x1, y1, dx1, dy1, cath1, saturated1, z1 = simul.padCath1
+    thetai = simul.theta
+    ( xyDxy, cath, saturated, z ) = simul.getMergedPads()  
+    simul.write()
+    #
+
+    nSaturated = np.sum(saturated)
+    print("# cath0", cath0.size)
     print("# nSaturated", nSaturated)
     nFigRow = 2; nFigCol = 4
     fig, ax = plt.subplots(nrows=nFigRow, ncols=nFigCol, figsize=(15, 7))
@@ -547,22 +996,63 @@ if __name__ == "__main__":
         ax[iRow,iCol].set_xlim( simul.gridXLimits[0], simul.gridXLimits[1])
         ax[iRow,iCol].set_ylim( simul.gridYLimits[0], simul.gridYLimits[1])
 
-    uPlt.setLUTScale( 0, max( np.max(z0), np.max(z1) )  )
-    uPlt.drawPads( fig, ax[0,0], x0, y0, dx0, dy0, z0,  title="Mathieson  cath-0", doLimits=False )
-    uPlt.drawPads( fig, ax[1,0], x1, y1, dx1, dy1, z1,  title="Mathieson  cath-1", doLimits=False )
+    # uPlt.setLUTScale( 0, max( np.max(z0), np.max(z1) )  )
+    uPlt.setLUTScale( 0, np.max(z0) )
+    uPlt.drawPads( fig, ax[0,0], x0, y0, dx0, dy0, z0,  title="Mathieson", doLimits=False )
+    # uPlt.drawPads( fig, ax[1,0], x1, y1, dx1, dy1, z1,  title="Mathieson  cath-1", doLimits=False )
     ax[0,0].plot( x0[saturated0==1], y0[saturated0==1], "o", color='black', markersize=3 )
-    ax[1,0].plot( x1[saturated1==1], y1[saturated1==1], "o", color='black', markersize=3 )
-    uPlt.drawPads( fig, ax[0,1], x0, y0, dx0, dy0, z0, doLimits=False, displayLUT=False, alpha=0.5)
-    uPlt.drawPads( fig, ax[0,1], x1, y1, dx1, dy1, z1,  title="Mathieson  both cath", doLimits=False, alpha=0.5)    
-    # uPlt.drawPads( fig, ax[1,0], x0r, y0r, dx0r, dy0r, z0r,  title="Mathieson  cath-0 - Removed pads" )
-    # uPlt.drawPads( fig, ax[1,1], x1r, y1r, dx1r, dy1r, z1r,  title="Mathieson  cath-1 - Removed pads" )
+    # ax[1,0].plot( x1[saturated1==1], y1[saturated1==1], "o", color='black', markersize=3 )
+    uPlt.drawPads( fig, ax[0,1], x0, y0, dx0, dy0, z0, title= r"Mathieson & $\theta_i$", doLimits=False, displayLUT=False, alpha=1.0)
+    # uPlt.drawPads( fig, ax[0,1], x1, y1, dx1, dy1, z1,  title="Mathieson  both cath", doLimits=False, alpha=0.5)    
+    ## uPlt.drawPads( fig, ax[1,0], x0r, y0r, dx0r, dy0r, z0r,  title="Mathieson  cath-0 - Removed pads" )
+    ## uPlt.drawPads( fig, ax[1,1], x1r, y1r, dx1r, dy1r, z1r,  title="Mathieson  cath-1 - Removed pads" )
     #
     uPlt.drawModelComponents( ax[0,1], thetai, color='black', pattern="+" ) 
     uPlt.drawModelComponents( ax[0,1], thetai, color='black', pattern="show w" ) 
     
     fig.suptitle( "Filtering pads to a Mathieson Mixture")
     
-  
+    # PET
+    # EM case : newTheta, pixTheta = runAdaptPET( simul, 400 )
+    #(newTheta, pixInit, pixTheta0, pixTheta1) = findLocalMaxWithPETFromEvent( simul, 400 )
+    (newTheta, pixInit, pixTheta0, pixTheta1) = PETAlgorithmConvergence( simul, 400 )
+    # Pixels
+    ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar( pixInit )
+    print("???", xPix.size, np.min( xPix), np.max(xPix), np.max(qPix) )
+    uPlt.setLUTScale( 0, 1.0 * np.max( qPix) )
+    uPlt.drawPads( fig, ax[1,1], xPix, yPix, dxPix, dyPix, qPix,  title="Pixels Init",  doLimits=False)
+    #
+    ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar(pixTheta0)
+    uPlt.setLUTScale( 0, 1.0 * np.max( qPix) )
+    uPlt.drawPads( fig, ax[1,2], xPix, yPix, dxPix, dyPix, qPix,  title="Pixels theta0",  doLimits=False)
+    #
+    ( qPix, xPix, yPix, dxPix, dyPix ) = tUtil.thetaAsWMuVar(pixTheta1)
+    uPlt.setLUTScale( 0, 1.0 * np.max( qPix) )
+    uPlt.drawPads( fig, ax[1,3], xPix, yPix, dxPix, dyPix, qPix,  title="Pixels theta1",  doLimits=False)    
+    #
+    uPlt.drawModelComponents( ax[1,1], thetai, color='black', pattern="+" ) 
+    uPlt.drawModelComponents( ax[1,1], thetai, color='black', pattern="show w" ) 
+    uPlt.drawModelComponents( ax[1,2], thetai, color='white', pattern="o" ) 
+    uPlt.drawModelComponents( ax[1,3], thetai, color='white', pattern="o" ) 
+    uPlt.drawModelComponents( ax[1,2], newTheta, color='black', pattern="+" ) 
+    uPlt.drawModelComponents( ax[1,2], newTheta, color='black', pattern="show w" ) 
+    uPlt.drawModelComponents( ax[1,3], newTheta, color='black', pattern="+" ) 
+    uPlt.drawModelComponents( ax[1,3], newTheta, color='black', pattern="show w" ) 
+    # uPlt.drawModelComponents( ax[1,2], fusedTheta, color='black', pattern="+" ) 
+    # uPlt.drawModelComponents( ax[1,2], fusedTheta, color='black', pattern="show w" ) 
+    
+    # (x, y, dx, dy) = tUtil.asXYdXdY( xyDxy )
+    # residual = PCWrap.computeResidual( xyDxy, z, newTheta )
+    # Residual
+    # print("???", np.max(residual), residual)
+    # uPlt.setLUTScale( np.min(residual) , np.max(residual)  )
+    # uPlt.drawPads( fig, ax[0,2], x[cath==0], y[cath==0], dx[cath==0], dy[cath==0], residual[cath==0], doLimits=False, displayLUT=False, alpha=0.5)
+    # uPlt.drawPads( fig, ax[0,2], x[cath==1], y[cath==1], dx[cath==1], dy[cath==1], residual[cath==1], title="Residual", doLimits=False, alpha=0.5 ) 
+    # Process
+    # Connected-Components
+    #
+    
+    #############  
     # Projection on one plane
     #(xProj, dxProj, yProj, dyProj, chA, chB) = PCWrap.projectChargeOnOnePlane(
     #                    x0, dx0, y0, dy0, x1, dx1, y1, dy1, z0, z1)
@@ -574,6 +1064,9 @@ if __name__ == "__main__":
     # uPlt.drawPads( fig, ax[0,3], xProj, yProj, dxProj, dyProj, chA,  title="Projection",  doLimits=False)
     # uPlt.drawPads( fig, ax[1,3], xProj, yProj, dxProj, dyProj, chB,  title="Projection",  doLimits=False)
     """
+    
+    """
+    # EM gaussian
     newTheta, fusedTheta = runAdaptEM( simul )
     # 
     uPlt.drawModelComponents( ax[1,1], newTheta, color='black', pattern="+" ) 
@@ -583,19 +1076,9 @@ if __name__ == "__main__":
     uPlt.drawModelComponents( ax[1,2], fusedTheta, color='black', pattern="show w" ) 
     
     (x, y, dx, dy) = tUtil.asXYdXdY( xyDxy )
-    """ Invalid
-    residual = PCWrap.computeMathiesonResidual( xyDxy, cath, z, newTheta, chId )
-    residual = residual / z
-    (xProj, dxProj, yProj, dyProj, chU, chV) = PCWrap.projectChargeOnOnePlane(
-                        x0, dx0, y0, dy0, x1, dx1, y1, dy1, residual[cath==0], residual[cath==1])
-    residuProj = (chU+chV)
-    print("??? residual cath0", residual[cath==0])
-    print("??? residual cath1", residual[cath==1])
-    idx0 = np.argmax( residual[cath==0] )
-    idx1 = np.argmax( residual[cath==1] )
-    print("??? idx0", idx0)
-    print("??? idx1", idx1)
     """
+    """
+    
     # Residual
     residual = save["Residual"]
     uPlt.setLUTScale( np.min(residual) , np.max(residual)  )
@@ -610,6 +1093,7 @@ if __name__ == "__main__":
     residuProj = save["ResidualProj"]
     uPlt.setLUTScale( np.min(residuProj) , np.max(residuProj)  )
     uPlt.drawPads( fig, ax[1,3], xProj, yProj, dxProj, dyProj, residuProj, title="Relative Proj. Residual", doLimits=False )
+    """
     #
 
     # Process
@@ -705,6 +1189,19 @@ if __name__ == "__main__":
     print("            muY", muY)
     """
     plt.show()
+    return
+# MCH case
+def twoObservedDataPlane():
+  return
+    
+if __name__ == "__main__":
+    
+    pcWrap = PCWrap.setupPyCWrapper()
+    pcWrap.o2_mch_initMathieson()
+    
+    # singleObservedDataPlane(pcWrap)
+    animationPETAlgorithm(pcWrap)
+
     
     # free memory in Pad-Processing
     PCWrap.freeMemoryPadProcessing()

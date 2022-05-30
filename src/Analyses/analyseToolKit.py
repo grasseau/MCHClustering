@@ -434,7 +434,7 @@ def processPreCluster( preClusters, ev, pc, mcObj, display=False ):
 
   #
   # free memory in Pad-Processing
-  PCWrap.freeMemoryPadProcessing()
+  # PCWrap.freeMemoryPadProcessing()
 
   #
   return thetaResult
@@ -479,7 +479,7 @@ def intersectionArea( xrInf,  xrSup,  yrInf,  yrSup, xInf,  xSup,  yInf,  ySup, 
         
   return area
 
-def buildPixels(  x0, dx0, y0, dy0, x1, dx1, y1, dy1, z0, z1, reso=0.07):
+def buildPixels(  x0, dx0, y0, dy0, x1, dx1, y1, dy1, z0, z1, reso=0.07, initQToOne=False, qCutOff=True):
   xMin = max( np.min( x0-dx0),  np.min( x1-dx1) )
   xMax = min( np.max( x0+dx0),  np.max( x1+dx1) )
   yMin = max( np.min( y0-dy0),  np.min( y1-dy1) )
@@ -503,7 +503,7 @@ def buildPixels(  x0, dx0, y0, dy0, x1, dx1, y1, dy1, z0, z1, reso=0.07):
   dxPix = np.zeros( (nXPixels, nYPixels))
   yPix = np.zeros( (nXPixels, nYPixels))
   dyPix = np.zeros( (nXPixels, nYPixels))
-  qPix = np.zeros( (nXPixels, nYPixels))
+  qPix = np.ones( (nXPixels, nYPixels))
   for i in range(nXPixels):
     xPixInf = i * reso + xMin
     xPixSup = xPixInf + reso 
@@ -512,7 +512,8 @@ def buildPixels(  x0, dx0, y0, dy0, x1, dx1, y1, dy1, z0, z1, reso=0.07):
       yPixSup = yPixInf + reso 
       areaCharge0 = intersectionArea(xPixInf, xPixSup, yPixInf, yPixSup, x0Inf, x0Sup, y0Inf, y0Sup, z0)
       areaCharge1 = intersectionArea(xPixInf, xPixSup, yPixInf, yPixSup, x1Inf, x1Sup, y1Inf, y1Sup, z1)
-      qPix[i, j] = min( areaCharge0, areaCharge1 )
+      if not initQToOne :
+        qPix[i, j] = min( areaCharge0, areaCharge1 )        
       xPix[i,j] = xPixInf + reso*0.5
       dxPix[i,j] = reso*0.5
       yPix[i,j] = yPixInf + reso*0.5
@@ -532,13 +533,14 @@ def buildPixels(  x0, dx0, y0, dy0, x1, dx1, y1, dy1, z0, z1, reso=0.07):
   # input("next")
   
   # qCut = 0.02
-  qCut = uMin* areaRatio
-  idx = np.where( qPix > qCut )[0]
-  xPix = xPix[idx]
-  dxPix = dxPix[idx]
-  yPix = yPix[idx]
-  dyPix = dyPix[idx]
-  qPix = qPix[idx]
+  if qCutOff :
+    qCut = uMin* areaRatio
+    idx = np.where( qPix > qCut )[0]
+    xPix = xPix[idx]
+    dxPix = dxPix[idx]
+    yPix = yPix[idx]
+    dyPix = dyPix[idx]
+    qPix = qPix[idx]
   print("buildPixel: nbr of pixels=", qPix.size)
   return (xPix, dxPix, yPix, dyPix, qPix)
 
@@ -913,7 +915,7 @@ def findLocalMaxWithPET( xyDxy0, xyDxy1, q0, q1, chId, proj=None, display=False 
     x0, y0, dx0, dy0, q0 = geom.addBoundaryPads( x0, y0, dx0, dy0, q0 )
     x1, y1, dx1, dy1, q1 = geom.addBoundaryPads( x1, y1, dx1, dy1, q1 )
         
-    # Reso 
+    # Reso  
     if (x0.size != 0  ):
       xMin  = np.min( x0 - dx0 )
       xMax  = np.max( x0 + dx0 )

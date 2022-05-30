@@ -118,6 +118,7 @@ def setupPyCWrapper():
   """ # Not used
   #
   #
+  """ Not Used
   extCLib.computeMathiesonResidual.resType = None
   extCLib.computeMathiesonResidual.argtypes = [ 
                                     array_1d_double,  # xyInfSup
@@ -128,6 +129,7 @@ def setupPyCWrapper():
                                     c_int, c_int,     # K, N 
                                     array_1d_double   # residual
                                 ]
+  """
   #
   # Setup Pad Processing functions
   #
@@ -315,14 +317,14 @@ def compute2DMathiesonMixturePadIntegrals( xyInfSup, theta, chamberId ):
   N = int( xyInfSup.size / 4)
   K = int( theta.size / 5)
   integrals = np.zeros( (N) )
-  CLib.compute2DMathiesonMixturePadIntegrals( xyInfSup, theta, N, K, chamberId, integrals )
+  CLib.o2_mch_compute2DMathiesonMixturePadIntegrals( xyInfSup, theta, N, K, chamberId, integrals )
   return integrals
 
 def computeCij( xyInfSup, theta, chamberId ):
   N = int( xyInfSup.size / 4)
   K = int( theta.size / 5)
   Cij = np.zeros( (N*K) )
-  CLib.computeCij( xyInfSup, theta, N, K, chamberId, Cij )
+  CLib.o2_mch_computeCij( xyInfSup, theta, N, K, chamberId, Cij )
   return Cij.reshape((N,K), order="F") 
 
 

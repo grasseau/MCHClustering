@@ -26,12 +26,12 @@ namespace mch
 typedef struct dataFit {
   int N;
   int K;
-  double* x_ptr;
-  double* dx_ptr;
-  double* y_ptr;
-  double* dy_ptr;
-  Mask_t* cath_ptr;
-  double* zObs_ptr;
+  const double* x_ptr;
+  const double* dx_ptr;
+  const double* y_ptr;
+  const double* dy_ptr;
+  const Mask_t* cath_ptr;
+  const double* zObs_ptr;
   Mask_t* notSaturated_ptr;
   double* cathWeights_ptr;
   double *cathMax_ptr;

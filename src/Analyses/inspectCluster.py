@@ -207,6 +207,9 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   dx1 = dxi[cathi==1]
   dy1 = dyi[cathi==1]
   z1  = chi[cathi==1]
+  twoCath = True
+  if (x0.size ==0) or (x1.size ==0):
+    twoCath = False
   saturate1 = saturated[cathi==1]
   matchFlag = (match > 0.33)
   notSaturated = ( sumSaturated == 0)
@@ -239,6 +242,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   # Local max in C++
   # LocalMax of both cathodes
   thetaLocalMax = PCWrap.collectThetaExtra()
+  dUtil.printTheta("[python] thetaLocalMax", thetaLocalMax)
   
   # Compute the max of the Reco and EM seeds/hits
   maxDxMinREM, maxDyMinREM = aTK.minDxDy( muX, muY, preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc])
@@ -264,7 +268,9 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   drawPlot = display and nbrHits==1 and (match > 0.33) and (maxDxMin > 0.07 or maxDyMin > 0.07) and (chId > 6)
   drawPlot = display and nbrHits==1 and (match > 0.33) and (maxDxMin > 0.07 or maxDyMin > 0.07) 
   drawPlot = display and (nRecoSeeds != nbrHits) and (chId > 6)
-  drawPlot = display and ((nRecoSeeds != nbrHits) or (maxDxMinREM > 0.07 or maxDyMinREM > 0.07)) 
+  drawPlot = display  and not notSaturated 
+  drawPlot = display  and not twoCath
+  drawPlot = display and (nRecoSeeds != nbrHits)
   drawPlot = display 
   #
   """
@@ -349,6 +355,9 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     """
     #
     # Merged Groups
+    print( "padToCathGrp", padToCathGrp)
+    # if ( padToCathGrp.size != 0):
+    padCathGrpMax = padCathGrpMax if (padCathGrpMax !=0) else 1 
     uPlt.setLUTScale( 0.0, padCathGrpMax ) 
     uPlt.drawPads( fig, ax[0,2], xi, yi, dxi, dyi, padToCathGrp,  doLimits=False, alpha=0.5 )
     ax[0,2].set_title("Group of pads")
@@ -356,6 +365,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     # Pixels 
     #
     # Init
+    pEnd = 0
     for p in range(7, -1, -1):
       (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(p)
       if nPix != 0: pEnd = p; break
@@ -522,7 +532,7 @@ if __name__ == "__main__":
     # Fitting
      for ev in [0]:
       # for pc in [57, 87, 94, 95, 103, 135, 139]:   
-      for pc in [135, 139]:   
+      for pc in [24, 35, 49, 53, 135, 139]:   
           
         inspectPreCluster( recoData, ev, pc, mcData, display=True)
         
@@ -557,16 +567,43 @@ if __name__ == "__main__":
       # for pc in [15, 49, 84, 121, 131, 197, 243,251, 285, 286]:
       # Test set for bbr of parameters
       # for pc in [21, 81, 103, 131, 140, 152, 163, 243, 285, 286]:   
-      for pc in range(14,300):   
+      # for pc in range(84,300):
+      # Pb with groups
+      for pc in [ 49, 66, 84] :   
         inspectPreCluster( recoData, ev, pc, mcData, display=True, displayBefore=True)
         
     # for ev in range(39, nEvents):
     # for ev in range(39, nEvents):
     # inspectEvent( recoData, 0, mcData, startPCluster=40, display=True, displayBefore=False )
     # inspectEvent( recoData, 0, mcData, startPCluster=5, display=True, displayBefore=True )
+    
   elif 1:
+    """
+    Different number of seeds
+    """
+    ev = 0
+    pcList = [15, 28, 53, 55, 131, 140, 152, 163, 179, 189, 243, 250, 285, 286]
+    for pc in pcList :   
+      inspectPreCluster( recoData, ev, pc, mcData, display=True, displayBefore=False)
+    ev = 1
+    pcList = [3, 57]
+    for pc in pcList :   
+      inspectPreCluster( recoData, ev, pc, mcData, display=True, displayBefore=False)
+    ev = 2
+    pcList = [44, 47, 68, 91, 149]
+    for pc in pcList :   
+      inspectPreCluster( recoData, ev, pc, mcData, display=True, displayBefore=False)
+  elif 0:
+    """
+    Remove groups on low charge
+    """
+    # evList = [ (3,64), (5,259), (21,3) , (35,10), (39,17), (39,56), (44,7), (45,38), (45,187), (45,216)]
+    evList = [ (3,64), (21,3),  (44,7), (45,187), (45,216)]
+    for evpc in evList :   
+      inspectPreCluster( recoData, evpc[0], evpc[1], mcData, display=True, displayBefore=False)
+  elif 0:
     for ev in range(0, nEvents):
-      inspectEvent( recoData, ev, mcData, display=True, displayBefore=True )    
+      inspectEvent( recoData, ev, mcData, display=True, displayBefore=False )   
      
   else :
     for ev in range(0, nEvents):

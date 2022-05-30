@@ -8,7 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Cluster Processing
-import C.PyCWrapper as PCWrap
+# import C.PyCWrapper as PCWrap
+import O2_Clustering.PyCWrapper as PCWrap
 import Util.plot as uPlt
 import Util.geometry as geom
 import Util.dataTools as dUtil
@@ -370,7 +371,7 @@ def classifyOnEvAndPC( measure, mcObj, recoObj, evRange ):
 if __name__ == "__main__":
     
   pcWrap = PCWrap.setupPyCWrapper()
-  pcWrap.initMathieson()
+  pcWrap.o2_mch_initMathieson()
   
   # Read MC data
   mcData = IO.MCData(fileName="../MCData/MCDataDump.dat")
@@ -390,6 +391,7 @@ if __name__ == "__main__":
     emMeasure.append( aTK.processEvent( recoData, ev, mcData ) )    
   
   # recoConfMatrix = statOnDistances( recoMeasure, mcData, recoData, range(0, 6) )
+ 
   recoConfMatrix = statOnDistances( recoMeasure, mcData, recoData, range(0,nEvents) )
   
   # emConfMatrix = statOnDistances( emMeasure, mcData, recoData, range(0, 6) )
@@ -397,9 +399,27 @@ if __name__ == "__main__":
   
   (recoTP, recoFP, recoFN) = recoConfMatrix
   (emTP, emFP, emFN) = emConfMatrix
+  allRecoTP = 0; allRecoFP = 0; allRecoFN = 0;
+  allEMTP = 0; allEMFP = 0; allEMFN = 0;
   for ch in range(1,11,1):
     print('reco chId=', ch, "TP/FP/FN", recoTP[ch], recoFP[ch], recoFN[ch])
     print('em   chId=', ch, "TP/FP/FN", emTP[ch], emFP[ch], emFN[ch])
+    allRecoTP += recoTP[ch]
+    allRecoFP += recoFP[ch]
+    allRecoFN += recoFN[ch]
+    allEMTP += emTP[ch]
+    allEMFP += emFP[ch]
+    allEMFN += emFN[ch] 
+  print('reco all', ch, "TP/FP/FN", allRecoTP, allRecoFP, allRecoFN)
+  print('em   all', ch, "TP/FP/FN", allEMTP, allEMFP, allEMFN)
+  print("Reco TP/FP/FN")
+  print(recoTP)
+  print(recoFP)
+  print(recoFN)
+  print("EM TP/FP/FN")
+  print(emTP)
+  print(emFP)
+  print(emFN)
   
   """
   recoSet = classifyOnEvAndPC( recoMeasure, mcData, recoData, range(0,5) )

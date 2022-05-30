@@ -172,13 +172,13 @@ int getNbrOfThetaExtra() {
 }
 
 void saveProjectedPads(const o2::mch::Pads *pads, double *qProj ) {
-    int nbrOfProjPads = pads->nPads;
+    int nbrOfProjPads = pads->getNbrOfPads();
     inspectModel.nbrOfProjPads = nbrOfProjPads;
     inspectModel.projectedPads = new double[nbrOfProjPads*4];
-    o2::mch::vectorCopy( pads->x, nbrOfProjPads, &inspectModel.projectedPads[0] );
-    o2::mch::vectorCopy( pads->y, nbrOfProjPads, &inspectModel.projectedPads[1*nbrOfProjPads] );
-    o2::mch::vectorCopy( pads->dx, nbrOfProjPads, &inspectModel.projectedPads[2*nbrOfProjPads] );
-    o2::mch::vectorCopy( pads->dy, nbrOfProjPads, &inspectModel.projectedPads[3*nbrOfProjPads] );
+    o2::mch::vectorCopy( pads->getX(), nbrOfProjPads, &inspectModel.projectedPads[0] );
+    o2::mch::vectorCopy( pads->getY(), nbrOfProjPads, &inspectModel.projectedPads[1*nbrOfProjPads] );
+    o2::mch::vectorCopy( pads->getDX(), nbrOfProjPads, &inspectModel.projectedPads[2*nbrOfProjPads] );
+    o2::mch::vectorCopy( pads->getDY(), nbrOfProjPads, &inspectModel.projectedPads[3*nbrOfProjPads] );
     inspectModel.qProj = qProj;
 }
 
@@ -373,15 +373,15 @@ int collectPixels( int which, int N, double *xyDxy, double *q) {
 }
 
 void inspectSavePixels( int which, o2::mch::Pads &pixels  ) {
-   int N = pixels.nPads;
+   int N = pixels.getNbrOfPads();
    double *xyDxyQ = new double[5*N];
    double *xyDxy = xyDxyQ;
    double *q = &xyDxyQ[4*N];
-   o2::mch::vectorCopy( pixels.x, N, xyDxy);
-   o2::mch::vectorCopy( pixels.y, N, &xyDxy[N]);
-   o2::mch::vectorCopy( pixels.dx, N, &xyDxy[2*N]);
-   o2::mch::vectorCopy( pixels.dy, N, &xyDxy[3*N]);
-   o2::mch::vectorCopy( pixels.q, N, q);
+   o2::mch::vectorCopy( pixels.getX(), N, xyDxy);
+   o2::mch::vectorCopy( pixels.getY(), N, &xyDxy[N]);
+   o2::mch::vectorCopy( pixels.getDX(), N, &xyDxy[2*N]);
+   o2::mch::vectorCopy( pixels.getDY(), N, &xyDxy[3*N]);
+   o2::mch::vectorCopy( pixels.getCharges(), N, q);
    DataBlock_t db= {N, xyDxyQ};
    inspectPadProcess.xyDxyQPixels[which].push_back( db);
    // printf("[inspectPadProcess], chanel=%d, nbrGrp=%ld\n", which, inspectPadProcess.xyDxyQPixels[which].size() );
