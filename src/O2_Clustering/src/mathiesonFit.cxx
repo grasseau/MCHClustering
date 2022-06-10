@@ -136,7 +136,7 @@ int f_ChargeIntegral(const gsl_vector *gslParams, void *dataFit,
   // Perform the normalization
   for (int i = 0; i < N; i++) {
     z[i] = z[i] * coefNorm[cath[i]];
-    chargePerCath[cath[i]] + z[i];
+    chargePerCath[cath[i]] += z[i];
   }
   //
   // printf("maxCath: %f %f\n", cathMax[0], cathMax[1]);
@@ -584,9 +584,10 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
     // associate the fitting mode, the function, and the starting parameters
     gsl_multifit_fdfsolver_set(s, &f, &params0.vector);
 
-    if (verbose > 1) {
+    if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
       printState(-1, s, K);
     }
+
     // double initialResidual = gsl_blas_dnrm2(s->f);
     double initialResidual = 0.0;
     // Fitting iteration
@@ -609,7 +610,7 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
       if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
         printf("  Solver status = %s\n", gsl_strerror(status));
       }
-      if (verbose > 0) {
+      if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
         printState(iter, s, K);
       }
       /* ???? Inv

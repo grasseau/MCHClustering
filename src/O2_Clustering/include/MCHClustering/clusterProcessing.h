@@ -12,16 +12,17 @@
 #ifndef _CLUSTERPROCESSING_H
 #define _CLUSTERPROCESSING_H
 
+#include "MCHClustering/ClusterConfig.h"
 typedef std::pair<int, const double *> DataBlock_t;
 
 extern "C" {
 void setMathiesonVarianceApprox(int chId, double *theta, int K);
 
-int clusterProcess(const double *xyDxyi, const Mask_t *cathi,
-                   const Mask_t *saturated, const double *zi, int chId,
+int clusterProcess(const double *xyDxyi, const o2::mch::Mask_t *cathi,
+                   const o2::mch::Mask_t *saturated, const double *zi, int chId,
                    int nPads);
 
-void collectTheta(double *theta, Groups_t *thetaToGroup, int N);
+void collectTheta(double *theta, o2::mch::Groups_t *thetaToGroup, int N);
 
 int getNbrOfPadsInGroups();
 
@@ -39,7 +40,7 @@ void computeResidual(const double *xyDxy, const double *zObs,
 
 void collectResidual(double *residual, int N);
 
-void computeMathiesonResidual(const double *xyDxy, const Mask_t *cath,
+void computeMathiesonResidual(const double *xyDxy, const o2::mch::Mask_t *cath,
                               const double *zObs, const double *theta, int chId,
                               int K, int N, double *residual);
 

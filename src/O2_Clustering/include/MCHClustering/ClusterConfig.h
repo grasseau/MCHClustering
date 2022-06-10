@@ -19,6 +19,10 @@
 namespace o2 {
 namespace mch {
 
+typedef int PadIdx_t;   // Pad index type
+typedef short Groups_t; // Groups/sub-cluster type
+typedef short Mask_t;   // To build mask
+
 struct ClusterConfig {
   // Physical-Numerical parameters
   static constexpr double minChargeOfClusterPerCathode =
@@ -32,7 +36,7 @@ struct ClusterConfig {
     debug = 0x3   ///< Ful details
   };
   static constexpr VerboseMode fittingLog = info;
-  static constexpr VerboseMode groupsLog = info;
+  static constexpr VerboseMode padMappingLog = info;
   static constexpr VerboseMode EMLocalMaxLog = info;
   static constexpr VerboseMode laplacianLocalMaxLog = no;
   static constexpr VerboseMode inspectModelLog = no;

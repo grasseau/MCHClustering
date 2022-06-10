@@ -99,8 +99,9 @@ PadIdx_t *Pads::buildKFirstsNeighbors(int kernelSize) {
       throw std::overflow_error("Not enough allocation");
     }
   }
-  if (VERBOSE > 1)
-    Pads::printNeighbors(neighbors_, N);
+  if (ClusterConfig::padMappingLog >= ClusterConfig::detail) {
+   Pads::printNeighbors(neighbors_, N);
+  }
   return neighbors_;
 }
 

@@ -1893,7 +1893,8 @@ void Cluster::updateProjectionGroups() {
     } else if ((i > -1) && (j > -1)) {
       // projPadToGrp[k] = grpToGrp[ projPadToGrp[k] ];
       projPadToGrp[k] = cath0ToGrp[i];
-      if (ClusterConfig::groupsCheck && (cath0ToGrp[i] != cath1ToGrp[j])) {
+      // if (ClusterConfig::groupsCheck && (cath0ToGrp[i] != cath1ToGrp[j])) {
+      if (0) {
         printf("  [updateProjectionGroups] i, cath0ToGrp[i]=(%d, %d); j, "
                "cath1ToGrp[j]=(%d, %d)\n",
                i, cath0ToGrp[i], j, cath1ToGrp[j]);

@@ -495,11 +495,15 @@ if __name__ == "__main__":
     for pc in reco:
       # processPreCluster ( pc, display=True, displayBefore=False )
       processPreCluster ( pc, display=True, displayBefore=False )
-  elif 1:
+  elif 0:
     # pc = reco.readPreCluster( 0, 0, 44)
     pc = reco.readPreCluster( 0, 7, 319)
     # Fig JDL 2022
     pc = reco.readPreCluster( 0, 0, 673)
+    processPreCluster ( pc, display=True, displayBefore=True )
+  elif 1:
+    # Fig JDL 2022
+    pc = reco.readPreCluster( 0, 4, 153)
     processPreCluster ( pc, display=True, displayBefore=True )
   else :
     # pc = reco.readPreCluster( 0, 1, 757)
