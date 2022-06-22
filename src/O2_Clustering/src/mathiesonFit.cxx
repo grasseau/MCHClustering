@@ -1,6 +1,6 @@
 // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
-// See https://alice-o2.web.cern.ch/copyright for details of the copyright
-// holders. All rights not expressly granted are reserved.
+// See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
+// All rights not expressly granted are reserved.
 //
 // This software is distributed under the terms of the GNU General Public
 // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
@@ -19,30 +19,31 @@
 
 using namespace o2::mch;
 
-int f_ChargeIntegral(const gsl_vector *gslParams, void *dataFit,
-                     gsl_vector *residuals) {
-  funcDescription_t *dataPtr = (funcDescription_t *)dataFit;
+int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
+                     gsl_vector* residuals)
+{
+  funcDescription_t* dataPtr = (funcDescription_t*)dataFit;
   int N = dataPtr->N;
   int K = dataPtr->K;
-  const double *x = dataPtr->x_ptr;
-  const double *y = dataPtr->y_ptr;
-  const double *dx = dataPtr->dx_ptr;
-  const double *dy = dataPtr->dy_ptr;
-  const Mask_t *cath = dataPtr->cath_ptr;
-  const double *zObs = dataPtr->zObs_ptr;
-  Mask_t *notSaturated = dataPtr->notSaturated_ptr;
+  const double* x = dataPtr->x_ptr;
+  const double* y = dataPtr->y_ptr;
+  const double* dx = dataPtr->dx_ptr;
+  const double* dy = dataPtr->dy_ptr;
+  const Mask_t* cath = dataPtr->cath_ptr;
+  const double* zObs = dataPtr->zObs_ptr;
+  Mask_t* notSaturated = dataPtr->notSaturated_ptr;
   int chamberId = dataPtr->chamberId;
-  double *cathWeights = dataPtr->cathWeights_ptr;
-  double *cathMax = dataPtr->cathMax_ptr;
-  double *zCathTotalCharge = dataPtr->zCathTotalCharge_ptr;
+  double* cathWeights = dataPtr->cathWeights_ptr;
+  double* cathMax = dataPtr->cathMax_ptr;
+  double* zCathTotalCharge = dataPtr->zCathTotalCharge_ptr;
   // ??? int verbose = dataPtr->verbose;
   // Parameters
-  const double *params = gsl_vector_const_ptr(gslParams, 0);
+  const double* params = gsl_vector_const_ptr(gslParams, 0);
   // Note:
   //  mux = mu[0:K-1]
   //  muy = mu[K:2K-1]
-  const double *mu = &params[0];
-  double *w = (double *)&params[2 * K];
+  const double* mu = &params[0];
+  double* w = (double*)&params[2 * K];
 
   // Set constrain: sum_(w_k) = 1
   double lastW = 1.0 - vectorSum(w, K - 1);
@@ -66,10 +67,10 @@ int f_ChargeIntegral(const gsl_vector *gslParams, void *dataFit,
   double zTmp[N];
   //
   double xyInfSup[4 * N];
-  double *xInf = getXInf(xyInfSup, N);
-  double *xSup = getXSup(xyInfSup, N);
-  double *yInf = getYInf(xyInfSup, N);
-  double *ySup = getYSup(xyInfSup, N);
+  double* xInf = getXInf(xyInfSup, N);
+  double* xSup = getXSup(xyInfSup, N);
+  double* yInf = getYInf(xyInfSup, N);
+  double* ySup = getYSup(xyInfSup, N);
 
   // Compute the pads charge considering the
   // Mathieson set w_k, mu_x, mu_y
@@ -136,6 +137,7 @@ int f_ChargeIntegral(const gsl_vector *gslParams, void *dataFit,
   // Perform the normalization
   for (int i = 0; i < N; i++) {
     z[i] = z[i] * coefNorm[cath[i]];
+    // To have traces about the fitting
     chargePerCath[cath[i]] += z[i];
   }
   //
@@ -145,9 +147,10 @@ int f_ChargeIntegral(const gsl_vector *gslParams, void *dataFit,
   //
 
   if (ClusterConfig::fittingLog >= ClusterConfig::debug) {
-    printf("    Max of unsaturated (observed) pads (cathMax0/1)= %f, %f, "
-           "maxThZ (computed)  %f, %f\n",
-           cathMax[0], cathMax[1], maxThZ[0], maxThZ[1]);
+    printf(
+      "    Max of unsaturated (observed) pads (cathMax0/1)= %f, %f, "
+      "maxThZ (computed)  %f, %f\n",
+      cathMax[0], cathMax[1], maxThZ[0], maxThZ[1]);
   }
   //
   // Cathode Penalization
@@ -156,8 +159,8 @@ int f_ChargeIntegral(const gsl_vector *gslParams, void *dataFit,
   // Tested but Not used
   double cathPenal = 0;
   if (ClusterConfig::fittingLog >= ClusterConfig::debug) {
-    double cathPenal = fabs(zCathTotalCharge[0] - chargePerCath[0]) +
-                       fabs(zCathTotalCharge[1] - chargePerCath[1]);
+    cathPenal = fabs(zCathTotalCharge[0] - chargePerCath[0]) +
+                fabs(zCathTotalCharge[1] - chargePerCath[1]);
   }
   //
   // w-Penalization
@@ -217,30 +220,31 @@ int f_ChargeIntegral(const gsl_vector *gslParams, void *dataFit,
 }
 
 // Invalid version
-int f_ChargeIntegral0(const gsl_vector *gslParams, void *dataFit,
-                      gsl_vector *residuals) {
-  funcDescription_t *dataPtr = (funcDescription_t *)dataFit;
+int f_ChargeIntegral0(const gsl_vector* gslParams, void* dataFit,
+                      gsl_vector* residuals)
+{
+  funcDescription_t* dataPtr = (funcDescription_t*)dataFit;
   int N = dataPtr->N;
   int K = dataPtr->K;
-  const double *x = dataPtr->x_ptr;
-  const double *y = dataPtr->y_ptr;
-  const double *dx = dataPtr->dx_ptr;
-  const double *dy = dataPtr->dy_ptr;
-  const Mask_t *cath = dataPtr->cath_ptr;
-  const double *zObs = dataPtr->zObs_ptr;
-  const Mask_t *notSaturated = dataPtr->notSaturated_ptr;
+  const double* x = dataPtr->x_ptr;
+  const double* y = dataPtr->y_ptr;
+  const double* dx = dataPtr->dx_ptr;
+  const double* dy = dataPtr->dy_ptr;
+  const Mask_t* cath = dataPtr->cath_ptr;
+  const double* zObs = dataPtr->zObs_ptr;
+  const Mask_t* notSaturated = dataPtr->notSaturated_ptr;
   int chamberId = dataPtr->chamberId;
-  double *cathWeights = dataPtr->cathWeights_ptr;
-  double *cathMax = dataPtr->cathMax_ptr;
-  double *zCathTotalCharge = dataPtr->zCathTotalCharge_ptr;
+  double* cathWeights = dataPtr->cathWeights_ptr;
+  double* cathMax = dataPtr->cathMax_ptr;
+  double* zCathTotalCharge = dataPtr->zCathTotalCharge_ptr;
   int verbose = dataPtr->verbose;
   // Parameters
-  const double *params = gsl_vector_const_ptr(gslParams, 0);
+  const double* params = gsl_vector_const_ptr(gslParams, 0);
   // Note:
   //  mux = mu[0:K-1]
   //  muy = mu[K:2K-1]
-  const double *mu = &params[0];
-  double *w = (double *)&params[2 * K];
+  const double* mu = &params[0];
+  double* w = (double*)&params[2 * K];
 
   // Set constrain: sum_(w_k) = 1
   // Rewriten ??? w[K-1] = 1.0 - vectorSum( w, K-1 );
@@ -266,10 +270,10 @@ int f_ChargeIntegral0(const gsl_vector *gslParams, void *dataFit,
   // TODO: optimize compute before
   double xyInfSup[4 * N];
   //
-  double *xInf = getXInf(xyInfSup, N);
-  double *xSup = getXSup(xyInfSup, N);
-  double *yInf = getYInf(xyInfSup, N);
-  double *ySup = getYSup(xyInfSup, N);
+  double* xInf = getXInf(xyInfSup, N);
+  double* xSup = getXSup(xyInfSup, N);
+  double* yInf = getYInf(xyInfSup, N);
+  double* ySup = getYSup(xyInfSup, N);
 
   vectorSetZero(z, N);
   for (int k = 0; k < K; k++) {
@@ -354,7 +358,7 @@ int f_ChargeIntegral0(const gsl_vector *gslParams, void *dataFit,
     printf("  non saturated sum zCath0/1 %f %f\n", zCath0, zCath1);
   }
   double cathPenal =
-      fabs(zCathTotalCharge[0] - zCath0) + fabs(zCathTotalCharge[1] - zCath1);
+    fabs(zCathTotalCharge[0] - zCath0) + fabs(zCathTotalCharge[1] - zCath1);
   // ??? vectorAdd( zObs, -1.0, residual );
   // TODO Optimize (elementwise not a good solution)
   for (i = 0; i < N; i++) {
@@ -386,7 +390,8 @@ int f_ChargeIntegral0(const gsl_vector *gslParams, void *dataFit,
   return GSL_SUCCESS;
 }
 
-void printState(int iter, gsl_multifit_fdfsolver *s, int K) {
+void printState(int iter, gsl_multifit_fdfsolver* s, int K)
+{
   printf("  Fitting iter=%3d |f(x)|=%g\n", iter, gsl_blas_dnrm2(s->f));
   printf("    mu (x,y):");
   int k = 0;
@@ -417,11 +422,14 @@ void printState(int iter, gsl_multifit_fdfsolver *s, int K) {
 //  - the intitialization of Mathieson module must be done before
 //  (initMathieson)
 // zCathTotalCharge = sum excludind saturated pads
-namespace o2 {
-namespace mch {
+namespace o2
+{
+namespace mch
+{
 
-void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
-                  double *thetaFinal, double *khi2, double *pError) {
+void fitMathieson(const Pads& iPads, double* thetaInit, int kInit, int mode,
+                  double* thetaFinal, double* khi2, double* pError)
+{
   int status;
 
   // process / mode
@@ -437,16 +445,16 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
   if (ClusterConfig::fittingLog >= ClusterConfig::info) {
     printf("\n> [fitMathieson] Fitting \n");
     printf(
-        "  mode: verbose, doJacobian, computeKhi2, computeStdDev %d %d %d %d\n",
-        verbose, doJacobian, computeKhi2, computeStdDev);
+      "  mode: verbose, doJacobian, computeKhi2, computeStdDev %d %d %d %d\n",
+      verbose, doJacobian, computeKhi2, computeStdDev);
   }
   //
   int N = iPads.getNbrOfPads();
   //
-  double *muAndWi = getMuAndW(thetaInit, kInit);
+  double* muAndWi = getMuAndW(thetaInit, kInit);
   //
   // Check if fitting is possible
-  double *muAndWf = getMuAndW(thetaFinal, kInit);
+  double* muAndWf = getMuAndW(thetaFinal, kInit);
   if (3 * kInit - 1 > N) {
     muAndWf[0] = NAN;
     muAndWf[kInit] = NAN;
@@ -456,7 +464,7 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
 
   funcDescription_t mathiesonData;
   double cathMax[2] = {0.0, 0.0};
-  double *cathWeights;
+  double* cathWeights;
 
   if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
     vectorPrintShort("  iPads.cath", iPads.getCathodes(), N);
@@ -519,8 +527,8 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
     cathWeights[i] = (mathiesonData.cath_ptr[i] == 0) ? zCathTotalCharge[0]
                                                       : zCathTotalCharge[1];
     cathMax[mathiesonData.cath_ptr[i]] = std::fmax(
-        cathMax[mathiesonData.cath_ptr[i]],
-        mathiesonData.notSaturated_ptr[i] * mathiesonData.zObs_ptr[i]);
+      cathMax[mathiesonData.cath_ptr[i]],
+      mathiesonData.notSaturated_ptr[i] * mathiesonData.zObs_ptr[i]);
   }
   if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
     vectorPrintShort("mathiesonData.cath_ptr", mathiesonData.cath_ptr, N);
@@ -551,7 +559,7 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
   for (int k = 0; k < kInit; k++) {
     maxIndex[k] = k;
   }
-  double *w = &muAndWi[2 * kInit];
+  double* w = &muAndWi[2 * kInit];
   std::sort(maxIndex, &maxIndex[kInit],
             [=](int a, int b) { return (w[a] > w[b]); });
 
@@ -579,15 +587,14 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
     gsl_vector_view params0 = gsl_vector_view_array(muAndWTest, 3 * K - 1);
 
     // Fitting method
-    gsl_multifit_fdfsolver *s = gsl_multifit_fdfsolver_alloc(
-        gsl_multifit_fdfsolver_lmsder, N, 3 * K - 1);
+    gsl_multifit_fdfsolver* s = gsl_multifit_fdfsolver_alloc(
+      gsl_multifit_fdfsolver_lmsder, N, 3 * K - 1);
     // associate the fitting mode, the function, and the starting parameters
     gsl_multifit_fdfsolver_set(s, &f, &params0.vector);
 
     if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
       printState(-1, s, K);
     }
-
     // double initialResidual = gsl_blas_dnrm2(s->f);
     double initialResidual = 0.0;
     // Fitting iteration
@@ -646,7 +653,7 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
     }
     double finalResidual = gsl_blas_dnrm2(s->f);
     bool keepInitialTheta =
-        fabs(finalResidual - initialResidual) / initialResidual < 1.0e-1;
+      fabs(finalResidual - initialResidual) / initialResidual < 1.0e-1;
 
     // Khi2
     if (computeKhi2 && (khi2 != nullptr)) {
@@ -689,15 +696,17 @@ void fitMathieson(const Pads &iPads, double *thetaInit, int kInit, int mode,
       muAndWf[3 * kInit - 1] = 1.0 - sumW;
 
       // Parameter error
+      /* Pb Mac compilation
       if (computeStdDev && (pError != nullptr)) { //
         // Covariance matrix an error
-        gsl_matrix *covar = gsl_matrix_alloc(3 * K - 1, 3 * K - 1);
+        gsl_matrix* covar = gsl_matrix_alloc(3 * K - 1, 3 * K - 1);
         gsl_multifit_covar(s->J, 0.0, covar);
         for (int k = 0; k < (3 * K - 1); k++) {
           pError[k] = sqrt(gsl_matrix_get(covar, k, k));
         }
         gsl_matrix_free(covar);
       }
+      */
     }
     if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
       printf("  status parameter error = %s\n", gsl_strerror(status));

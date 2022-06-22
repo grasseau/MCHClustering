@@ -289,7 +289,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   selected = (nbrOfGroups > 1)
   selected = not twoCath
   selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
-
+  selected = (xr.size > nbrHits)
   #
   if display and selected:
     nFigRow = 2; nFigCol = 4
@@ -372,6 +372,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     # EM Final
     thetaEMFinal = PCWrap.collectThetaEMFinal()
     #
+    pEnd = 0
     for p in range(7, -1, -1):
       (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(p)
       if nPix != 0: pEnd = p; break
@@ -491,7 +492,7 @@ if __name__ == "__main__":
   RecoTracks.read()
   
   # All
-  if 0:    
+  if 1:    
     for pc in reco:
       # processPreCluster ( pc, display=True, displayBefore=False )
       processPreCluster ( pc, display=True, displayBefore=False )
@@ -501,8 +502,8 @@ if __name__ == "__main__":
     # Fig JDL 2022
     pc = reco.readPreCluster( 0, 0, 673)
     processPreCluster ( pc, display=True, displayBefore=True )
-  elif 1:
-    # Fig JDL 2022
+  elif 0:
+    # Groups pb
     pc = reco.readPreCluster( 0, 4, 153)
     processPreCluster ( pc, display=True, displayBefore=True )
   else :

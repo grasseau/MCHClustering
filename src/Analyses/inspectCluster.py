@@ -270,8 +270,9 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   drawPlot = display and (nRecoSeeds != nbrHits) and (chId > 6)
   drawPlot = display  and not notSaturated 
   drawPlot = display  and not twoCath
-  drawPlot = display and (nRecoSeeds != nbrHits)
+  drawPlot = display and (nRecoSeeds != nbrHits) 
   drawPlot = display 
+  drawPlot = display and (maxDxMin > 0.07 or maxDyMin > 0.07) 
   #
   """
   if (padCathGrpMax != thetaMaxGrp):
@@ -577,7 +578,7 @@ if __name__ == "__main__":
     # inspectEvent( recoData, 0, mcData, startPCluster=40, display=True, displayBefore=False )
     # inspectEvent( recoData, 0, mcData, startPCluster=5, display=True, displayBefore=True )
     
-  elif 1:
+  elif 0:
     """
     Different number of seeds
     """
@@ -607,6 +608,6 @@ if __name__ == "__main__":
      
   else :
     for ev in range(0, nEvents):
-      emMeasure.append( inspectEvent( recoData, ev, mcData, display=False, displayBefore=False ) )    
+      emMeasure.append( inspectEvent( recoData, ev, mcData, display=True, displayBefore=False ) )    
 
     

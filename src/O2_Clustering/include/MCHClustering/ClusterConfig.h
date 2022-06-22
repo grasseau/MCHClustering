@@ -1,6 +1,6 @@
 // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
-// See https://alice-o2.web.cern.ch/copyright for details of the copyright
-// holders. All rights not expressly granted are reserved.
+// See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
+// All rights not expressly granted are reserved.
 //
 // This software is distributed under the terms of the GNU General Public
 // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
@@ -13,11 +13,13 @@
 /// \brief Clustering and fifting parameters
 /// \author Gilles Grasseau, Subatech
 
-#ifndef ALICEO2_MCH_CLUSTERCONFIG_H_
-#define ALICEO2_MCH_CLUSTERCONFIG_H_
+#ifndef O2_MCH_CLUSTERCONFIG_H_
+#define O2_MCH_CLUSTERCONFIG_H_
 
-namespace o2 {
-namespace mch {
+namespace o2
+{
+namespace mch
+{
 
 typedef int PadIdx_t;   // Pad index type
 typedef short Groups_t; // Groups/sub-cluster type
@@ -26,7 +28,7 @@ typedef short Mask_t;   // To build mask
 struct ClusterConfig {
   // Physical-Numerical parameters
   static constexpr double minChargeOfClusterPerCathode =
-      1.1; // Lowest Charge of a Group
+    1.1; // Lowest Charge of a Group
 
   // Logs
   enum VerboseMode {
@@ -35,14 +37,22 @@ struct ClusterConfig {
     detail = 0x2, ///< Describes in detail
     debug = 0x3   ///< Ful details
   };
-  static constexpr VerboseMode fittingLog = info;
-  static constexpr VerboseMode padMappingLog = info;
-  static constexpr VerboseMode EMLocalMaxLog = info;
+  static constexpr VerboseMode fittingLog = no;
+  static constexpr VerboseMode processingLog = no; // Global
+  static constexpr VerboseMode padMappingLog = no;
+  static constexpr VerboseMode groupsLog = no;
+  static constexpr VerboseMode EMLocalMaxLog = detail;
   static constexpr VerboseMode laplacianLocalMaxLog = no;
   static constexpr VerboseMode inspectModelLog = no;
   // TODO ???
   // Check, Stat
   // Check
+  enum ActivateMode {
+    inactive = 0x0, ///< No activation
+    active = 0x1,   ///< Describe default activation
+  };
+  static constexpr ActivateMode inspectModel = active;
+
   static constexpr bool groupsCheck = true;
   static constexpr bool padMappingCheck = true;
 };
@@ -50,4 +60,4 @@ struct ClusterConfig {
 } // namespace mch
 } // end namespace o2
 
-#endif // ALICEO2_MCH_CLUSTERCONFIG_H_
+#endif // O2_MCH_CLUSTERCONFIG_H_

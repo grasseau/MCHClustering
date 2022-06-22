@@ -1,6 +1,6 @@
 // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
-// See https://alice-o2.web.cern.ch/copyright for details of the copyright
-// holders. All rights not expressly granted are reserved.
+// See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
+// All rights not expressly granted are reserved.
 //
 // This software is distributed under the terms of the GNU General Public
 // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
@@ -24,15 +24,18 @@
 #define VERBOSE 1
 #define CHECK 1
 
-namespace o2 {
-namespace mch {
+namespace o2
+{
+namespace mch
+{
 
-PadIdx_t *Pads::buildFirstNeighbors(double *X, double *Y, double *DX,
-                                    double *DY, int N) {
+PadIdx_t* Pads::buildFirstNeighbors(double* X, double* Y, double* DX,
+                                    double* DY, int N)
+{
   const double eps = epsilonGeometry;
-  PadIdx_t *neighbors = new PadIdx_t[MaxNeighbors * N];
+  PadIdx_t* neighbors = new PadIdx_t[MaxNeighbors * N];
   for (PadIdx_t i = 0; i < N; i++) {
-    PadIdx_t *i_neigh = getNeighborListOf(neighbors, i);
+    PadIdx_t* i_neigh = getNeighborListOf(neighbors, i);
     // Search neighbors of i
     for (PadIdx_t j = 0; j < N; j++) {
 
@@ -58,30 +61,36 @@ PadIdx_t *Pads::buildFirstNeighbors(double *X, double *Y, double *DX,
   }
   return neighbors;
 }
-// Build the K-neighbor list
-PadIdx_t *Pads::buildKFirstsNeighbors(int kernelSize) {
+// Build the K-neighbors list
+PadIdx_t* Pads::buildKFirstsNeighbors(int kernelSize)
+{
   // kernelSize must be in the interval [0:2]
   const double eps = epsilonGeometry;
-  const double *X = x;
-  const double *Y = y;
-  const double *DX = dx;
-  const double *DY = dy;
+  const double* X = x;
+  const double* Y = y;
+  const double* DX = dx;
+  const double* DY = dy;
   int N = nPads;
   if ((kernelSize < 0) || (kernelSize > 2)) {
     // set to default values
     printf("Warning in getNeighbors : kerneSize overwritten by the default\n");
     kernelSize = 1;
   }
-  PadIdx_t *neighbors_ = new PadIdx_t[MaxNeighbors * N];
+  PadIdx_t* neighbors_ = new PadIdx_t[MaxNeighbors * N];
+  double factor = (2 * kernelSize - 1);
   for (PadIdx_t i = 0; i < N; i++) {
-    PadIdx_t *i_neigh = getNeighborListOf(neighbors_, i);
+    PadIdx_t* i_neigh = getNeighborListOf(neighbors_, i);
+    double xTerm = factor * DX[i] + eps;
+    double yTerm = factor * DY[i] + eps;
     // Search neighbors of i
     for (PadIdx_t j = 0; j < N; j++) {
       int xMask0 =
-          (fabs(X[i] - X[j]) < ((2 * kernelSize - 1) * DX[i] + DX[j] + eps));
-      int yMask0 =
-          (fabs(Y[i] - Y[j]) < ((2 * kernelSize - 1) * DY[i] + DY[j] + eps));
-      if ((xMask0 && yMask0)) {
+        (fabs(X[i] - X[j]) < (xTerm + DX[j]));
+      int yMask0 = 0;
+      if (xMask0) {
+        yMask0 = (fabs(Y[i] - Y[j]) < (yTerm + DY[j]));
+      }
+      if (xMask0 && yMask0) {
         *i_neigh = j;
         i_neigh++;
         // Check
@@ -99,13 +108,16 @@ PadIdx_t *Pads::buildKFirstsNeighbors(int kernelSize) {
       throw std::overflow_error("Not enough allocation");
     }
   }
+
   if (ClusterConfig::padMappingLog >= ClusterConfig::detail) {
-   Pads::printNeighbors(neighbors_, N);
+    Pads::printNeighbors(neighbors_, N);
   }
+
   return neighbors_;
 }
 
-Pads *Pads::addBoundaryPads() {
+Pads* Pads::addBoundaryPads()
+{
   double eps = epsilonGeometry;
   //
   std::vector<double> bX;
@@ -114,10 +126,10 @@ Pads *Pads::addBoundaryPads() {
   std::vector<double> bdY;
   int N = nPads;
   // Build neigbours if required
-  PadIdx_t *neigh = buildFirstNeighbors();
+  PadIdx_t* neigh = buildFirstNeighbors();
   for (int i = 0; i < N; i++) {
     bool east = true, west = true, north = true, south = true;
-    for (const PadIdx_t *neigh_ptr = getTheFirtsNeighborOf(neigh, i);
+    for (const PadIdx_t* neigh_ptr = getTheFirtsNeighborOf(neigh, i);
          *neigh_ptr != -1; neigh_ptr++) {
       PadIdx_t v = *neigh_ptr;
       double xDelta = (x[v] - x[i]);
@@ -165,12 +177,12 @@ Pads *Pads::addBoundaryPads() {
   }
   int nPadToAdd = bX.size();
   int nTotalPads = N + nPadToAdd;
-  if (VERBOSE > 2) {
+  if (ClusterConfig::padMappingLog >= ClusterConfig::detail) {
     printf("nTotalPads=%d, nPads=%d,  nPadToAdd=%d\n", nTotalPads, N,
            nPadToAdd);
   }
-  Pads *padsWithBoundaries = new Pads(nTotalPads, chamberId);
-  Pads *newPads = padsWithBoundaries;
+  Pads* padsWithBoundaries = new Pads(nTotalPads, chamberId);
+  Pads* newPads = padsWithBoundaries;
   for (int i = 0; i < N; i++) {
     newPads->x[i] = x[i];
     newPads->y[i] = y[i];
@@ -191,7 +203,8 @@ Pads *Pads::addBoundaryPads() {
   return padsWithBoundaries;
 }
 
-Pads::Pads(int N, int chId, int mode_) {
+Pads::Pads(int N, int chId, int mode_)
+{
   nPads = N;
   mode = mode_;
   chamberId = chId;
@@ -244,7 +257,8 @@ Pads::Pads( const Pads *pads0, const Pads *pads1) {
 }
 */
 
-Pads::Pads(const Pads &pads, int mode_) {
+Pads::Pads(const Pads& pads, int mode_)
+{
   nPads = pads.nPads;
   mode = mode_;
   chamberId = pads.chamberId;
@@ -257,10 +271,10 @@ Pads::Pads(const Pads &pads, int mode_) {
     memcpy(q, pads.q, sizeof(double) * nPads);
   } else if (mode == xydxdyMode) {
     //  xyInfSupMode ->  xydxdyMode
-    double *xInf = pads.x;
-    double *yInf = pads.y;
-    double *xSup = pads.dx;
-    double *ySup = pads.dy;
+    double* xInf = pads.x;
+    double* yInf = pads.y;
+    double* xSup = pads.dx;
+    double* ySup = pads.dy;
     for (int i = 0; i < nPads; i++) {
       dx[i] = 0.5 * (xSup[i] - xInf[i]);
       dy[i] = 0.5 * (ySup[i] - yInf[i]);
@@ -270,10 +284,10 @@ Pads::Pads(const Pads &pads, int mode_) {
     memcpy(q, pads.q, sizeof(double) * nPads);
   } else {
     // xydxdyMode -> xyInfSupMode
-    double *xInf = x;
-    double *yInf = y;
-    double *xSup = dx;
-    double *ySup = dy;
+    double* xInf = x;
+    double* yInf = y;
+    double* xSup = dx;
+    double* ySup = dy;
     for (int i = 0; i < nPads; i++) {
       xInf[i] = pads.x[i] - pads.dx[i];
       xSup[i] = pads.x[i] + pads.dx[i];
@@ -285,7 +299,8 @@ Pads::Pads(const Pads &pads, int mode_) {
   memcpy(saturate, pads.saturate, sizeof(Mask_t) * nPads);
 }
 
-Pads::Pads(const Pads &pads, const Groups_t *mask) {
+Pads::Pads(const Pads& pads, const Groups_t* mask)
+{
   nPads = vectorSumShort(mask, pads.nPads);
   mode = xydxdyMode;
   chamberId = pads.chamberId;
@@ -318,8 +333,9 @@ xydxdyMode; nPads = nPads_; chamberId = chId; allocate();
 */
 
 // Take the ownership of coordinates (x, y, dx, dy)
-Pads::Pads(double *x_, double *y_, double *dx_, double *dy_, int chId,
-           int nPads_) {
+Pads::Pads(double* x_, double* y_, double* dx_, double* dy_, int chId,
+           int nPads_)
+{
   mode = xydxdyMode;
   nPads = nPads_;
   chamberId = chId;
@@ -333,10 +349,11 @@ Pads::Pads(double *x_, double *y_, double *dx_, double *dy_, int chId,
   neighbors = nullptr;
 }
 
-Pads::Pads(const double *x_, const double *y_, const double *dx_,
-           const double *dy_, const double *q_, const short *cathode,
-           const Mask_t *saturate_, short selectedCath, int chId,
-           PadIdx_t *mapCathPadIdxToPadIdx, int nAllPads) {
+Pads::Pads(const double* x_, const double* y_, const double* dx_,
+           const double* dy_, const double* q_, const short* cathode,
+           const Mask_t* saturate_, short selectedCath, int chId,
+           PadIdx_t* mapCathPadIdxToPadIdx, int nAllPads)
+{
   mode = xydxdyMode;
   int nCathode1 = vectorSumShort(cathode, nAllPads);
   nPads = nCathode1;
@@ -364,7 +381,8 @@ Pads::Pads(const double *x_, const double *y_, const double *dx_,
   totalCharge = qSum;
 }
 
-Pads::Pads(const Pads *pads1, const Pads *pads2, int mode_) {
+Pads::Pads(const Pads* pads1, const Pads* pads2, int mode_)
+{
   // Take Care: pads1 and pads2 must be in xydxdyMode
   int N1 = (pads1 == nullptr) ? 0 : pads1->nPads;
   int N2 = (pads2 == nullptr) ? 0 : pads2->nPads;
@@ -394,10 +412,10 @@ Pads::Pads(const Pads *pads1, const Pads *pads2, int mode_) {
       vectorSetShort(&cath[N1], 1, N2);
     }
   } else {
-    double *xInf = x;
-    double *yInf = y;
-    double *xSup = dx;
-    double *ySup = dy;
+    double* xInf = x;
+    double* yInf = y;
+    double* xSup = dx;
+    double* ySup = dy;
     for (int i = 0; i < N1; i++) {
       xInf[i] = pads1->x[i] - pads1->dx[i];
       xSup[i] = pads1->x[i] + pads1->dx[i];
@@ -419,9 +437,11 @@ Pads::Pads(const Pads *pads1, const Pads *pads2, int mode_) {
   }
 }
 
-void Pads::removePad(int index) {
-  if ((index < 0) || (index >= nPads))
+void Pads::removePad(int index)
+{
+  if ((index < 0) || (index >= nPads)) {
     return;
+  }
   int nItems = nPads - index;
   if (index == nPads - 1) {
     nPads = nPads - 1;
@@ -438,7 +458,8 @@ void Pads::removePad(int index) {
   nPads = nPads - 1;
 }
 
-void Pads::allocate() {
+void Pads::allocate()
+{
   // Note: Must be deallocated/releases if required
   x = nullptr;
   y = nullptr;
@@ -459,9 +480,10 @@ void Pads::allocate() {
 
 void Pads::setCharges(double c) { vectorSet(q, c, nPads); }
 
-void Pads::setCharges(double *q_, int n) { vectorCopy(q_, n, q); }
+void Pads::setCharges(double* q_, int n) { vectorCopy(q_, n, q); }
 
-void Pads::setToZero() {
+void Pads::setToZero()
+{
   for (int i = 0; i < nPads; i++) {
     x[i] = 0.0;
     y[i] = 0.0;
@@ -471,7 +493,8 @@ void Pads::setToZero() {
   }
 }
 
-int Pads::removePads(double qCut) {
+int Pads::removePads(double qCut)
+{
   double qSum = 0.0;
   int k = 0;
   for (int i = 0; i < nPads; i++) {
@@ -490,37 +513,43 @@ int Pads::removePads(double qCut) {
   return k;
 }
 
-void Pads::normalizeCharges() {
+void Pads::normalizeCharges()
+{
   for (int i = 0; i < nPads; i++) {
     q[i] = q[i] / totalCharge;
   }
 }
 
 // Build the neighbor list
-PadIdx_t *Pads::buildFirstNeighbors() {
+PadIdx_t* Pads::buildFirstNeighbors()
+{
   int N = nPads;
-  if (neighbors == nullptr)
+  if (neighbors == nullptr) {
     neighbors = buildFirstNeighbors(x, y, dx, dy, N);
+  }
   return neighbors;
 }
 
-int Pads::addIsolatedPadInGroups(Mask_t *cathToGrp, Mask_t *grpToGrp,
-                                 int nGroups) {
+int Pads::addIsolatedPadInGroups(Mask_t* cathToGrp, Mask_t* grpToGrp,
+                                 int nGroups)
+{
   int nNewGroups = 0;
-  if (nPads == 0)
+  if (nPads == 0) {
     return nGroups;
-  if (VERBOSE > 1) {
+  }
+
+  if (ClusterConfig::padMappingLog >= ClusterConfig::detail) {
     printf("[addIsolatedPadInGroups]  nGroups=%d\n", nGroups);
     vectorPrintShort("  cathToGrp input", cathToGrp, nPads);
   }
-  PadIdx_t *neigh = buildFirstNeighbors();
+  PadIdx_t* neigh = buildFirstNeighbors();
 
   for (int p = 0; p < nPads; p++) {
     if (cathToGrp[p] == 0) {
       // Neighbors
       //
       int q = -1;
-      for (PadIdx_t *neigh_ptr = getNeighborListOf(neigh, p); *neigh_ptr != -1;
+      for (PadIdx_t* neigh_ptr = getNeighborListOf(neigh, p); *neigh_ptr != -1;
            neigh_ptr++) {
         q = *neigh_ptr;
         // printf("  Neigh of %d: %d\n", p, q);
@@ -565,7 +594,8 @@ int Pads::addIsolatedPadInGroups(Mask_t *cathToGrp, Mask_t *grpToGrp,
     // Terminal Grp :  gBar = grpToGrp[gBar]
     grpToGrp[g] = gBar;
   }
-  if (VERBOSE > 2) {
+
+  if (ClusterConfig::padMappingLog >= ClusterConfig::debug) {
     printf("  grpToGrp\n");
     for (int g = 0; g < (nGroups + 1); g++) {
       printf("  %d -> %d\n", g, grpToGrp[g]);
@@ -581,7 +611,8 @@ int Pads::addIsolatedPadInGroups(Mask_t *cathToGrp, Mask_t *grpToGrp,
   return nNewGroups;
 }
 
-void Pads::release() {
+void Pads::release()
+{
   if (x != nullptr) {
     delete[] x;
     x = nullptr;
@@ -611,10 +642,12 @@ void Pads::release() {
     delete[] saturate;
     saturate = nullptr;
   }
+  deleteInt(neighbors);
   nPads = 0;
 }
 
-Pads *Pads::refinePads() {
+Pads* Pads::refinePads()
+{
   int N = nPads;
   /* qCut : not used
   // Count pad such as q > 4 * pixCutOf
@@ -629,11 +662,11 @@ Pads *Pads::refinePads() {
   double cut = -1;
   int count = N;
   //
-  if (VERBOSE > 0) {
+  if (ClusterConfig::padMappingLog >= ClusterConfig::detail) {
     vectorPrint("Pads::refinePads", q, N);
     printf("Pads::refinePads count(new nPads)=%d\n", count);
   }
-  Pads *rPads = new Pads(count * 4, chamberId);
+  Pads* rPads = new Pads(count * 4, chamberId);
   int k = 0;
   for (int i = 0; i < N; i++) {
     if (q[i] > cut) {
@@ -677,7 +710,161 @@ Pads *Pads::refinePads() {
   return rPads;
 }
 
-Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
+Pads* Pads::extractLocalMax()
+{
+  // Option extractLocalMax
+  //   - true: extraxt local maxima
+  //   - false: filter pixels arround the maxima
+  if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
+    printf("  - extractLocalMax (extractLocalMax nPads=%d)\n",
+           nPads);
+  }
+  double qMax = vectorMax(q, nPads);
+  //
+  // Compute the neighbors once
+  if (neighbors == nullptr) {
+    // Kernel size of 1
+    neighbors = buildKFirstsNeighbors(1);
+  }
+  PadIdx_t* neigh = neighbors;
+  //
+  // Result of the Laplacian-like operator
+  double morphLaplacian[nPads];
+  double laplacian[nPads];
+  double weight[nPads];
+  vectorSet(morphLaplacian, -1.0, nPads);
+  Mask_t alreadyDone[nPads];
+  vectorSetZeroShort(alreadyDone, nPads);
+  std::vector<PadIdx_t> newPixelIdx;
+  bool less;
+  for (int i = 0; i < nPads; i++) {
+    if (alreadyDone[i] == 0) {
+      int nLess = 0;
+      int count = 0;
+      laplacian[i] = 0.0;
+      weight[i] = 0.0;
+      for (PadIdx_t* neigh_ptr = getNeighborListOf(neigh, i); *neigh_ptr != -1;
+           neigh_ptr++) {
+        PadIdx_t v = *neigh_ptr;
+        // Morphologic Laplacian
+        // nLess += (q[v] < q[i]);
+        less = (q[v] <= q[i]);
+        count++;
+        if (less) {
+          nLess++;
+          // Laplacian
+          double cst;
+          cst = (i == v) ? 1.0 : -0.125;
+          laplacian[i] += cst * q[v];
+          weight[i] += q[v];
+        }
+      }
+      // Invalid ?? morphLaplacian[i] = double(nLess) / (count - 1);
+      morphLaplacian[i] = double(nLess) / count;
+      //
+      if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
+        printf(
+          "    Laplacian i=%d, x[i]=%6.3f, y[i]=%6.3f, z[i]=%6.3f, count=%d, "
+          "morphLapl[i]=%6.3f, lapl[i]=%6.3f, weight[i]=%6.3f\n",
+          i, x[i], y[i], q[i], count, morphLaplacian[i], laplacian[i],
+          weight[i]);
+      }
+      if (morphLaplacian[i] >= 1.0) {
+          //  Local max charge must be higher than 1.5 % of the max and
+          //  the curvature must be greater than 50% of the peak
+          // Inv ??? if ((q[i] > 0.015 * qMax) || (fabs(laplacian[i]) > (0.5 * q[i]))) {
+          if (q[i] > 0.015 * qMax) {
+            newPixelIdx.push_back(i);
+            if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
+              printf(
+                "    Laplacian i=%d, x[i]=%6.3f, y[i]=%6.3f, z[i]=%6.3f, "
+                "count=%d, morphLapl[i]=%6.3f, lapl[i]=%6.3f, weight[i]=%6.3f",
+                i, x[i], y[i], q[i], count, morphLaplacian[i], laplacian[i],
+                weight[i]);
+              printf("  Selected %d\n", i);
+            }
+          }
+          // Invalid the neihbors
+          // they can't be a maximun
+          for (PadIdx_t* neigh_ptr = getNeighborListOf(neigh, i); *neigh_ptr != -1;
+           neigh_ptr++) {
+             PadIdx_t v = *neigh_ptr;
+            alreadyDone[v] = 1;
+          }
+      }
+    }
+  }
+  // Extract the new selected pixels
+  int nNewPixels = newPixelIdx.size();
+  Pads* newPixels = new Pads(nNewPixels, chamberId);
+  for (int i = 0; i < nNewPixels; i++) {
+    newPixels->x[i] = x[newPixelIdx[i]];
+    newPixels->y[i] = y[newPixelIdx[i]];
+    newPixels->dx[i] = dx[newPixelIdx[i]];
+    newPixels->dy[i] = dy[newPixelIdx[i]];
+    newPixels->q[i] = q[newPixelIdx[i]];
+  }
+  Pads* localMax = nullptr;
+  // Suppress local max. whose charge is less of 1%
+  // of the max charge of local Max
+  double cutRatio = 0.01;
+  double qCut = cutRatio * vectorMax(newPixels->q, newPixels->nPads);
+  //
+  // Refine the charge and coordinates of the local max.
+  //
+  // ??? TODO:  suppress te refinment to optimize
+  localMax = new Pads(nNewPixels, chamberId);
+  localMax->setToZero();
+  // Sort local max by charge value
+  int index[nNewPixels];
+  for (int k = 0; k < nNewPixels; k++) {
+    index[k] = k;
+  }
+  std::sort(index, &index[nNewPixels], [=](int a, int b) {
+    return (newPixels->q[a] > newPixels->q[b]);
+  });
+  /// ???? delete[] neigh;
+  neigh = newPixels->buildKFirstsNeighbors(1);
+  // Avoid taking the same charge for 2 different localMax
+  Mask_t mask[nNewPixels];
+  vectorSetShort(mask, 1, nNewPixels);
+  int kSelected = 0;
+  for (int k = 0; k < nNewPixels; k++) {
+    if (mask[k] == 1) {
+      // Compute the barycenter
+      for (PadIdx_t* neigh_ptr = getNeighborListOf(neigh, k);
+           *neigh_ptr != -1; neigh_ptr++) {
+        PadIdx_t v = *neigh_ptr;
+        localMax->q[k] += newPixels->q[v] * mask[v];
+        localMax->x[k] += newPixels->x[v] * newPixels->q[v] * mask[v];
+        localMax->y[k] += newPixels->y[v] * newPixels->q[v] * mask[v];
+        mask[v] = 0;
+      }
+      // Select (or not) the local Max
+      if (localMax->q[k] > qCut) {
+        localMax->q[kSelected] = localMax->q[k];
+        localMax->x[kSelected] = localMax->x[k] / localMax->q[k];
+        localMax->y[kSelected] = localMax->y[k] / localMax->q[k];
+        localMax->dx[kSelected] = newPixels->dx[k];
+        localMax->dy[kSelected] = newPixels->dy[k];
+        if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
+          printf("  add a seed q=%9.4f, (x,y) = (%9.4f, %9.4f)\n",
+                 localMax->q[k], localMax->x[k], localMax->q[k]);
+        }
+        kSelected++;
+      }
+    }
+  }
+  localMax->nPads = kSelected;
+
+  delete [] neigh;
+  delete newPixels;
+
+  return localMax;
+}
+
+Pads* Pads::clipOnLocalMax(bool extractLocalMax)
+{
   // Option extractLocalMax
   //   - true: extraxt local maxima
   //   - false: filter pixels arround the maxima
@@ -690,12 +877,14 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
   double relativeNoise = 0.00;
   double qMax = vectorMax(q, nPads);
   double cutoff;
-  PadIdx_t *neigh;
-  if (extractLocalMax) {
-    neigh = buildKFirstsNeighbors(1);
-  } else {
-    neigh = buildKFirstsNeighbors(2);
+  // Compute the neighbors once
+  if ((neighbors == nullptr) && extractLocalMax) {
+    // Kernel size of 1
+    neighbors = buildKFirstsNeighbors(1);
+  } else if (neighbors == nullptr) {
+    neighbors = buildKFirstsNeighbors(2);
   }
+  PadIdx_t* neigh = neighbors;
   //
   // Result of the Laplacian-like operator
   double morphLaplacian[nPads];
@@ -711,7 +900,7 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
     laplacian[i] = 0.0;
     weight[i] = 0.0;
     cutoff = relativeNoise * q[i];
-    for (PadIdx_t *neigh_ptr = getNeighborListOf(neigh, i); *neigh_ptr != -1;
+    for (PadIdx_t* neigh_ptr = getNeighborListOf(neigh, i); *neigh_ptr != -1;
          neigh_ptr++) {
       PadIdx_t v = *neigh_ptr;
       // Morphologic Laplacian
@@ -726,10 +915,11 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
     morphLaplacian[i] = double(nLess) / (count - 1);
     //
     if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
-      printf("  Laplacian i=%d, x[i]=%6.3f, y[i]=%6.3f, z[i]=%6.3f, count=%d, "
-             "morphLapl[i]=%6.3f, lapl[i]=%6.3f, weight[i]=%6.3f\n",
-             i, x[i], y[i], q[i], count, morphLaplacian[i], laplacian[i],
-             weight[i]);
+      printf(
+        "  Laplacian i=%d, x[i]=%6.3f, y[i]=%6.3f, z[i]=%6.3f, count=%d, "
+        "morphLapl[i]=%6.3f, lapl[i]=%6.3f, weight[i]=%6.3f\n",
+        i, x[i], y[i], q[i], count, morphLaplacian[i], laplacian[i],
+        weight[i]);
     }
     if (morphLaplacian[i] >= 1.0) {
       if (extractLocalMax) {
@@ -739,10 +929,10 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
           newPixelIdx.push_back(i);
           if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
             printf(
-                "  Laplacian i=%d, x[i]=%6.3f, y[i]=%6.3f, z[i]=%6.3f, "
-                "count=%d, morphLapl[i]=%6.3f, lapl[i]=%6.3f, weight[i]=%6.3f",
-                i, x[i], y[i], q[i], count, morphLaplacian[i], laplacian[i],
-                weight[i]);
+              "  Laplacian i=%d, x[i]=%6.3f, y[i]=%6.3f, z[i]=%6.3f, "
+              "count=%d, morphLapl[i]=%6.3f, lapl[i]=%6.3f, weight[i]=%6.3f",
+              i, x[i], y[i], q[i], count, morphLaplacian[i], laplacian[i],
+              weight[i]);
             printf("  Selected %d\n", i);
           }
         }
@@ -751,24 +941,26 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
         if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
           printf("  Selected neighbors of i=%d: ", i);
         }
-        for (PadIdx_t *neigh_ptr = getNeighborListOf(neigh, i);
+        for (PadIdx_t* neigh_ptr = getNeighborListOf(neigh, i);
              *neigh_ptr != -1; neigh_ptr++) {
           PadIdx_t v = *neigh_ptr;
           if (alreadySelect[v] == 0) {
             alreadySelect[v] = 1;
             newPixelIdx.push_back(v);
-            if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail)
+            if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
               printf("%d, ", v);
+            }
           }
         }
-        if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail)
+        if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
           printf("\n");
+        }
       }
     }
   }
   // Extract the new selected pixels
   int nNewPixels = newPixelIdx.size();
-  Pads *newPixels = new Pads(nNewPixels, chamberId);
+  Pads* newPixels = new Pads(nNewPixels, chamberId);
   for (int i = 0; i < nNewPixels; i++) {
     newPixels->x[i] = x[newPixelIdx[i]];
     newPixels->y[i] = y[newPixelIdx[i]];
@@ -776,7 +968,7 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
     newPixels->dy[i] = dy[newPixelIdx[i]];
     newPixels->q[i] = q[newPixelIdx[i]];
   }
-  Pads *localMax = nullptr;
+  Pads* localMax = nullptr;
   if (extractLocalMax) {
     // Suppress local max. whose charge is less of 1% of the max charge of local
     // Max
@@ -796,7 +988,7 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
     std::sort(index, &index[nNewPixels], [=](int a, int b) {
       return (newPixels->q[a] > newPixels->q[b]);
     });
-    delete[] neigh;
+    /// ???? delete[] neigh;
     neigh = newPixels->buildKFirstsNeighbors(1);
     // Avoid taking the same charge for 2 different localMax
     Mask_t mask[nNewPixels];
@@ -804,7 +996,7 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
     int kSelected = 0;
     for (int k = 0; k < nNewPixels; k++) {
       if (mask[k] == 1) {
-        for (PadIdx_t *neigh_ptr = getNeighborListOf(neigh, k);
+        for (PadIdx_t* neigh_ptr = getNeighborListOf(neigh, k);
              *neigh_ptr != -1; neigh_ptr++) {
           PadIdx_t v = *neigh_ptr;
           localMax->q[k] += newPixels->q[v] * mask[v];
@@ -837,11 +1029,12 @@ Pads *Pads::clipOnLocalMax(bool extractLocalMax) {
   }
 }
 
-void Pads::printNeighbors(const PadIdx_t *neigh, int N) {
+void Pads::printNeighbors(const PadIdx_t* neigh, int N)
+{
   printf("Neighbors %d\n", N);
   for (int i = 0; i < N; i++) {
     printf("  neigh of i=%2d: ", i);
-    for (const PadIdx_t *neigh_ptr = getNeighborListOf(neigh, i);
+    for (const PadIdx_t* neigh_ptr = getNeighborListOf(neigh, i);
          *neigh_ptr != -1; neigh_ptr++) {
       PadIdx_t j = *neigh_ptr;
       printf("%d, ", j);
@@ -850,7 +1043,8 @@ void Pads::printNeighbors(const PadIdx_t *neigh, int N) {
   }
 }
 
-void Pads::printPads(const char *title, const Pads &pads) {
+void Pads::printPads(const char* title, const Pads& pads)
+{
   printf("%s\n", title);
   if (pads.mode == xydxdyMode) {
     for (int i = 0; i < pads.nPads; i++) {

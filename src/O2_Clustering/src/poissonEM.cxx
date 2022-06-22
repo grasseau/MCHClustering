@@ -1,6 +1,6 @@
 // Copyright 2019-2020 CERN and copyright holders of ALICE O2.
-// See https://alice-o2.web.cern.ch/copyright for details of the copyright
-// holders. All rights not expressly granted are reserved.
+// See https://alice-o2.web.cern.ch/copyright for details of the copyright holders.
+// All rights not expressly granted are reserved.
 //
 // This software is distributed under the terms of the GNU General Public
 // License v3 (GPL Version 3), copied verbatim in the file "COPYING".
@@ -14,6 +14,7 @@
 
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_vector.h>
+#include <gsl/gsl_matrix.h>
 
 #include "MCHClustering/ClusterConfig.h"
 #include "MCHClustering/PadsPEM.h"
@@ -27,13 +28,16 @@
 static int nIterMin = 10;
 static int nIterMax = 400;
 
-namespace o2 {
-namespace mch {
+namespace o2
+{
+namespace mch
+{
 
-void iterateEMPoisson(const double *Cij, const double *Ci,
-                      const Mask_t *maskCij, const double *qPixels,
-                      const double *qPad, double *qPadPrediction, int nPixels,
-                      int nPads, double *newQPixels) {
+void iterateEMPoisson(const double* Cij, const double* Ci,
+                      const Mask_t* maskCij, const double* qPixels,
+                      const double* qPad, double* qPadPrediction, int nPixels,
+                      int nPads, double* newQPixels)
+{
 
   double residu = 0.0;
 
@@ -43,7 +47,7 @@ void iterateEMPoisson(const double *Cij, const double *Ci,
     qPadPrediction[j] = 0;
     for (int i = 0; i < nPixels; i++) {
       qPadPrediction[j] +=
-          maskCij[nPads * i + j] * Cij[nPads * i + j] * qPixels[i];
+        maskCij[nPads * i + j] * Cij[nPads * i + j] * qPixels[i];
     }
     // Prevent  zero division
     if (qPadPrediction[j] < 1.0e-6) {
@@ -76,13 +80,14 @@ void iterateEMPoisson(const double *Cij, const double *Ci,
   }
 }
 
-void fastIterateEMPoisson(const double *Cij, const double *Ci,
-                          const double *qPixels, const double *qPad,
-                          double *qPadPrediction, int nPixels, int nPads,
-                          double *newQPixels) {
+void fastIterateEMPoisson(const double* Cij, const double* Ci,
+                          const double* qPixels, const double* qPad,
+                          double* qPadPrediction, int nPixels, int nPads,
+                          double* newQPixels)
+{
 
   double residu = 0.0;
-  double *qRatio = new double[nPads];
+  double* qRatio = new double[nPads];
 
   // Compute charge prediction on pad j based on pixel charges
   //  qPadPrediction[j] = Sum_i{ Cij[i,j].qPixels[i] }
@@ -125,15 +130,105 @@ void fastIterateEMPoisson(const double *Cij, const double *Ci,
       newQPixels[i] = 0;
     }
   }
-  delete qRatio;
+  delete[] qRatio;
 }
 
-double computeChiSquare(const Pads &pads, const double *qPredictedPads,
-                        int iStart, int iEnd) {
+void fastIterateEMPoissonV1(const double* Cij, const double* Ci,
+                            const double* qPixels, const double* qPad,
+                            double* qPadPrediction, int nPixels, int nPads,
+                            double* newQPixels)
+{
+
+  double residu = 0.0;
+  double* qRatio = new double[nPads];
+
+  // Compute charge prediction on pad j based on pixel charges
+  //  qPadPrediction[j] = Sum_i{ Cij[i,j].qPixels[i] }
+  gsl_matrix_const_view Cij_gsl = gsl_matrix_const_view_array(Cij, nPixels, nPads);
+  gsl_vector_const_view qPixels_gsl = gsl_vector_const_view_array(qPixels, nPixels);
+  gsl_vector_view qPadPrediction_gsl = gsl_vector_view_array(qPadPrediction, nPads);
+
+  gsl_blas_dgemv(CblasTrans, 1.0, &Cij_gsl.matrix, &qPixels_gsl.vector, 0.0, &qPadPrediction_gsl.vector);
+  for (int j = 0; j < nPads; j++) {
+    // Prevent division by zero
+    if (qPadPrediction[j] < 1.0e-10) {
+      qPadPrediction[j] = qPadPrediction[j] + 1.0e-10;
+    }
+    qRatio[j] = qPad[j] / qPadPrediction[j];
+    residu += fabs(qPadPrediction[j] - qPad[j]);
+  }
+
+  // Update the pixel charge qPixels with the
+  // the new predicted charges qPadPrediction
+  // qPixels[i] = qPixels[i] / Ci[i] * Sum_j { Cij[i,j]*qPad[j] /
+  // qPadPrediction[j] }
+  gsl_vector_view qRatio_gsl = gsl_vector_view_array(qRatio, nPads);
+  gsl_vector_view newQPixels_gsl = gsl_vector_view_array(newQPixels, nPixels);
+  if (1) {
+  gsl_blas_dgemv(CblasNoTrans, 1.0, &Cij_gsl.matrix, &qRatio_gsl.vector, 0.0, &newQPixels_gsl.vector);
+
+  for (int i = 0; i < nPixels; i++) {
+    if (Ci[i] > 1.0e-10) {
+      newQPixels[i] = newQPixels[i] * qPixels[i] / Ci[i];
+    } else {
+      newQPixels[i] = 0;
+    }
+  }
+  } else if(0) {
+  for (int i = 0; i < nPixels; i++) {
+    // Normalization term
+    // r = np.sum( Cij[:,j]*qPad[0:nPads] / qPadPrediction[0:nPads] )
+    double s_i = 0;
+    newQPixels[i] = 0.;
+    for (int j = 0; j < nPads; j++) {
+       s_i = s_i + Cij[nPads * i + j] * qRatio[j];
+    }
+    if (Ci[i] > 1.0e-10) {
+      newQPixels[i] = s_i * qPixels[i] / Ci[i];
+    } else {
+      newQPixels[i] = 0;
+    }
+  }
+  } else  {
+  for (int i = 0; i < nPixels; i++) {
+    // Normalization term
+    // r = np.sum( Cij[:,j]*qPad[0:nPads] / qPadPrediction[0:nPads] )
+    double s_i = 0;
+    // newQPixels[i] = 0.;
+
+      for (int j = 0; j < nPads; j++) {
+         s_i = s_i + Cij[nPads * i + j] * qRatio[j];
+      }
+      if (Ci[i] > 1.0e-10) {
+        newQPixels[i] = s_i * qPixels[i] / Ci[i];
+      } else {
+      newQPixels[i] = 0;
+    }
+
+    /*
+    double s_i = 0;
+    if (Ci[i] > 1.0e-10) {
+      for (int j = 0; j < nPads; j++) {
+        s_i += Cij[nPads * i + j] * qRatio[j];
+      }
+      newQPixels[i] = s_i * qPixels[i] / Ci[i];
+    } else {
+      newQPixels[i] = 0;
+    }
+     */
+  }
+  }
+
+  delete[] qRatio;
+}
+
+double computeChiSquare(const Pads& pads, const double* qPredictedPads,
+                        int iStart, int iEnd)
+{
   // Compute Chi2 on unsaturated pads
   double chi2 = 0.0;
-  const double *q = pads.getCharges();
-  const Mask_t *sat = pads.getSaturates();
+  const double* q = pads.getCharges();
+  const Mask_t* sat = pads.getSaturates();
   for (int i = iStart; i < iEnd; i++) {
     double var = (1 - sat[i]) * (q[i] - qPredictedPads[i]);
     chi2 += var * var;
@@ -141,10 +236,11 @@ double computeChiSquare(const Pads &pads, const double *qPredictedPads,
   return chi2;
 }
 
-std::pair<double, double> PoissonEMLoop(const Pads &pads, Pads &pixels,
-                                        const double *Cij, Mask_t *maskCij,
+std::pair<double, double> PoissonEMLoop(const Pads& pads, Pads& pixels,
+                                        const double* Cij, Mask_t* maskCij,
                                         int qCutMode, double minPadResidu,
-                                        int nItMax, int n0) {
+                                        int nItMax, int n0)
+{
   // The array pixels return the last state
   //
   // Init.
@@ -152,14 +248,14 @@ std::pair<double, double> PoissonEMLoop(const Pads &pads, Pads &pixels,
   int nPads = pads.getNbrOfPads();
   int nPixels = pixels.getNbrOfPads();
   //
-  const double *x = pixels.getX();
-  const double *y = pixels.getY();
-  const double *dx = pixels.getDX();
-  const double *dy = pixels.getDY();
-  double *qPixels = new double[pixels.getNbrOfPads()];
+  const double* x = pixels.getX();
+  const double* y = pixels.getY();
+  const double* dx = pixels.getDX();
+  const double* dy = pixels.getDY();
+  double* qPixels = new double[pixels.getNbrOfPads()];
   vectorCopy(pixels.getCharges(), pixels.getNbrOfPads(), qPixels);
   //
-  const double *qPads = pads.getCharges();
+  const double* qPads = pads.getCharges();
   //
   // MaskCij: Used to disable Cij contribution (disable pixels)
   vectorSetShort(maskCij, 1, nPads * nPixels);
@@ -173,8 +269,9 @@ std::pair<double, double> PoissonEMLoop(const Pads &pads, Pads &pixels,
   int it = 0;
   if (ClusterConfig::EMLocalMaxLog > ClusterConfig::detail) {
     printf("Poisson EM\n");
-    printf("   it.  <Pixels_residu>   <Pad_residu>   max(Pad_residu)   "
-           "sum(Pad_residu)/sum(qPad)\n");
+    printf(
+      "   it.  <Pixels_residu>   <Pad_residu>   max(Pad_residu)   "
+      "sum(Pad_residu)/sum(qPad)\n");
   }
   double meanPixelsResidu = 0.0;
   double maxPixelsResidu = 0.0;
@@ -255,10 +352,11 @@ std::pair<double, double> PoissonEMLoop(const Pads &pads, Pads &pixels,
 
     } else {
     */
-
     // iterateEMPoisson( Cij, Ci, maskCij, qPixels, qPads, qPadPrediction,
     // nPixels, nPads, qPixels);
-    fastIterateEMPoisson(Cij, Ci, qPixels, qPads, qPadPrediction, nPixels,
+    // fastIterateEMPoisson(Cij, Ci, qPixels, qPads, qPadPrediction, nPixels,
+    //                     nPads, qPixels);
+    fastIterateEMPoisson(Cij, Ci, previousQPixels, qPads, qPadPrediction, nPixels,
                          nPads, qPixels);
     // }
 
