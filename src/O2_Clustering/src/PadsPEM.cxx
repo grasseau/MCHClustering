@@ -199,6 +199,7 @@ Pads* Pads::addBoundaryPads()
     newPads->q[i] = 0.0;
     newPads->saturate[i] = 0;
   }
+  newPads->totalCharge = totalCharge;
   //
   return padsWithBoundaries;
 }
@@ -262,6 +263,7 @@ Pads::Pads(const Pads& pads, int mode_)
   nPads = pads.nPads;
   mode = mode_;
   chamberId = pads.chamberId;
+  totalCharge = pads.totalCharge;
   allocate();
   if (mode == pads.mode) {
     memcpy(x, pads.x, sizeof(double) * nPads);
@@ -299,7 +301,7 @@ Pads::Pads(const Pads& pads, int mode_)
   memcpy(saturate, pads.saturate, sizeof(Mask_t) * nPads);
 }
 
-Pads::Pads(const Pads& pads, const Groups_t* mask)
+Pads::Pads(const Pads& pads, const Mask_t* mask)
 {
   nPads = vectorSumShort(mask, pads.nPads);
   mode = xydxdyMode;
@@ -314,6 +316,7 @@ Pads::Pads(const Pads& pads, const Groups_t* mask)
   if (pads.saturate) {
     vectorGatherShort(pads.saturate, mask, pads.nPads, saturate);
   }
+  totalCharge = vectorSum( q, nPads);
 }
 
 /* Old version: Unused
@@ -347,6 +350,7 @@ Pads::Pads(double* x_, double* y_, double* dx_, double* dy_, int chId,
   // Set null Charge
   vectorSetZero(q, nPads);
   neighbors = nullptr;
+  totalCharge = 0;
 }
 
 Pads::Pads(const double* x_, const double* y_, const double* dx_,
@@ -381,6 +385,33 @@ Pads::Pads(const double* x_, const double* y_, const double* dx_,
   totalCharge = qSum;
 }
 
+Pads::Pads(const double* x_, const double* y_, const double* dx_,
+           const double* dy_, const double* q_, const short* cathode,
+           const Mask_t* saturate_, int chId, int nAllPads)
+{
+  mode = xydxdyMode;
+  // int nCathode1 = vectorSumShort(cathode, nAllPads);
+  nPads = nAllPads;
+  /*
+  if (selectedCath == 0) {
+    nPads = nAllPads - nCathode1;
+  }
+  */
+  chamberId = chId;
+  allocate();
+  double qSum = 0;
+  // Copy
+  vectorCopy( x_, nPads, x);
+  vectorCopy( y_, nPads, y);
+  vectorCopy( dx_, nPads, dx);
+  vectorCopy( dy_, nPads, dy);
+  vectorCopy( q_, nPads, q);
+  vectorCopyShort( cathode, nPads, cath);
+  vectorCopyShort( saturate_, nPads, saturate);
+  totalCharge = vectorSum(q, nPads);
+}
+
+// Concatenate pads
 Pads::Pads(const Pads* pads1, const Pads* pads2, int mode_)
 {
   // Take Care: pads1 and pads2 must be in xydxdyMode
@@ -435,6 +466,7 @@ Pads::Pads(const Pads* pads1, const Pads* pads2, int mode_)
       cath[i + N1] = 1;
     }
   }
+  totalCharge = vectorSum( q, nPads);
 }
 
 void Pads::removePad(int index)
@@ -478,9 +510,9 @@ void Pads::allocate()
   q = new double[N];
 }
 
-void Pads::setCharges(double c) { vectorSet(q, c, nPads); }
+void Pads::setCharges(double c) { vectorSet(q, c, nPads); totalCharge= c*nPads;}
 
-void Pads::setCharges(double* q_, int n) { vectorCopy(q_, n, q); }
+void Pads::setCharges(double* q_, int n) { vectorCopy(q_, n, q); totalCharge=vectorSum(q_, n);}
 
 void Pads::setToZero()
 {
@@ -707,16 +739,14 @@ Pads* Pads::refinePads()
       k++;
     }
   }
+  rPads->totalCharge = 4*totalCharge;
   return rPads;
 }
 
 Pads* Pads::extractLocalMax()
 {
-  // Option extractLocalMax
-  //   - true: extraxt local maxima
-  //   - false: filter pixels arround the maxima
   if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
-    printf("  - extractLocalMax (extractLocalMax nPads=%d)\n",
+    printf("  - Pads::extractLocalMax (extractLocalMax nPads=%d)\n",
            nPads);
   }
   double qMax = vectorMax(q, nPads);
@@ -775,7 +805,7 @@ Pads* Pads::extractLocalMax()
           // Inv ??? if ((q[i] > 0.015 * qMax) || (fabs(laplacian[i]) > (0.5 * q[i]))) {
           if (q[i] > 0.015 * qMax) {
             newPixelIdx.push_back(i);
-            if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
+            if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::info) {
               printf(
                 "    Laplacian i=%d, x[i]=%6.3f, y[i]=%6.3f, z[i]=%6.3f, "
                 "count=%d, morphLapl[i]=%6.3f, lapl[i]=%6.3f, weight[i]=%6.3f",
@@ -847,8 +877,8 @@ Pads* Pads::extractLocalMax()
         localMax->y[kSelected] = localMax->y[k] / localMax->q[k];
         localMax->dx[kSelected] = newPixels->dx[k];
         localMax->dy[kSelected] = newPixels->dy[k];
-        if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::detail) {
-          printf("  add a seed q=%9.4f, (x,y) = (%9.4f, %9.4f)\n",
+        if (ClusterConfig::EMLocalMaxLog >= ClusterConfig::info) {
+          printf("    seed selected q=%8.2f, (x,y) = (%8.3f, %8.3f)\n",
                  localMax->q[k], localMax->x[k], localMax->q[k]);
         }
         kSelected++;

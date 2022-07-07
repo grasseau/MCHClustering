@@ -143,7 +143,6 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   chId = DEId // 100
   ( xi, yi, dxi, dyi, chi, saturated, cathi, adc ) = pads
   (nHits, xr, yr, errX, errY, uid, startPadIdx, nPadIdx) = hits
-  
   print("[python] ###")
   print("[python] ### New Pre Cluster bc=", bc,", orbit=", orbit, ", iROF=", iROF)
   print("[python] ###")
@@ -206,7 +205,12 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   twoCath = True
   if (x0.size ==0) or (x1.size ==0):
     twoCath = False
-
+  
+  if xr.size >= 1 :
+    wr = np.ones( xr.size ) * 1.0/xr.size
+    thetaRecoi = tUtil.asTheta( wr, xr, yr)
+    thetaRecof = PCWrap.fitMathieson( xyDxy, chi, cathi, saturated, chId, thetaRecoi)
+    tUtil.printTheta("[python] Reco thetaRecof", thetaRecof) 
   if displayBefore:
     fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(10, 7) )
 
@@ -261,7 +265,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     print("except ???")
   plt.show()
   # nPETSeeds, thetaPET, pixTheta0, pixTheta1  = clusterProcessWithPET( xyDxy, cathi, saturated, chi, chId,  proj = (xProj, dxProj, yProj, dyProj, zProj) )
-  # tUtil.printTheta("clusterProcessWithPET", thetaPET)  
+  # tUtil.printUtiltTheta("clusterProcessWithPET", thetaPET)  
   # New find local Max
   
   xyDxy0 = tUtil.asXYdXY( x0, y0, dx0, dy0 )
@@ -284,12 +288,12 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   selected = True if nbrHits > 10 else False
   selected = diffNbrOfSeeds and chId > 8
   selected = diffNbrOfSeeds 
-  selected = True
   # select good ones
   selected = (nbrOfGroups > 1)
   selected = not twoCath
-  selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
   selected = (xr.size > nbrHits)
+  selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
+  selected = True
   #
   if display and selected:
     nFigRow = 2; nFigCol = 4
@@ -342,8 +346,8 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     padCathGrpMax = 0
     if padToCathGrp.size != 0:
       padCathGrpMax = np.max( padToCathGrp )
-    uPlt.setLUTScale( 0.0, padCathGrpMax ) 
-    uPlt.drawPads( fig, ax[0,1], xi, yi, dxi, dyi, padToCathGrp,  doLimits=False, alpha=0.5 )
+      uPlt.setLUTScale( 0.0, padCathGrpMax ) 
+      uPlt.drawPads( fig, ax[0,1], xi, yi, dxi, dyi, padToCathGrp,  doLimits=False, alpha=0.5 )
     ax[0,1].set_title("Group of pads")
       
     #
@@ -381,9 +385,9 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     if (nPix >0 ):
       (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
       # qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
-      print("????????????????? maxQPixel", pEnd-1, " ", np.max(qPix))
-      print( "????????????????? QPixel", nPix, " ", qPix)
-      print("xPix.size", xPix.size)
+      # print("????????????????? maxQPixel", pEnd-1, " ", np.max(qPix))
+      # print( "????????????????? QPixel", nPix, " ", qPix)
+      # print("xPix.size", xPix.size)
       
       uPlt.setLUTScale( 0.0, np.max(qPix))
       uPlt.drawPads( fig, ax[1,1], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
@@ -491,8 +495,8 @@ if __name__ == "__main__":
   RecoTracks = IOTracks.Tracks("/home/grasseau/TracksReco.dat")
   RecoTracks.read()
   
-  # All
-  if 1:    
+  if 0:    
+    # All
     for pc in reco:
       # processPreCluster ( pc, display=True, displayBefore=False )
       processPreCluster ( pc, display=True, displayBefore=False )
@@ -506,7 +510,7 @@ if __name__ == "__main__":
     # Groups pb
     pc = reco.readPreCluster( 0, 4, 153)
     processPreCluster ( pc, display=True, displayBefore=True )
-  else :
+  elif 0 :
     # pc = reco.readPreCluster( 0, 1, 757)
     # pc = reco.readPreCluster( 0, 1, 627)
     # pc = reco.readPreCluster( 0, 2, 1137)
@@ -526,7 +530,7 @@ if __name__ == "__main__":
     # pc = reco.readPreCluster( 0, 5, 521) # Pb of groups merging
     # pc = reco.readPreCluster( 0, 11, 1332) # Isolated pad and grp
     # pc = reco.readPreCluster( 0, 46, 1007)
-    pc = reco.readPreCluster( 0, 0, 376)
+    # pc = reco.readPreCluster( 0, 0, 376)
     #processPreCluster ( pc, display=True, displayBefore=True)
     # processPreCluster ( pc, display=True, displayBefore=True)
     # processPreCluster ( pc, display=True, displayBefore=True)
@@ -555,9 +559,17 @@ if __name__ == "__main__":
         processPreCluster ( pc, display=True, displayBefore=True )
       if (orbit==7) and (irof==319):
         processPreCluster ( pc, display=True, displayBefore=True )
-  # reco.read(verbose=True)
-  # nPreClusters = len(reco.padX )
-  # for ipc in range(0, nPreClusters ):
-    # processEvent( reco, ipc )    
-
+  elif 0:
+    # Big preClusters
+    #
+    evts = [ (5,74), (9,939), (18,655), (38,1152), (39,1149), (46,1007), (65,546), (80,755), (87,833) ]
+    evts = [ (9,939), (18,655), (38,1152), (39,1149)]
     
+    for ev in evts:
+      pc = reco.readPreCluster( 0, ev[0], ev[1] )
+      processPreCluster ( pc, display=False, displayBefore=False )
+      
+  else:
+    for i in range(100):
+      pc = reco.randomReadPreCluster()
+      processPreCluster ( pc, display=True, displayBefore=False )

@@ -80,7 +80,7 @@ void iterateEMPoisson(const double* Cij, const double* Ci,
   }
 }
 
-void fastIterateEMPoisson(const double* Cij, const double* Ci,
+void fastIterateEMPoissonV0(const double* Cij, const double* Ci,
                           const double* qPixels, const double* qPad,
                           double* qPadPrediction, int nPixels, int nPads,
                           double* newQPixels)
@@ -133,7 +133,7 @@ void fastIterateEMPoisson(const double* Cij, const double* Ci,
   delete[] qRatio;
 }
 
-void fastIterateEMPoissonV1(const double* Cij, const double* Ci,
+void fastIterateEMPoisson(const double* Cij, const double* Ci,
                             const double* qPixels, const double* qPad,
                             double* qPadPrediction, int nPixels, int nPads,
                             double* newQPixels)

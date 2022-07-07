@@ -315,7 +315,20 @@ class Run2PreCluster:
       ( bc_, orbit_, irof_, deid_, nbrOfPads) = id
       if (bc_ == bc) and (orbit_ == orbit) and (irof_ == iROF) :
          return pc
-
+     
+  def randomReadPreCluster(self):
+    totalROFs = len( self.preClusterId )
+    if ( totalROFs == 0):
+        totalROFs = self.read()
+    print("randomReadPreCluster totalROFs", totalROFs)
+    k = np.random.randint(0, totalROFs, 1)[0]
+    print("randomReadPreCluster totalROFs, k", totalROFs, ' ', k)
+    id = ( self.BC[k], self.orbit[k], self.iROF[k], self.DEId[k], self.padX[k].size)
+    pads = ( self.padX[k], self.padY[k], self.padDX[k], self.padDY[k], self.padCharge[k], self.padSaturated[k], self.padCathode[k], self.padADC[k] )
+    hits = (self.hitX[k].size, self.hitX[k], self.hitY[k], self.hitErrX[k], self.hitErrY[k], self.hitUID[k], self.hitFirstPadIdx[k], self.hitNbrPads[k])
+    #
+    return id, pads, hits
+     
   def readPreClusterData(self, preClusterId, verbose=False):
     # New PreCluster
     # Read header

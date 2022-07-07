@@ -245,7 +245,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   dUtil.printTheta("[python] thetaLocalMax", thetaLocalMax)
   
   # Compute the max of the Reco and EM seeds/hits
-  maxDxMinREM, maxDyMinREM = aTK.minDxDy( muX, muY, preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc])
+  maxDxMinReco, maxDyMinReco = aTK.minDxDy( muX, muY, preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc])
   
   drawPlot = display and (match > 0.33) 
   drawPlot = display and (match > 0.33)  and ( np.sum( saturated) > 0 )
@@ -272,7 +272,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   drawPlot = display  and not twoCath
   drawPlot = display and (nRecoSeeds != nbrHits) 
   drawPlot = display 
-  drawPlot = display and (maxDxMin > 0.07 or maxDyMin > 0.07) 
+  drawPlot = display and (maxDxMinReco > 0.07 or maxDyMinReco > 0.07) 
   #
   """
   if (padCathGrpMax != thetaMaxGrp):

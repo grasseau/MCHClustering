@@ -57,20 +57,22 @@ def setupPyCWrapper():
   #
   # Setup Mathieson fitting functions
   #
-  """
   extCLib.fitMathieson.resType = None
-  extCLib.fitMathieson.argtypes = [ array_1d_double,  # thetai
-                                    array_1d_double,  # xyAndDxy
-                                    array_1d_double,  # z (mesurred)
+  extCLib.fitMathieson.argtypes = [ 
+                                    array_1d_double,  # x
+                                    array_1d_double,  # y
+                                    array_1d_double,  # dx
+                                    array_1d_double,  # dy
+                                    array_1d_double,  # q (mesurred)
                                     array_1d_short,   # cath
-                                    array_1d_double,  # zCathTotalCharge
-                                    c_int, c_int,     # K, N 
-                                    c_int, c_int,     # chamberId, jacobian
+                                    array_1d_short,   # saturate
+                                    c_int, c_int,     # chId, N 
+                                    array_1d_double,  # thetai
+                                    c_int,            # kInit                                    
                                     array_1d_double,  # thetaf
                                     array_1d_double,  # Khi2
                                     array_1d_double   # pError
                                 ]
-  """
   #
   # Setup Gaussian EM functions
   #
@@ -130,6 +132,18 @@ def setupPyCWrapper():
                                     array_1d_double   # residual
                                 ]
   """
+  extCLib.fitMathiesonMag.resType = None
+  extCLib.fitMathiesonMag.argtypes = [ 
+                                    array_1d_double,  # xyAndDxy
+                                    array_1d_double,  # z (mesurred)
+                                    array_1d_short,   # cath
+                                    array_1d_short,   # saturate
+                                    c_int,            # chamberId
+                                    array_1d_double,  # thetai
+                                    c_int, c_int,     # K, N 
+                                    array_1d_double,  # thetaf
+                                    array_1d_double,  # Khi2
+                                ]
   #
   # Setup Pad Processing functions
   #
@@ -328,33 +342,38 @@ def computeCij( xyInfSup, theta, chamberId ):
   return Cij.reshape((N,K), order="F") 
 
 
-def fitMathieson( thetai, xyAndDxy, cath, z, chId, verbose=0, doJacobian=0, doKhi=0, doStdErr=0):
+def fitMathieson( xyDxy, q, cath, sat, chId, thetai, verbose=0, doJacobian=0, doKhi=0, doStdErr=0):
   # process : verbose(2bits) + doJacobian(1bit) + computeKhi2(1bit) + computeStdDev(1bit)
-  N = int( xyAndDxy.size / 4)
+  N = int( xyDxy.size / 4)
   K = int( thetai.size / 5)
-  doProcess = verbose + (doJacobian << 2) + ( doKhi << 3) + (doStdErr << 4)
-  zCathTotalCharge = np.array([ np.sum(z[cath==0]), np.sum(z[cath==1]) ])
+  # doProcess = verbose + (doJacobian << 2) + ( doKhi << 3) + (doStdErr << 4)
   # Returned values
+  # dUtil.asXYdXdY( xyDxy )
+  x = xyDxy[0*N:1*N]
+  y = xyDxy[1*N:2*N]
+  dx = xyDxy[2*N:3*N]
+  dy = xyDxy[3*N:4*N]
   thetaf = np.zeros( (5*K) )
   khi2 = np.zeros( (1) )
   pError = np.zeros( (3*K * 3*K) )
-  """
-  extCLib.fitMathieson.argtypes = [ array_1d_double,  # thetai
-                                    array_1d_double,  # xyAndDxy
-                                    array_1d_double,  # z (mesurred)
-                                    array_1d_short,   # cath
-                                    array_1d_double,  # zCathTotalCharge
-                                    c_int, c_int,     # K, N 
-                                    c_int, c_int,     # chamberId, jacobian
-                                    array_1d_double,  # thetaf
-                                    array_1d_double,  # Khi2
-                                    array_1d_double   # pErr
-  """                               
-  CLib.fitMathieson( thetai, xyAndDxy, z, cath, zCathTotalCharge, K, N,
-                         chId, doProcess, 
-                         thetaf, khi2, pError 
-                      )
-  return ( thetaf, khi2, pError)
+
+  CLib.fitMathieson( x, y, dx, dy, q, cath, sat,
+                         chId, N, thetai, K,
+                         thetaf, khi2, pError )
+
+  return thetaf
+
+def fitMathiesonMag( xyAndDxy, z, cath, sat, chId, thetai):
+  #
+  N = int( xyAndDxy.size / 4)
+  K = int( thetai.size / 5)
+  # Returned values
+  thetaf = np.zeros( (5*K) )
+  khi2 = np.zeros( (1) )
+  #
+  CLib.fitMathiesonMag( xyAndDxy, z, cath, sat, chId, thetai, K, N,
+                        thetaf, khi2) 
+  return thetaf
 
 def computeDiscretizedGaussian2D( xyInfSup, theta, K, N, k):
   N = int( xyInfSup.size / 4)
