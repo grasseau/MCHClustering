@@ -45,7 +45,7 @@ class ClusterPEM
   ~ClusterPEM();
   inline int getNbrOfPads(int c)
   {
-    return (pads[c] == nullptr ? 0 : pads[c]->getNbrOfPads());
+    return ((pads[c] == nullptr) ? 0 : pads[c]->getNbrOfPads());
   };
   inline int getNbrOfPads() {
       return getNbrOfPads(0) + getNbrOfPads(1);
@@ -56,7 +56,7 @@ class ClusterPEM
   };
   inline const double* getCharges( int c) {
     return (pads[c] == nullptr ? 0 : pads[c]->getCharges());
-  } 
+  }
   inline const Pads* getPads(int c) { return pads[c]; };
   inline const Groups_t* getCathGroup(int c) { return cathGroup[c]; };
   inline Groups_t* getProjPadGroup() { return projPadToGrp; };
@@ -142,6 +142,9 @@ class ClusterPEM
   int renumberGroups(Groups_t* grpToGrp, int nGrp);
   // Remove low charged groups
   void removeLowChargedGroups(int nGroups);
+  // Remove smallCharged seeds
+  int filterFitModelOnSmallChargedSeeds(Pads& pads, double* theta, int K,
+                                              Mask_t* maskFilteredTheta);
   // Keep the seeds inside the cluster area
   // Some fitting cases provide seeds outside of the cluster area
   int filterFitModelOnClusterRegion(Pads& pads, double* theta, int K,

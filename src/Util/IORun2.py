@@ -302,7 +302,7 @@ class Run2PreCluster:
   def __next__(self): 
     EOF=getEOF(self.file, "reading preCluster", verbose=True)
     if not EOF:
-      data = self.readOnePreCluster()
+      data = self.readOnePreCluster(verbose=True)
       self.nbrOfReadPreclusters += 1
     else:
       data = ()

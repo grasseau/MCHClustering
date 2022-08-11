@@ -43,6 +43,11 @@ namespace mch
 constexpr int nMacroIterations = 8;
 static constexpr int nIterations[nMacroIterations] = {5, 10, 10, 10,
                                                       10, 10, 10, 30};
+/* ??? Debug
+static constexpr int nIterations[nMacroIterations] = {1, 1, 1, 1,
+                                                      1, 1, 1, 30};
+*/
+
 static constexpr double minPadResidues[nMacroIterations] = {2.0, 2.0, 1.5, 1.5,
                                                             1.0, 1.0, 0.5, 0.5};
 

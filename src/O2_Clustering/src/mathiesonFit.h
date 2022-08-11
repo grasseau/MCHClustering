@@ -39,6 +39,7 @@ typedef struct dataFit {
   double* zCathTotalCharge_ptr;
   int verbose;
   double *thetaInit; // Only used by InspectModel
+  double *cathCoefNorm_ptr; // Used to keep the normalization of the 2 cathodes
 } funcDescription_t;
 
 void fitMathieson(const Pads& iPads, double* thetaInit, int kInit, int mode,

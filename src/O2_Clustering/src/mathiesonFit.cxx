@@ -19,6 +19,44 @@
 
 using namespace o2::mch;
 
+double chargeNormalization( const Mask_t* cath, const Mask_t* notSaturated, const double* cathMaxObs, int N, double* z, double* coefNorm) {
+  double zMax[2] = {0, 0};
+  for (int i = 0; i < N; i++) {
+    zMax[cath[i]] = std::fmax(zMax[cath[i]], notSaturated[i] * z[i]);
+  }
+  // Avoid dividing by 0
+  for (int c = 0; c < 2; c++) {
+    if (zMax[c] < 1.0e-6) {
+      // In this case cathMax[c] must be 0
+      zMax[c] = 1.0;
+    }
+  }
+  //
+  // Normalization coefficient
+  //
+  // Use the max charge cathode for each cathode
+  coefNorm[0] = cathMaxObs[0] / zMax[0];
+  coefNorm[1] = cathMaxObs[1] / zMax[1];
+  // Perform the normalization
+  for (int i = 0; i < N; i++) {
+    z[i] = z[i] * coefNorm[cath[i]];
+    // To have traces about the fitting
+    // chargePerCath[cath[i]] += z[i];
+  }
+  // Use to weight the penalization
+  double meanCoef = (coefNorm[0] + coefNorm[1]) /
+                    ((coefNorm[0] > 1.0e-6) + (coefNorm[1] > 1.0e-6));
+
+  if (ClusterConfig::fittingLog >= ClusterConfig::debug) {
+    printf(
+      "    Max of unsaturated (observed) pads (cathMax0/1)= %f, %f, "
+      "maxThZ (computed)  %f, %f\n",
+      cathMaxObs[0], cathMaxObs[1], zMax[0], zMax[1]);
+  }
+
+  return  meanCoef;
+}
+
 int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
                      gsl_vector* residuals)
 {
@@ -36,6 +74,7 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
   double* cathWeights = dataPtr->cathWeights_ptr;
   double* cathMax = dataPtr->cathMax_ptr;
   double* zCathTotalCharge = dataPtr->zCathTotalCharge_ptr;
+  double* cathCoefNorm = dataPtr->cathCoefNorm_ptr;
   // ??? int verbose = dataPtr->verbose;
   // Parameters
   const double* params = gsl_vector_const_ptr(gslParams, 0);
@@ -49,7 +88,7 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
   double lastW = 1.0 - vectorSum(w, K - 1);
   //
   // Display paramameters (w, mu_x, mu_x
-  if (ClusterConfig::fittingLog >= ClusterConfig::debug) {
+  if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
     printf("  Function evaluation at:\n");
     for (int k = 0; k < K; k++) {
       printf("    mu_k[%d] = %g %g \n", k, mu[k], mu[K + k]);
@@ -100,7 +139,7 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
   //
   // To Normalize each cathode with the charge sum
   // of unsaturated pads
-  // Not used in residual computation
+  // NOT USED in this residual computation
   double sumNormalizedZ[2];
   if (ClusterConfig::fittingLog >= ClusterConfig::debug) {
     for (int i = 0; i < N; i++) {
@@ -112,56 +151,32 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
     }
   }
 
-  // Get the max charge of unsaturrated pads for each cathodes
-  // Will be used to normalize the charge
-  double maxThZ[2] = {0, 0};
-  for (int i = 0; i < N; i++) {
-    maxThZ[cath[i]] = fmax(maxThZ[cath[i]], notSaturated[i] * z[i]);
-  }
-  // Avoid dividing by 0
-  for (int c = 0; c < 2; c++) {
-    if (maxThZ[c] < 1.0e-6) {
-      // cathMax[c] sould be 0
-      maxThZ[c] = 1.0;
-    }
-  }
-  //
-  // Normalization coefficient
-  //
-  // Use the max charge cathode for each cathode
-  double coefNorm[2] = {cathMax[0] / maxThZ[0], cathMax[1] / maxThZ[1]};
-  // Use to wheight the penalization
-  double meanCoef = (coefNorm[0] + coefNorm[1]) /
-                    ((coefNorm[0] > 1.0e-6) + (coefNorm[1] > 1.0e-6));
-  double chargePerCath[2] = {0.0, 0.0};
-  // Perform the normalization
-  for (int i = 0; i < N; i++) {
-    z[i] = z[i] * coefNorm[cath[i]];
-    // To have traces about the fitting
-    chargePerCath[cath[i]] += z[i];
-  }
+  // Charge normalization
+  // Get the max charge of unsaturated pads for each cathodes
+  double meanCoef = chargeNormalization( cath, notSaturated, cathMax, N, z, cathCoefNorm );
   //
   // printf("maxCath: %f %f\n", cathMax[0], cathMax[1]);
   // printf("coefNorm: %f %f\n", coefNorm[0], coefNorm[1]);
   // printf("meaCoef: %f \n", meanCoef);
   //
 
-  if (ClusterConfig::fittingLog >= ClusterConfig::debug) {
-    printf(
-      "    Max of unsaturated (observed) pads (cathMax0/1)= %f, %f, "
-      "maxThZ (computed)  %f, %f\n",
-      cathMax[0], cathMax[1], maxThZ[0], maxThZ[1]);
-  }
   //
   // Cathode Penalization
   //
   // Consider the charge sum for each cathode
-  // Tested but Not used
+  // Tested but NOT USED
+  // To be removed for perf
+  double chargePerCath[2] = {0., 0.};
+  for (int i = 0; i < N; i++) {
+    // To have traces about the fitting
+    chargePerCath[cath[i]] += z[i];
+  }
   double cathPenal = 0;
   if (ClusterConfig::fittingLog >= ClusterConfig::debug) {
     cathPenal = fabs(zCathTotalCharge[0] - chargePerCath[0]) +
                 fabs(zCathTotalCharge[1] - chargePerCath[1]);
   }
+
   //
   // w-Penalization
   //
@@ -190,7 +205,7 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
     //
     // Residuals with penalization
     //
-    gsl_vector_set(residuals, i, mask * ((zObs[i] - z[i]) + meanCoef * wPenal));
+    gsl_vector_set(residuals, i, mask * ((z[i] - zObs[i]) + meanCoef * wPenal));
     //
     // Without penalization
     // gsl_vector_set(residuals, i, mask * (zObs[i] - z[i]) + 0 * wPenal);
@@ -215,6 +230,143 @@ int f_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
              notSaturated[i], gsl_vector_get(residuals, i));
     }
     printf("\n");
+  }
+  if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
+    printf("    |f| = %g \n", gsl_blas_dnrm2(residuals));
+  }
+  return GSL_SUCCESS;
+}
+
+// Derivate of the Charge Integral i.e. mathieson
+int df_ChargeIntegral(const gsl_vector* gslParams, void* dataFit,
+                     gsl_matrix* J)
+{
+  funcDescription_t* dataPtr = (funcDescription_t*)dataFit;
+  int N = dataPtr->N;
+  int K = dataPtr->K;
+  const double* x = dataPtr->x_ptr;
+  const double* y = dataPtr->y_ptr;
+  const double* dx = dataPtr->dx_ptr;
+  const double* dy = dataPtr->dy_ptr;
+  const Mask_t* cath = dataPtr->cath_ptr;
+  const double* zObs = dataPtr->zObs_ptr;
+  Mask_t* notSaturated = dataPtr->notSaturated_ptr;
+  int chamberId = dataPtr->chamberId;
+  double* cathWeights = dataPtr->cathWeights_ptr;
+  double* cathMax = dataPtr->cathMax_ptr;
+  double* zCathTotalCharge = dataPtr->zCathTotalCharge_ptr;
+  double* cathCoefNorm = dataPtr->cathCoefNorm_ptr;
+  // ??? int verbose = dataPtr->verbose;
+  // Parameters
+  const double* params = gsl_vector_const_ptr(gslParams, 0);
+  // Note:
+  //  mux = mu[0:K-1]
+  //  muy = mu[K:2K-1]
+  const double* mux = &params[0];
+  const double* muy = &params[K];
+  double* w = (double*)&params[2 * K];
+
+  // Compute mathieson on x/y
+  // and charge integral on x/y
+  double xCI[N], yCI[N];
+  double xMath[N], yMath[N], xyMath[N];
+  double xyInf[N], xySup[N];
+  double xyVar[N];
+  // Set constrain: sum_(w_k) = 1
+  double lastW = 1.0 - vectorSum(w, K - 1);
+
+  if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
+    printf("  df evaluation at:\n");
+    for (int k = 0; k < K; k++) {
+      printf("    mu_k[%d] = %g %g \n", k, mux[k], muy[k]);
+    }
+    for (int k = 0; k < K - 1; k++) {
+      printf("    w_k[%d] = %g \n", k, w[k]);
+    }
+    // Last W
+    printf("    w_k[%d] = %g \n", K - 1, lastW);
+  }
+
+  for (int k = 0; k < K; k++) {
+    double w_k = (k < (K-1))? w[k]: lastW;
+    //
+    // X components for CI and mathieson
+    //
+    // xyVar = x - mux[k]
+    vectorAddScalar(x, -mux[k], N, xyVar);
+    // xInf = xyVar - dx
+    vectorAddVector(xyVar, -1.0, dx, N, xyInf);
+    // xSup = xInf + 2.0 * dx
+    vectorAddVector(xyInf, 2.0, dx, N, xySup);
+    // Compute the derivate : mathieson(xSup) - mathieson(xInf)
+    compute1DMathieson( xyInf, N, 0, chamberId, xyMath);
+    compute1DMathieson( xySup, N, 0, chamberId, xMath);
+    vectorAddVector( xMath, -1, xyMath, N, xMath);
+    vectorMultScalar(xMath, 4, N, xMath);
+    // Compute the 1D Charge integral on x
+    compute1DPadIntegrals(xyInf, xySup, N, 0, chamberId, xCI);
+    //
+    // Y components for CI and mathieson
+    //
+    // xyVar = y - muy[k]
+    vectorAddScalar(y, -muy[k], N, xyVar);
+    // Mathieson at  xyVar
+    compute1DMathieson( xyVar, N, 1, chamberId, yMath);
+    // yInf = xyVar - dy
+    vectorAddVector(xyVar, -1.0, dy, N, xyInf);
+    // ySup = yInf + 2.0 * dy
+    vectorAddVector(xyInf, 2.0, dy, N, xySup);
+    // Compute the derivate : mathieson(ySup) - mathieson(yInf)
+    compute1DMathieson( xyInf, N, 1, chamberId, xyMath);
+    compute1DMathieson( xySup, N, 1, chamberId, yMath);
+    vectorAddVector( yMath, -1, xyMath, N, yMath);
+    vectorMultScalar(yMath, 4, N, yMath);
+    // Compute the 1D Charge integral on y
+    compute1DPadIntegrals(xyInf, xySup, N, 1, chamberId, yCI);
+
+    // Normalization factor
+    // double meanCoef = chargeNormalization( cath, notSaturated, cathMax, N, z);
+    //
+    //  Jacobian matrix
+    //
+    // d / dmux_k component
+
+    for (int i = 0; i < N; i++) {
+      gsl_matrix_set (J, i, k,  -0.5*w_k*cathCoefNorm[cath[i]]*xMath[i]*yCI[i]);
+    }
+    // d / dmuy_k component
+    for (int i = 0; i < N; i++) {
+      gsl_matrix_set (J, i, k+K,  -0.5*w_k*cathCoefNorm[cath[i]]*xCI[i]*yMath[i]);
+    }
+    // d / dw_k component
+    if (k < K-1) {
+      for (int i = 0; i < N; i++) {
+        gsl_matrix_set (J, i, 2*K+k,  -0.5*cathCoefNorm[cath[i]]*xCI[i]*yCI[i]);
+      }
+    }
+    // ??? vectorPrint("xMath", xMath, N);
+    // vectorPrint("yMath", yMath, N);
+    // vectorPrint("xCI", xCI, N);
+    // vectorPrint("yCI", yCI, N);
+  }
+  if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
+    double sumdParam[3*K];
+    vectorSet( sumdParam, 0.0, 3*K);
+    for (int k=0; k < 3*K - 1; k++) {
+      printf("%2d: ", k);
+      for (int i=0; i < N; i++) {
+         sumdParam[k] += gsl_matrix_get( J, i, k);
+         printf("%g ", gsl_matrix_get(J, i, k) );
+      }
+      printf("\n");
+    }
+    printf("  Sum_i d/dparam :\n");
+    for (int k = 0; k < K; k++) {
+      printf("    mux/y[%d] = %g %g \n", k, sumdParam[k], sumdParam[K + k]);
+    }
+    for (int k = 0; k < K; k++) {
+      printf("    w_k[%d] = %g \n", k, sumdParam[2*K + k]);
+    }
   }
   return GSL_SUCCESS;
 }
@@ -390,9 +542,9 @@ int f_ChargeIntegral0(const gsl_vector* gslParams, void* dataFit,
   return GSL_SUCCESS;
 }
 
-void printState(int iter, gsl_multifit_fdfsolver* s, int K)
+void printState(int iter, gsl_multifit_fdfsolver* s, int K, int N)
 {
-  printf("  Fitting iter=%3d |f(x)|=%g\n", iter, gsl_blas_dnrm2(s->f));
+  printf("  Fitting iter=%3d |f(x)| =%g\n", iter, gsl_blas_dnrm2(s->f));
   printf("    mu (x,y):");
   int k = 0;
   for (; k < 2 * K; k++) {
@@ -414,6 +566,16 @@ void printState(int iter, gsl_multifit_fdfsolver* s, int K)
   printf("    dx:");
   for (; k < 2 * K; k++) {
     printf(" % 7.3f", gsl_vector_get(s->dx, k));
+  }
+  printf("\n");
+  printf("    Jacobian");
+  double sum = 0.0;
+  for (int k=0; k < K; k++) {
+    printf("    k:");
+    for (int i=0; i < N; i++) {
+      printf(" % 7.3f",  gsl_matrix_get (s->J, i, k) );
+    }
+    printf("\n");
   }
   printf("\n");
 }
@@ -426,7 +588,7 @@ namespace o2
 {
 namespace mch
 {
-void printState(int iter, gsl_multifit_fdfsolver* s, int K)
+void printState(int iter, gsl_multifit_fdfsolver* s, int K, int N)
 {
   printf("  Fitting iter=%3d |f(x)|=%g\n", iter, gsl_blas_dnrm2(s->f));
   printf("    mu (x,y):");
@@ -450,6 +612,28 @@ void printState(int iter, gsl_multifit_fdfsolver* s, int K)
   printf("    dx:");
   for (; k < 2 * K; k++) {
     printf(" % 7.3f", gsl_vector_get(s->dx, k));
+  }
+  printf("\n");
+  printf("    Jacobian\n");
+  double sum = 0.0;
+  for (int k=0; k < K; k++) {
+    printf("    k=%2d mux:", k);
+    for (int i=0; i < N; i++) {
+      printf(" % 7.3f",  gsl_matrix_get (s->J, i, k) );
+    }
+    printf("\n");
+    printf("    k=%2d muy:", k);
+    for (int i=0; i < N; i++) {
+      printf(" % 7.3f",  gsl_matrix_get (s->J, i, k+K) );
+    }
+    printf("\n");
+    if (k < K-1) {
+      printf("    k=%2d w  :", k);
+      for (int i=0; i < N; i++) {
+        printf(" % 7.3f",  gsl_matrix_get (s->J, i, k+2*K) );
+      }
+    }
+    printf("\n");
   }
   printf("\n");
 }
@@ -535,6 +719,7 @@ void fitMathieson(const Pads& iPads, double* thetaInit, int kInit, int mode,
   */
   // Total Charge per cathode plane
   double zCathTotalCharge[2];
+  double cathCoefNorm[2] = {0.0};
   Mask_t mask[N];
   // Cath 1
   vectorCopyShort(mathiesonData.cath_ptr, N, mask);
@@ -567,12 +752,14 @@ void fitMathieson(const Pads& iPads, double* thetaInit, int kInit, int mode,
   mathiesonData.cathMax_ptr = cathMax;
   mathiesonData.chamberId = iPads.getChamberId();
   mathiesonData.zCathTotalCharge_ptr = zCathTotalCharge;
+  mathiesonData.cathCoefNorm_ptr = cathCoefNorm;
   mathiesonData.verbose = verbose;
   //
   // Define Function, jacobian
   gsl_multifit_function_fdf f;
   f.f = &f_ChargeIntegral;
   f.df = nullptr;
+  //f.df = df_ChargeIntegral;
   f.fdf = nullptr;
   f.n = N;
   f.p = 3 * kInit - 1;
@@ -620,7 +807,7 @@ void fitMathieson(const Pads& iPads, double* thetaInit, int kInit, int mode,
     gsl_multifit_fdfsolver_set(s, &f, &params0.vector);
 
     if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
-      o2::mch::printState(-1, s, K);
+      o2::mch::printState(-1, s, K, N);
     }
     // double initialResidual = gsl_blas_dnrm2(s->f);
     double initialResidual = 0.0;
@@ -645,7 +832,7 @@ void fitMathieson(const Pads& iPads, double* thetaInit, int kInit, int mode,
         printf("  Solver status = %s\n", gsl_strerror(status));
       }
       if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
-        o2::mch::printState(iter, s, K);
+        o2::mch::printState(iter, s, K, N);
       }
       /* ???? Inv
       if (status) {
@@ -668,7 +855,7 @@ void fitMathieson(const Pads& iPads, double* thetaInit, int kInit, int mode,
       if (fabs(prevResidual - residual) < 1.0e-2) {
         // Stop iteration
         // Take the previous value of theta
-        if (ClusterConfig::fittingLog >= ClusterConfig::detail) {
+        if (ClusterConfig::fittingLog >= ClusterConfig::info) {
           printf("  Stop iteration (dResidu~0), prevResidual=%f residual=%f\n",
                  prevResidual, residual);
         }

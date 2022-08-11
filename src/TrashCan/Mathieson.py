@@ -73,6 +73,15 @@ class Mathieson:
     I = 2.0 * self.curK4x * ( np.arctan( uSup ) - np.arctan( uInf ) ) 
     return I
 
+  def computeAtanTanh( self, x):
+    # Coef type defined with mType in construxtor
+    # x/u
+    u = self.curSqrtK3x * np.tanh( self.curK2x * self.curInvPitch * x )
+    # uSup = self.curSqrtK3x * np.tanh( self.curK2x * self.curInvPitch * xSup )
+    
+    # I = 2.0 * self.curK4x * ( np.arctan( uSup ) - np.arctan( uInf ) ) 
+    return 2.0 * self.curK4x * (np.arctan( u ))
+
   def computeMathieson2DIntegral( self, xInf, xSup, yInf, ySup ):
     # Coef type defined with mType in construxtor
     # x/u

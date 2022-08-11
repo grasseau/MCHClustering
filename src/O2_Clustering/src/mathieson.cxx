@@ -34,14 +34,43 @@ static double K1x[2], K1y[2];
 static double K2x[2], K2y[2];
 static const double sqrtK3x[2] = {sqrtK3x1_2, sqrtK3x3_10},
                     sqrtK3y[2] = {sqrtK3y1_2, sqrtK3y3_10};
+static double K3x[2], K3y[2];
 static double K4x[2], K4y[2];
 static double pitch[2] = {pitch1_2, pitch3_10};
 static double invPitch[2];
 
-void initMathieson()
+// Spline Coef
+int useSpline = 0;
+SplineCoef* splineCoef[2][2];
+static double splineXYStep = 1.0e-3;
+static double splineXYLimit = 3.0;
+static int nSplineSampling=0;
+double* splineXY = nullptr;
+
+//
+int useCache = 0;
+
+SplineCoef::SplineCoef(int N) {
+  a = new double[N];
+  b = new double[N];
+  c = new double[N];
+  d = new double[N];
+}
+
+SplineCoef::~SplineCoef() {
+  delete[] a;
+  delete[] b;
+  delete[] c;
+  delete[] d;
+}
+void initMathieson( int useSpline_, int useCache_)
 {
+  useSpline = useSpline_;
+  useCache = useCache_;
   //
   for (int i = 0; i < 2; i++) {
+    K3x[i] = sqrtK3x[i] * sqrtK3x[i];
+    K3y[i] = sqrtK3y[i] * sqrtK3y[i];
     K2x[i] = M_PI * 0.5 * (1.0 - sqrtK3x[i] * 0.5);
     K2y[i] = M_PI * 0.5 * (1.0 - sqrtK3y[i] * 0.5);
     K1x[i] = K2x[i] * sqrtK3x[i] * 0.25 / (atan(sqrtK3x[i]));
@@ -50,83 +79,216 @@ void initMathieson()
     K4y[i] = K1y[i] / K2y[i] / sqrtK3y[i];
     invPitch[i] = 1.0 / pitch[i];
   }
+  if (useSpline) {
+    initSplineMathiesonPrimitive();
+  }
 }
 
-void compute2DPadIntegrals(const double* xInf, const double* xSup,
-                           const double* yInf, const double* ySup, int N,
-                           int chamberId, double Integrals[])
+void initSplineMathiesonPrimitive( ) {
+   // x/y Interval and positive x/y limit
+   double xyStep = splineXYStep;
+   double xyLimit = splineXYLimit;
+   // X/Y Sampling
+   nSplineSampling = int(xyLimit / xyStep) + 1;
+   int N = nSplineSampling;
+
+   splineXY = new double[N];
+   for (int i=0; i < N; i++) {
+     splineXY[i] = xyStep * i;
+   }
+   double* xy = splineXY;
+
+   // Spline coef allocation for the 4 functions
+   splineCoef[0][0] = new SplineCoef(N);
+   splineCoef[0][1] = new SplineCoef(N);
+   splineCoef[1][0] = new SplineCoef(N);
+   splineCoef[1][1] = new SplineCoef(N);
+
+   // Compute the spline Coef. for the 4 Mathieson primitives
+   double mathPrimitive[N];
+   double rightDerivative(0.0), leftDerivative;
+   // X and Y primitives on chambers <= 2 (Mathieson Type = 0)
+   int mathiesonType = 0;
+   int axe = 0;
+   mathiesonPrimitive(xy, N, axe, 2, mathPrimitive);
+   leftDerivative = 2.0 * K4x[mathiesonType] * sqrtK3x[mathiesonType] * K2x[mathiesonType] * invPitch[mathiesonType];
+   computeSplineCoef( xy, xyStep, mathPrimitive, N, leftDerivative, rightDerivative, o2::mch::splineCoef[mathiesonType][axe]);
+   axe = 1;
+   mathiesonPrimitive(xy, N, axe, 2, mathPrimitive);
+   leftDerivative = 2.0 * K4y[mathiesonType] * sqrtK3y[mathiesonType] * K2y[mathiesonType] * invPitch[mathiesonType];
+   computeSplineCoef( xy, xyStep, mathPrimitive, N, leftDerivative, rightDerivative, splineCoef[mathiesonType][axe]);
+   mathiesonType = 1;
+   axe = 0;
+   mathiesonPrimitive(xy, N, axe, 3, mathPrimitive);
+   leftDerivative = 2.0 * K4x[mathiesonType] * sqrtK3x[mathiesonType] * K2x[mathiesonType] * invPitch[mathiesonType];
+   computeSplineCoef( xy, xyStep, mathPrimitive, N, leftDerivative, rightDerivative, splineCoef[mathiesonType][axe]);
+   axe = 1;
+   mathiesonPrimitive(xy, N, axe, 3, mathPrimitive);
+   leftDerivative = 2.0 * K4y[mathiesonType] * sqrtK3y[mathiesonType] * K2y[mathiesonType] * invPitch[mathiesonType];
+   computeSplineCoef( xy, xyStep, mathPrimitive, N, leftDerivative, rightDerivative, splineCoef[mathiesonType][axe]);
+}
+
+// Spline implementation of the book "Numerical Analysis" - 9th edition
+// Richard L Burden, J Douglas Faires
+// Section 3.5, p. 146
+// Restrictions : planed with a regular sampling (dx = cst)
+// spline(x) :[-inf, +inf] -> [-1/2, +1/2]
+// Error < 7.0 e-11 for 1001 sampling between [0, 3.0]
+void computeSplineCoef( const double* xy, double xyStep, const double* f, int N,
+        double leftDerivative, double rightDerivative, SplineCoef* splineCoef) {
+  double *a = splineCoef->a;
+  double *b = splineCoef->b;
+  double *c = splineCoef->c;
+  double *d = splineCoef->d;
+
+  // a coef : the sampled function
+  vectorCopy( f, N, a);
+
+  // Step 1
+  double h = xyStep;
+
+  // Step 2 & 3 : Compute alpha
+  double alpha[N];
+  alpha[0] = 3.0 / h * (f[1] - f[0]) - 3*leftDerivative;
+  alpha[N-1] =  3*rightDerivative - 3.0 / h * (f[N-1] - f[N-2]);
+  for (int i=1; i < N-1; i++) {
+    // To keep the general case if h is not constant
+    alpha[i] = 3.0/h * (f[i+1] - f[i]) - 3.0/h * (f[i] - f[i-1]);
+  }
+
+  // Step 4 to 6 solve a tridiagonal linear system
+  //
+  // Step 4
+  double l[N], mu[N], z[N];
+  l[0] = 2.0 * h;
+  mu[0] = 0.5;
+  z[0] = alpha[0] / l[0];
+  //
+  // Step 5
+  for (int i = 1; i < N-1; i++) {
+    l[i] = 2.0 * (xy[i+1] - xy[i-1]) - h * mu[i-1];
+    mu[i] = h / l[i];
+    z[i] = (alpha[i] - h*z[i-1]) / l[i];
+  }
+  //
+  // Step 6
+  l[N-1] = h*(2.0-mu[N-2]);
+  z[N-1] = (alpha[N-1] - h*z[N-2]) / l[N-1];
+  c[N-1] = z[N-1];
+
+  // Step 7 : calculate cubic coefficients
+  for (int j=N-2; j >= 0; j--) {
+    c[j] = z[j] - mu[j] * c[j+1];
+    b[j] = (f[j+1]-f[j]) / h - h/3.0 * (c[j+1] + 2*c[j]);
+    d[j] = (c[j+1]-c[j]) / (3 * h);
+  }
+}
+
+void splineMathiesonPrimitive( const double *x, int N, int axe, int chamberId, double* mPrimitive )
+{
+  int mathiesonType = (chamberId <= 2) ? 0 : 1;
+  double *a = splineCoef[mathiesonType][axe]->a;
+  double *b = splineCoef[mathiesonType][axe]->b;
+  double *c = splineCoef[mathiesonType][axe]->c;
+  double *d = splineCoef[mathiesonType][axe]->d;
+  double dx = splineXYStep;
+  // ??? int N = nSampling;
+  double signX[N];
+  // x without sign
+  double uX[N];
+  for (int i=0; i<N; i++) {
+      signX[i] = (x[i] >=0) ? 1: -1;
+      uX[i] = x[i] * x[i];
+  }
+  // print("???  x / self.dx", x / self.dx)
+
+  double cst = 1.0 / dx;
+  // Get indexes in the sample function
+  int idx;
+  double h;
+  for (int i=0; i<N; i++) {
+    int k = int( uX[i] * cst + dx*0.1 );
+    if ( k < nSplineSampling) {
+      idx = k;
+      h = uX[idx] - k*dx;
+    } else {
+      idx = nSplineSampling-1;
+      h = 0;
+    }
+    mPrimitive[i] = signX[i] * (a[idx] + h*( b[idx] + h*( c[idx] + h *(d[idx]))));
+  }
+  //    print ("uX ",  uX)
+  //    print ("h ",  h)
+  //    print ("f(x0) ",  a[idx])
+  //    print ("df|dx0",  h*( b[idx] + h*( c[idx] + h *(d[idx]))))
+  //    print ("f, ",  a[idx] + h*( b[idx] + h*( c[idx] + h *(d[idx]))))
+}
+
+// Return the Mathieson primitive at x or y
+void mathiesonPrimitive(const double* xy, int N,
+                           int axe, int chamberId, double mPrimitive[])
+{
+  mathiesonType = (chamberId <= 2) ? 0 : 1;
+  //
+  // Select Mathieson coef.
+  double curK2xy = (axe == 0) ? K2x[mathiesonType] : K2y[mathiesonType];
+  double curSqrtK3xy = (axe == 0) ? sqrtK3x[mathiesonType] : sqrtK3y[mathiesonType];
+  double curInvPitch = invPitch[mathiesonType];
+  double cst2xy = curK2xy * curInvPitch;
+  double curK4xy = (axe == 0) ? K4x[mathiesonType] : K4y[mathiesonType];
+
+  for (int i = 0; i < N; i++) {
+    double u = curSqrtK3xy * tanh(cst2xy * xy[i]);
+    mPrimitive[i] = 2 * curK4xy * atan( u );
+  }
+}
+
+void compute1DMathieson(const double* xy, int N,
+                           int axe, int chamberId, double mathieson[])
 {
   // Returning array: Charge Integral on all the pads
   //
-  if (chamberId <= 2) {
-    mathiesonType = 0;
-  } else {
-    mathiesonType = 1;
-  }
+  mathiesonType = (chamberId <= 2) ? 0 : 1;
+
   //
   // Select Mathieson coef.
-  double curK2x = K2x[mathiesonType];
-  double curK2y = K2y[mathiesonType];
-  double curSqrtK3x = sqrtK3x[mathiesonType];
-  double curSqrtK3y = sqrtK3y[mathiesonType];
-  double curK4x = K4x[mathiesonType];
-  double curK4y = K4y[mathiesonType];
+
+  double curK1xy = (axe == 0) ? K1x[mathiesonType] : K1y[mathiesonType];
+  double curK2xy = (axe == 0) ? K2x[mathiesonType] : K2y[mathiesonType];
+  double curK3xy = (axe == 0) ? K3x[mathiesonType] : K3y[mathiesonType];
   double curInvPitch = invPitch[mathiesonType];
-  double cst2x = curK2x * curInvPitch;
-  double cst2y = curK2y * curInvPitch;
-  double cst4 = 4.0 * curK4x * curK4y;
-  double uInf, uSup, vInf, vSup;
+  double cst2xy = curK2xy * curInvPitch;
 
   for (int i = 0; i < N; i++) {
-    // x/u
-    uInf = curSqrtK3x * tanh(cst2x * xInf[i]);
-    uSup = curSqrtK3x * tanh(cst2x * xSup[i]);
-    // y/v
-    vInf = curSqrtK3y * tanh(cst2y * yInf[i]);
-    vSup = curSqrtK3y * tanh(cst2y * ySup[i]);
-    //
-    Integrals[i] = cst4 * (atan(uSup) - atan(uInf)) * (atan(vSup) - atan(vInf));
-    // printf(" xyInfSup %2d  [%10.6g, %10.6g] x [%10.6g, %10.6g]-> %10.6g\n",
-    // i, xInf[i], xSup[i], yInf[i], ySup[i], Integrals[i]);
+    //  tanh(x) & tanh(y)
+    double xTanh = tanh(cst2xy * xy[i]);
+    double xTanh2 = xTanh * xTanh;
+    mathieson[i] = curK1xy * (1.0 - xTanh2) / (1.0 +  curK3xy * xTanh2);
   }
-  // printf(" I[0..%3ld] = %f, %f, ... %f\n", N-1, Integrals[0], Integrals[1],
-  // Integrals[N-1]);
   return;
 }
 
-void compute1DPadIntegrals(const double* xInf, const double* xSup, int N,
-                           int chamberId, bool xAxe, double* Integrals)
+void compute1DPadIntegrals(const double* xyInf, const double* xySup, int N,
+                           int axe, int chamberId, double* Integrals)
 {
   // Returning array: Charge Integral on all the pads
   //
-  if (chamberId <= 2) {
-    mathiesonType = 0;
-  } else {
-    mathiesonType = 1;
-  }
+  mathiesonType = (chamberId <= 2) ? 0 : 1;
+
   //
   // Select Mathieson coef.
   double curInvPitch = invPitch[mathiesonType];
-  double curK2, curSqrtK3, curK4, cst2;
-  if (xAxe) {
-    curK2 = K2x[mathiesonType];
-    curSqrtK3 = sqrtK3x[mathiesonType];
-    curK4 = K4x[mathiesonType];
-    cst2 = curK2 * curInvPitch;
-  } else {
-    curK2 = K2y[mathiesonType];
-    curSqrtK3 = sqrtK3y[mathiesonType];
-    curK4 = K4y[mathiesonType];
-    cst2 = curK2 * curInvPitch;
-  }
+  double curK2 = (axe == 0) ? K2x[mathiesonType]: K2y[mathiesonType];
+  double curSqrtK3 = (axe == 0) ? sqrtK3x[mathiesonType]: sqrtK3y[mathiesonType];
+  double curK4 = (axe == 0) ? K4x[mathiesonType]: K4y[mathiesonType];
+  double cst2 = curK2 * curInvPitch;
   double cst4 = 2.0 * curK4;
 
-  double uInf, uSup, vInf, vSup;
-
+  double uInf, uSup;
   for (int i = 0; i < N; i++) {
     // x/u
-    uInf = curSqrtK3 * tanh(cst2 * xInf[i]);
-    uSup = curSqrtK3 * tanh(cst2 * xSup[i]);
+    uInf = curSqrtK3 * tanh(cst2 * xyInf[i]);
+    uSup = curSqrtK3 * tanh(cst2 * xySup[i]);
     //
     Integrals[i] = cst4 * (atan(uSup) - atan(uInf));
     // printf(" xyInfSup %2d  [%10.6g, %10.6g] x [%10.6g, %10.6g]-> %10.6g\n",
@@ -135,6 +297,70 @@ void compute1DPadIntegrals(const double* xInf, const double* xSup, int N,
   // printf(" I[0..%3ld] = %f, %f, ... %f\n", N-1, Integrals[0], Integrals[1],
   // Integrals[N-1]);
   return;
+}
+
+void compute2DPadIntegrals(const double* xInf, const double* xSup,
+                           const double* yInf, const double* ySup, int N,
+                           int chamberId, double Integrals[])
+{
+  // vectorPrint("xInf ", xInf, N);
+  // vectorPrint("xSup ", xSup, N);
+
+  if( useSpline ) {
+    int axe = 0;
+    double lBoundPrim[N], uBoundPrim[N], xIntegrals[N];
+    splineMathiesonPrimitive( xInf, N, axe, chamberId, lBoundPrim );
+    vectorPrint("lBound spline ", lBoundPrim, N);
+    mathiesonPrimitive(xInf, N, axe, chamberId, lBoundPrim);
+    vectorPrint("lBound analytics ", lBoundPrim, N);
+    splineMathiesonPrimitive( xSup, N, axe, chamberId, uBoundPrim );
+    vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, xIntegrals);
+    vectorPrint("xIntegrals ", xIntegrals, N);
+    axe = 1;
+    splineMathiesonPrimitive( yInf, N, axe, chamberId, lBoundPrim );
+    splineMathiesonPrimitive( ySup, N, axe, chamberId, uBoundPrim );
+    vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, Integrals);
+    vectorPrint("yIntegrals ", Integrals, N);
+    //
+    vectorMultVector( xIntegrals, Integrals, N, Integrals);
+    vectorPrint("Integrals ", Integrals, N);
+  } else {
+    // Returning array: Charge Integral on all the pads
+    //
+    if (chamberId <= 2) {
+      mathiesonType = 0;
+    } else {
+      mathiesonType = 1;
+    }
+    //
+    // Select Mathieson coef.
+    double curK2x = K2x[mathiesonType];
+    double curK2y = K2y[mathiesonType];
+    double curSqrtK3x = sqrtK3x[mathiesonType];
+    double curSqrtK3y = sqrtK3y[mathiesonType];
+    double curK4x = K4x[mathiesonType];
+    double curK4y = K4y[mathiesonType];
+    double curInvPitch = invPitch[mathiesonType];
+    double cst2x = curK2x * curInvPitch;
+    double cst2y = curK2y * curInvPitch;
+    double cst4 = 4.0 * curK4x * curK4y;
+    double uInf, uSup, vInf, vSup;
+
+    for (int i = 0; i < N; i++) {
+      // x/u
+      uInf = curSqrtK3x * tanh(cst2x * xInf[i]);
+      uSup = curSqrtK3x * tanh(cst2x * xSup[i]);
+      // y/v
+      vInf = curSqrtK3y * tanh(cst2y * yInf[i]);
+      vSup = curSqrtK3y * tanh(cst2y * ySup[i]);
+      //
+      Integrals[i] = cst4 * (atan(uSup) - atan(uInf)) * (atan(vSup) - atan(vInf));
+      // printf(" xyInfSup %2d  [%10.6g, %10.6g] x [%10.6g, %10.6g]-> %10.6g * %10.6g = %10.6g\n",
+      // i, xInf[i], xSup[i], yInf[i], ySup[i], Integrals[i], 2.0 * curK4x*(atan(uSup) - atan(uInf)), 2.0 * curK4y*(atan(vSup) - atan(vInf)) ) ;
+    }
+    // printf(" I[0..%3ld] = %f, %f, ... %f\n", N-1, Integrals[0], Integrals[1],
+    // Integrals[N-1]);
+  }
 }
 
 void compute2DMathiesonMixturePadIntegrals(const double* xyInfSup0,
@@ -228,7 +454,7 @@ void computeFastCij(const Pads& pads, const Pads& pixel, double Cij[])
   vectorSet((double*)PadIntegralY, -1.0, nYPixels * N);
   double zInf[N];
   double zSup[N];
-  bool xAxe;
+  int axe;
   /*
   for (int kx=0; kx < nXPixels; kx++) {
     double x = xPixMin + kx * dxPix;
@@ -259,15 +485,15 @@ void computeFastCij(const Pads& pads, const Pads& pixel, double Cij[])
       // Not yet computed
       vectorAddScalar(xInf0, -muX[k], N, zInf);
       vectorAddScalar(xSup0, -muX[k], N, zSup);
-      xAxe = true;
-      compute1DPadIntegrals(zInf, zSup, N, chId, xAxe, &PadIntegralX[xIdx * N + 0]);
+      axe = 0;
+      compute1DPadIntegrals(zInf, zSup, N, axe, chId, &PadIntegralX[xIdx * N + 0]);
     }
     if (PadIntegralY[yIdx * N + 0] == -1) {
       // Not yet computed
       vectorAddScalar(yInf0, -muY[k], N, zInf);
       vectorAddScalar(ySup0, -muY[k], N, zSup);
-      xAxe = false;
-      compute1DPadIntegrals(zInf, zSup, N, chId, xAxe, &PadIntegralY[yIdx * N + 0]);
+      axe = 1;
+      compute1DPadIntegrals(zInf, zSup, N, axe, chId, &PadIntegralY[yIdx * N + 0]);
     }
     // Compute IC(xy) = IC(x) * IC(y)
     vectorMultVector(&PadIntegralX[xIdx * N + 0], &PadIntegralY[yIdx * N + 0], N, &Cij[N * k]);
@@ -297,7 +523,7 @@ void computeCij(const Pads& pads, const Pads& pixel, double Cij[])
   const double* xInf0 = pads.getXInf();
   const double* yInf0 = pads.getYInf();
   const double* xSup0 = pads.getXSup();
-  const double* ySup0 = pads.getXSup();
+  const double* ySup0 = pads.getYSup();
 
   //
   const double* muX = pixel.getX();
@@ -308,6 +534,7 @@ void computeCij(const Pads& pads, const Pads& pixel, double Cij[])
   double xSup[N];
   double ySup[N];
 
+  printf("  k  i   xInf   xSup   yInf   ySup    Cij\n");
   for (int k = 0; k < K; k++) {
     vectorAddScalar(xInf0, -muX[k], N, xInf);
     vectorAddScalar(xSup0, -muX[k], N, xSup);
@@ -564,7 +791,7 @@ void printXYdXY(const char* str, const double* xyDxy, int NMax, int N,
 } // namespace o2
 
 // C Wrapper
-void o2_mch_initMathieson() { o2::mch::initMathieson(); }
+void o2_mch_initMathieson() { o2::mch::initMathieson( o2::mch::ClusterConfig::useSpline, 0); }
 
 void o2_mch_compute2DPadIntegrals(const double* xInf, const double* xSup,
                                   const double* yInf, const double* ySup, int N,

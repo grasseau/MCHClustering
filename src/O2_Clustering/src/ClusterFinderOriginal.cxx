@@ -35,10 +35,11 @@
 
 #include <FairLogger.h>
 
+#include "MCHBase/MathiesonOriginal.h"
+#include "MCHBase/ResponseParam.h"
 #include "MCHClustering/ClusterizerParam.h"
 #include "PadOriginal.h"
 #include "ClusterOriginal.h"
-#include "MathiesonOriginal.h"
 
 namespace o2
 {
@@ -95,14 +96,14 @@ void ClusterFinderOriginal::init(bool run2Config)
     mLowestClusterCharge = 2. * mLowestPadCharge;
 
     // Mathieson function for station 1
-    mMathiesons[0].setPitch(ClusterizerParam::Instance().pitchSt1);
-    mMathiesons[0].setSqrtKx3AndDeriveKx2Kx4(ClusterizerParam::Instance().mathiesonSqrtKx3St1);
-    mMathiesons[0].setSqrtKy3AndDeriveKy2Ky4(ClusterizerParam::Instance().mathiesonSqrtKy3St1);
+    mMathiesons[0].setPitch(ResponseParam::Instance().pitchSt1);
+    mMathiesons[0].setSqrtKx3AndDeriveKx2Kx4(ResponseParam::Instance().mathiesonSqrtKx3St1);
+    mMathiesons[0].setSqrtKy3AndDeriveKy2Ky4(ResponseParam::Instance().mathiesonSqrtKy3St1);
 
     // Mathieson function for other stations
-    mMathiesons[1].setPitch(ClusterizerParam::Instance().pitchSt2345);
-    mMathiesons[1].setSqrtKx3AndDeriveKx2Kx4(ClusterizerParam::Instance().mathiesonSqrtKx3St2345);
-    mMathiesons[1].setSqrtKy3AndDeriveKy2Ky4(ClusterizerParam::Instance().mathiesonSqrtKy3St2345);
+    mMathiesons[1].setPitch(ResponseParam::Instance().pitchSt2345);
+    mMathiesons[1].setSqrtKx3AndDeriveKx2Kx4(ResponseParam::Instance().mathiesonSqrtKx3St2345);
+    mMathiesons[1].setSqrtKy3AndDeriveKy2Ky4(ResponseParam::Instance().mathiesonSqrtKy3St2345);
   }
 }
 
@@ -165,6 +166,10 @@ void ClusterFinderOriginal::findClusters(gsl::span<const Digit> digits)
         mClusters[iNewCluster].firstDigit = iFirstNewDigit;
         mClusters[iNewCluster].nDigits = nNewDigits;
         setClusterResolution(mClusters[iNewCluster]);
+        std::cout << "iNewCluster=" << iNewCluster << ", DEId=" << digits[0].getDetID()
+                 << ", x" <<  mClusters[iNewCluster].x << ", y" <<  mClusters[iNewCluster].y << ", z" <<  mClusters[iNewCluster].z
+                << "uid=" << mClusters[iNewCluster].uid << std::endl;
+
       }
     }
   }
@@ -217,7 +222,7 @@ void ClusterFinderOriginal::resetPreCluster(gsl::span<const Digit>& digits)
     if (charge <= 0.) {
       throw std::runtime_error("The precluster contains a digit with charge <= 0");
     }
-
+    std::cout << x << ", " << y << ", " << dx << ", " << dy << ", " << charge  << ", " << isSaturated << std::endl;
     mPreCluster->addPad(x, y, dx, dy, charge, isSaturated, plane, iDigit, PadOriginal::kZero);
   }
 }

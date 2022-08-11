@@ -541,20 +541,20 @@ def findLocalMax( pixTheta, xyInfSup, q, chId):
   print( "[python]---> chisq=", chisq)
   return refinedTheta
 
-def processPEM( pcWrap, readEvent=False):
+def animationPETAlgorithm( pcWrap):
     
     chId = 2
     # - Theta  (-1.5 < muX/Y < 1.5)
     # - Max Charge
     # - Min Charge
-    K = 1
-    Nx = 2
-    Ny = 3
+    K = 7
+    Nx = 20
+    Ny = 20
     # Nx = 2
     # Ny = 2    
     minCh = 5.0
     maxCh = 600.0
-    readObj = readEvent
+    readObj = True
     if ( not readObj ):
       simul = tUtil.SimulCluster( Nx, Ny, xGrid = [-1.0, 1.0], yGrid = [-1.0, 1.0])
       # Build the pads
@@ -565,84 +565,13 @@ def processPEM( pcWrap, readEvent=False):
     else:
       simul = tUtil.SimulCluster.read()
     #
-    #
     x0, y0, dx0, dy0, cath0, saturated0, z0 = simul.padCath0
-    x1, y1, dx1, dy1, cath1, saturated1, z1 = simul.padCath1
-    print("cath0 nbr of Pads", z0.size)
-    print("cath1 nbr of Pads", z1.size)
-    input("Next ?")
+    # x1, y1, dx1, dy1, cath1, saturated1, z1 = simul.padCath1
     thetai = simul.theta
     ( xyDxy, cath, saturated, z ) = simul.getMergedPads()  
     simul.write()
     #
-    # Process Sim. Event
-    nbrHits = PCWrap.clusterProcess( xyDxy, cath, saturated, z, chId )
-    (thetaResult, thetaToGrp) = PCWrap.collectTheta( nbrHits)
-    # EM
-    thetaEMFinal = PCWrap.collectThetaEMFinal()
-    
-    # Plot
-    nFigRow = 2; nFigCol = 3
-    fig, ax = plt.subplots(nrows=nFigRow, ncols=nFigCol, figsize=(15, 7))
-    for iRow in range( nFigRow):
-      for iCol in range( nFigCol):
-        ax[iRow,iCol].set_xlim( simul.gridXLimits[0], simul.gridXLimits[1])
-        ax[iRow,iCol].set_ylim( simul.gridYLimits[0], simul.gridYLimits[1])
 
-    # Orginal Pads
-    uPlt.setLUTScale( 0, max( np.max(z0), np.max(z1) )  )
-    uPlt.drawPads( fig, ax[0,0], x0, y0, dx0, dy0, z0,  title="Mathieson  cath-0", doLimits=False )
-    uPlt.drawPads( fig, ax[1,0], x1, y1, dx1, dy1, z1,  title="Mathieson  cath-1", doLimits=False )
-    ax[0,0].plot( x0[saturated0==1], y0[saturated0==1], "o", color='black', markersize=3 )
-    ax[1,0].plot( x1[saturated1==1], y1[saturated1==1], "o", color='black', markersize=3 )
-    uPlt.drawPads( fig, ax[0,1], x0, y0, dx0, dy0, z0, doLimits=False, displayLUT=False, alpha=0.5)
-    uPlt.drawPads( fig, ax[0,1], x1, y1, dx1, dy1, z1,  title="Mathieson  both cath", doLimits=False, alpha=0.5)   
-    uPlt.drawPads( fig, ax[1,1], x0, y0, dx0, dy0, z0, doLimits=False, displayLUT=False, alpha=0.5)
-    uPlt.drawPads( fig, ax[1,1], x1, y1, dx1, dy1, z1,  title="Mathieson  both cath", doLimits=False, alpha=0.5)    
-    #
-    uPlt.drawModelComponents( ax[0,1], thetai, color='black', pattern="+" ) 
-    uPlt.drawModelComponents( ax[0,1], thetai, color='black', pattern="show w" ) 
-    uPlt.drawModelComponents( ax[1,1], thetaResult, color='black', pattern="+" ) 
-    uPlt.drawModelComponents( ax[1,1], thetaResult, color='black', pattern="show w" ) 
-    
-    #
-    # Pixels
-    #    
-    #
-    pEnd = 0
-    for p in range(7, -1, -1):
-      (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(p)
-      if nPix != 0: pEnd = p; break
-    # Iteration 0
-    (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(0)
-    if (nPix >0 ):
-      (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
-      # qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
-      uPlt.setLUTScale( np.min(qPix), np.max(qPix)) 
-      uPlt.drawPads( fig, ax[0,2], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
-      #uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')
-      uPlt.drawModelComponents( ax[0,2], thetaResult, color="black", pattern='x', markersize=4)
-      uPlt.drawModelComponents( ax[0,2], thetaEMFinal, color="lightgrey", pattern='x')
-      uPlt.drawModelComponents( ax[0,2], thetaResult, color="black", pattern='x')
-    ax[0,2].set_title( 'Pixels & PET Algo {:1d}'.format(0) )
-    # Iteration pEnd
-    (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(pEnd)
-    if (nPix >0 ):
-      (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
-      # qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
-      uPlt.setLUTScale( 0.0, np.max(qPix))  
-      uPlt.drawPads( fig, ax[1,2], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
-      #uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')
-      uPlt.drawModelComponents( ax[1,2], thetaResult, color="black", pattern='x', markersize=4)
-      uPlt.drawModelComponents( ax[1,2], thetaEMFinal, color="lightgrey", pattern='x')
-      uPlt.drawModelComponents( ax[1,2], thetaResult, color="black", pattern='x')
-    ax[1,2].set_title( 'Pixels & PET Algo {:1d}'.format(pEnd) )
-
-    
-    fig.suptitle( "Filtering pads to a Mathieson Mixture")
-
-    plt.show()
-    
     nSaturated = np.sum(saturated)
     
     # Event
@@ -1271,7 +1200,7 @@ if __name__ == "__main__":
     pcWrap.o2_mch_initMathieson()
     
     # singleObservedDataPlane(pcWrap)
-    processPEM(pcWrap, readEvent=True)
+    animationPETAlgorithm(pcWrap)
 
     
     # free memory in Pad-Processing

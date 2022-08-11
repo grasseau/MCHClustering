@@ -191,6 +191,7 @@ Pads* Pads::addBoundaryPads()
     newPads->q[i] = q[i];
     newPads->saturate[i] = saturate[i];
   }
+  newPads->nObsPads = N;
   for (int i = N, k = 0; i < nTotalPads; i++, k++) {
     newPads->x[i] = bX[k];
     newPads->y[i] = bY[k];
@@ -207,6 +208,7 @@ Pads* Pads::addBoundaryPads()
 Pads::Pads(int N, int chId, int mode_)
 {
   nPads = N;
+  nObsPads = N;
   mode = mode_;
   chamberId = chId;
   allocate();
@@ -261,6 +263,7 @@ Pads::Pads( const Pads *pads0, const Pads *pads1) {
 Pads::Pads(const Pads& pads, int mode_)
 {
   nPads = pads.nPads;
+  nObsPads = pads.nObsPads;
   mode = mode_;
   chamberId = pads.chamberId;
   totalCharge = pads.totalCharge;
@@ -317,6 +320,7 @@ Pads::Pads(const Pads& pads, const Mask_t* mask)
     vectorGatherShort(pads.saturate, mask, pads.nPads, saturate);
   }
   totalCharge = vectorSum( q, nPads);
+  nObsPads = nPads;
 }
 
 /* Old version: Unused
@@ -341,6 +345,7 @@ Pads::Pads(double* x_, double* y_, double* dx_, double* dy_, int chId,
 {
   mode = xydxdyMode;
   nPads = nPads_;
+  nObsPads = nPads;
   chamberId = chId;
   x = x_;
   y = y_;
@@ -364,6 +369,7 @@ Pads::Pads(const double* x_, const double* y_, const double* dx_,
   if (selectedCath == 0) {
     nPads = nAllPads - nCathode1;
   }
+  nObsPads= nPads;
   chamberId = chId;
   allocate();
   double qSum = 0;
@@ -392,6 +398,7 @@ Pads::Pads(const double* x_, const double* y_, const double* dx_,
   mode = xydxdyMode;
   // int nCathode1 = vectorSumShort(cathode, nAllPads);
   nPads = nAllPads;
+  nObsPads = nPads;
   /*
   if (selectedCath == 0) {
     nPads = nAllPads - nCathode1;
@@ -412,17 +419,34 @@ Pads::Pads(const double* x_, const double* y_, const double* dx_,
 }
 
 // Concatenate pads
-Pads::Pads(const Pads* pads1, const Pads* pads2, int mode_)
+Pads::Pads(const Pads* pads0, const Pads* pads1, int mode_)
 {
-  // Take Care: pads1 and pads2 must be in xydxdyMode
+  // Take Care: pads0 and pads2 must be in xydxdyMode
+  int N0 = (pads0 == nullptr) ? 0 : pads0->nPads;
   int N1 = (pads1 == nullptr) ? 0 : pads1->nPads;
-  int N2 = (pads2 == nullptr) ? 0 : pads2->nPads;
-  nPads = N1 + N2;
-  chamberId = (N1) ? pads1->chamberId : pads2->chamberId;
+  int nObs0 = (pads0 == nullptr) ? 0 : pads0->nObsPads;
+  int nObs1 = (pads1 == nullptr) ? 0 : pads1->nObsPads;
+  nPads = N0 + N1;
+  chamberId = (N0) ? pads0->chamberId : pads1->chamberId;
   mode = mode_;
   allocate();
-  if (mode == xydxdyMode) {
-    // Copy pads1
+  // Copy observable pads0
+  int destIdx = 0;
+  copyPads(pads0, 0, destIdx, nObs0, 0);
+  destIdx += nObs0;
+  // Copy observable pads1
+  copyPads(pads1, 0, destIdx, nObs1, 1);
+  destIdx += nObs1;
+
+  // Boundary pads0
+  int n = N0 - nObs0;
+  copyPads(pads0, nObs0, destIdx, n, 0);
+  destIdx += n;
+  n = N1 - nObs1;
+  copyPads(pads1, nObs1, destIdx, n, 1);
+  destIdx += n;
+
+    /*
     if (N1) {
       memcpy(x, pads1->x, sizeof(double) * N1);
       memcpy(y, pads1->y, sizeof(double) * N1);
@@ -442,35 +466,44 @@ Pads::Pads(const Pads* pads1, const Pads* pads2, int mode_)
       memcpy(&saturate[N1], pads2->saturate, sizeof(Mask_t) * N2);
       vectorSetShort(&cath[N1], 1, N2);
     }
-  } else {
+    */
+  // ??? printPads(" Before InfSup", *this);
+  if (mode == xyInfSupMode) {
     double* xInf = x;
     double* yInf = y;
     double* xSup = dx;
     double* ySup = dy;
-    for (int i = 0; i < N1; i++) {
-      xInf[i] = pads1->x[i] - pads1->dx[i];
-      xSup[i] = pads1->x[i] + pads1->dx[i];
-      yInf[i] = pads1->y[i] - pads1->dy[i];
-      ySup[i] = pads1->y[i] + pads1->dy[i];
-      q[i] = pads1->q[i];
-      saturate[i] = pads1->saturate[i];
-      cath[i] = 0;
-    }
-    for (int i = 0; i < N2; i++) {
-      xInf[i + N1] = pads2->x[i] - pads2->dx[i];
-      xSup[i + N1] = pads2->x[i] + pads2->dx[i];
-      yInf[i + N1] = pads2->y[i] - pads2->dy[i];
-      ySup[i + N1] = pads2->y[i] + pads2->dy[i];
-      q[i + N1] = pads2->q[i];
-      saturate[i + N1] = pads2->saturate[i];
-      cath[i + N1] = 1;
+    for (int i = 0; i < nPads; i++) {
+      double u = x[i];
+      xInf[i] = u - dx[i];
+      xSup[i] = u + dx[i];
+      u = y[i];
+      yInf[i] = u - dy[i];
+      ySup[i] = u + dy[i];
     }
   }
   totalCharge = vectorSum( q, nPads);
+  nObsPads = nObs0 + nObs1;
+  // ??? printPads(" after InfSup", *this);
 }
+/*
+void Pads::print(const char *title)
+{
+  printf("%s\n", title);
+  printf("print pads nPads=%4d nObsPads=%4d mode=%1d\n", nPads, nObsPads, mode);
+  printf("idx      x       y       dx        dy cath  sat  charge \n");
+  for (int i=0; i < nPads; i++) {
+    printf("%2d %7.3f %7.3f %7.3f %7.3f    %1d     %1d %7.3f \n", i, x[i], y[i], dx[i], dy[i], cath[i], saturate[i], q[i]);
+  }
+}
+*/
 
+// ??? removePad can be suppressed ????
 void Pads::removePad(int index)
 {
+  if (nObsPads != nPads) {
+    throw std::out_of_range("Pads::removePad: bad usage");
+  }
   if ((index < 0) || (index >= nPads)) {
     return;
   }
@@ -488,6 +521,7 @@ void Pads::removePad(int index)
   vectorCopyShort(&saturate[index + 1], nItems, &saturate[index]);
   //
   nPads = nPads - 1;
+  nObsPads = nObsPads -1;
 }
 
 void Pads::allocate()
@@ -510,6 +544,33 @@ void Pads::allocate()
   q = new double[N];
 }
 
+void Pads::copyPads( const Pads* srcPads, int srcIdx, int dstIdx, int N, int cathValue)
+{
+  if(N) {
+    memcpy(&x[dstIdx],  &srcPads->x[srcIdx], sizeof(double) * N);
+    memcpy(&y[dstIdx],  &srcPads->y[srcIdx], sizeof(double) * N);
+    memcpy(&dx[dstIdx], &srcPads->dx[srcIdx], sizeof(double) * N);
+    memcpy(&dy[dstIdx], &srcPads->dy[srcIdx], sizeof(double) * N);
+    memcpy(&q[dstIdx],  &srcPads->q[srcIdx], sizeof(double) * N);
+    memcpy(&saturate[dstIdx], &srcPads->saturate[srcIdx], sizeof(Mask_t) * N);
+    vectorSetShort(&cath[dstIdx], cathValue, N);
+  }
+}
+//
+double Pads::getMeanTotalCharge()
+{
+  double meanCharge;
+  if (cath != nullptr) {
+    int nCath1 = vectorSumShort( cath, nPads);
+    int nCath0 = nPads - nCath1;
+    int nCath = (nCath0 > 0) + (nCath1 > 0);
+    meanCharge = totalCharge / nCath;
+  } else {
+    meanCharge = totalCharge;
+  }
+  return meanCharge;
+}
+
 void Pads::setCharges(double c) { vectorSet(q, c, nPads); totalCharge= c*nPads;}
 
 void Pads::setCharges(double* q_, int n) { vectorCopy(q_, n, q); totalCharge=vectorSum(q_, n);}
@@ -527,6 +588,9 @@ void Pads::setToZero()
 
 int Pads::removePads(double qCut)
 {
+  if (nObsPads != nPads) {
+    throw std::out_of_range("Pads::removePad: bad usage");
+  }
   double qSum = 0.0;
   int k = 0;
   for (int i = 0; i < nPads; i++) {
@@ -542,6 +606,7 @@ int Pads::removePads(double qCut)
   }
   totalCharge = qSum;
   nPads = k;
+  nObsPads = k;
   return k;
 }
 
@@ -676,6 +741,7 @@ void Pads::release()
   }
   deleteInt(neighbors);
   nPads = 0;
+  nObsPads = 0;
 }
 
 Pads* Pads::refinePads()
@@ -886,6 +952,7 @@ Pads* Pads::extractLocalMax()
     }
   }
   localMax->nPads = kSelected;
+  localMax->nObsPads = kSelected;
 
   delete [] neigh;
   delete newPixels;
@@ -1049,6 +1116,8 @@ Pads* Pads::clipOnLocalMax(bool extractLocalMax)
       }
     }
     localMax->nPads = kSelected;
+    localMax->nObsPads = kSelected;
+
   }
   delete[] neigh;
   if (extractLocalMax) {
@@ -1075,17 +1144,24 @@ void Pads::printNeighbors(const PadIdx_t* neigh, int N)
 
 void Pads::printPads(const char* title, const Pads& pads)
 {
-  printf("%s\n", title);
-  if (pads.mode == xydxdyMode) {
-    for (int i = 0; i < pads.nPads; i++) {
-      printf("  pads i=%3d: x=%3.5f, dx=%3.5f, y=%3.5f, dy=%3.5f\n", i,
-             pads.x[i], pads.dx[i], pads.y[i], pads.dy[i]);
+  if (&pads != nullptr) {
+    printf("%s\n", title);
+    printf("print pads nPads=%4d nObsPads=%4d mode=%1d\n", pads.nPads, pads.nObsPads, pads.mode);
+    if (pads.mode == xydxdyMode) {
+      printf("    i       x       y      dx      dy         q\n");
+      for (int i = 0; i < pads.nPads; i++) {
+        printf("  %3d %7.3f %7.3f %7.3f %7.3f %9.2f\n", i,
+               pads.x[i], pads.dx[i], pads.y[i], pads.dy[i], pads.q[i]);
+      }
+    } else {
+      printf("    i    xInf    xSup    yInf    ySup         q\n");
+      for (int i = 0; i < pads.nPads; i++) {
+        printf("  %3d %7.3f %7.3f %7.3f %7.3f %9.2f\n",
+               i, pads.x[i], pads.dx[i], pads.y[i], pads.dy[i], pads.q[i]);
+      }
     }
   } else {
-    for (int i = 0; i < pads.nPads; i++) {
-      printf("  pads i=%3d: xInf=%3.5f, xSup=%3.5f, yInf=%3.5f, ySup=%3.5f\n",
-             i, pads.x[i], pads.dx[i], pads.y[i], pads.dy[i]);
-    }
+    printf("%s can't print nullptr\n", title);
   }
 }
 

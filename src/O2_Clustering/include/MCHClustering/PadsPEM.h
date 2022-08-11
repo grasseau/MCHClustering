@@ -71,7 +71,7 @@ class Pads
   // Used to extract sub-clusters
   Pads(const Pads& pads, const Groups_t* mask);
   // Concatenate the 2 pads sets
-  Pads(const Pads* pads1, const Pads* pads2, int mode);
+  Pads(const Pads* pads0, const Pads* pads1, int mode);
   // Main constructor
   Pads(const double* x_, const double* y_, const double* dx_, const double* dy_,
        const double* q_, const short* cathode, const Mask_t* saturate_,
@@ -94,6 +94,8 @@ class Pads
   inline const Mask_t* getSaturates() const { return saturate; };
   inline const Mask_t* getCathodes() const { return cath; };
   inline double getTotalCharge() const { return totalCharge; };
+  // Mean of the 2 cathodes total Charge
+  double getMeanTotalCharge();
   inline int getChamberId() const { return chamberId; };
   void setCharges(double c);
   void setCharges(double* q_, int n);
@@ -116,6 +118,8 @@ class Pads
   Pads* clipOnLocalMax(bool extractLocalMax);
   // Groups
   int addIsolatedPadInGroups(Mask_t* cathToGrp, Mask_t* grpToGrp, int nGroups);
+  //
+  // inv void print(const char* title);
   ~Pads();
 
  private:
@@ -132,12 +136,16 @@ class Pads
   double* q = nullptr;
   double totalCharge = 0;
   int nPads = 0;
+  // n Observable/ measurable pads
+  // Used to speed-up the fitting
+  int nObsPads = 0;
   int chamberId = -1;
   PadIdx_t* neighbors = nullptr;
   //
   // Memory allocation/deallocation
   void allocate();
   void release();
+  void copyPads( const Pads* srcPads, int srcIdx, int destIdx, int N, int cathValue);
   // Utilities
   void removePad(int index);
   PadIdx_t* buildFirstNeighbors(double* X, double* Y, double* DX, double* DY,

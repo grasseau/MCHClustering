@@ -172,7 +172,6 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
     cathi = cathi_;
     saturated = saturated_;
   }
-
   // Build a cluster object
   ClusterPEM cluster(getConstX(xyDxyi, nPads), getConstY(xyDxyi, nPads),
                      getConstDX(xyDxyi, nPads), getConstDY(xyDxyi, nPads), zi,
@@ -265,6 +264,7 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
       }
     }
     // Add null pads in the neighboring of the sub-cluster
+    // ???
     subCluster->addBoundaryPads();
     //
     // Search for seeds on this sub-cluster

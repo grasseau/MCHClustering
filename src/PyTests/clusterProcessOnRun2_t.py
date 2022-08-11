@@ -149,6 +149,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   # Print cluster info
   print("[python] # DEIds", DEId)
   print("[python] # Nbr of pads:", xi.size)
+  print("[python] ???", xi)
   print("[python] # Nbr of pads per cathodes:", xi[cathi==0].size, xi[cathi==1].size)
   if ( xi.size > 800):
     idx = np.where( chi > 2.0)
@@ -177,6 +178,11 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   print("[python] # Min charge on cathodes", minCh0, minCh1 )
   print("[python] # Max charge on cathodes", maxCh0, maxCh1 )
   print("[python] # Saturated pads", np.sum( saturated))
+  
+  # 
+  if (xi.size <= 1) :
+    print("[python] # Skip, only one pad", xi.size)     
+    return
   # print("# Calibrated pads", np.sum( preClusters.padCalibrated[ev][pc]))
   # xyDxy
   xyDxy = tUtil.padToXYdXY( xi, yi, dxi, dyi)
@@ -273,7 +279,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   # xl, yl = geom.findLocalMax( xyDxy0, xyDxy1, z0, z1 )
   
   # 
-  recoTracks = getHitsInTracks( orbit , DEId)
+  # recoTracks = getHitsInTracks( orbit , DEId)
   # display = True
   diffNbrOfSeeds = (xr.size != nbrHits)
   if chId > 5:
@@ -292,9 +298,9 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   selected = (nbrOfGroups > 1)
   selected = not twoCath
   selected = (xr.size > nbrHits)
-  selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
   selected = True
-  #
+  selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
+  #f
   if display and selected:
     nFigRow = 2; nFigCol = 4
     fig, ax = plt.subplots(nrows=nFigRow, ncols=nFigCol, figsize=(15, 7))
@@ -345,7 +351,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     padToCathGrp = PCWrap.collectPadToCathGroup( xi.size )
     padCathGrpMax = 0
     if padToCathGrp.size != 0:
-      padCathGrpMax = np.max( padToCathGrp )
+      padCathGrpMax = max ( np.max( padToCathGrp ), 1)
       uPlt.setLUTScale( 0.0, padCathGrpMax ) 
       uPlt.drawPads( fig, ax[0,1], xi, yi, dxi, dyi, padToCathGrp,  doLimits=False, alpha=0.5 )
     ax[0,1].set_title("Group of pads")
@@ -412,7 +418,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     if (nPix >0 ):
       (xPix, yPix, dxPix, dyPix) = tUtil.asXYdXdY( xyDxyPix)
       # qPix, xPix, yPix, dxPix, dyPix = tUtil.thetaAsWMuVar( pixTheta1 )
-      uPlt.setLUTScale( np.min(qPix), np.max(qPix)) 
+      uPlt.setLUTScale( 0, np.max(qPix)) 
       uPlt.drawPads( fig, ax[0,2], xPix, yPix, dxPix, dyPix, qPix, doLimits=False, alpha=1.0 )
       #uPlt.drawModelComponents( ax[1,1], thetaTmp, color="black", pattern='x')
       uPlt.drawModelComponents( ax[0,2], thetaResult, color="black", pattern='x', markersize=4)
@@ -484,6 +490,7 @@ if __name__ == "__main__":
   
   # Read MC data
   reco = IO.Run2PreCluster(fileName="../Run2Data/recoRun2-100.dat")
+  # reco = IO.Run2PreCluster(fileName="../Run3Data/orig-pp-july-22-r3.dat")
   """
   for pc in reco:
     (id, pads, hits ) = pc
@@ -492,10 +499,13 @@ if __name__ == "__main__":
       processPreCluster ( pc )
       sys.exit()
   """
-  RecoTracks = IOTracks.Tracks("/home/grasseau/TracksReco.dat")
-  RecoTracks.read()
+
+  # Humm ! Take care :  old version of track file
+  # Seems not used
+  # RecoTracks = IOTracks.Tracks("/home/grasseau/Alice/MCHClustering/src/Run2Data/TracksReco.dat")
+  # RecoTracks.read()
   
-  if 0:    
+  if 1:    
     # All
     for pc in reco:
       # processPreCluster ( pc, display=True, displayBefore=False )

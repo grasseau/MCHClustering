@@ -29,13 +29,20 @@ struct ClusterConfig {
   //
   // Physical-Numerical parameters
   //
-  static constexpr double minChargeOfClusterPerCathode = 1.1; // Lowest Charge of a Group
+  // Run2
+  // 4.f * 0.22875f;
+  static constexpr double minChargeOfPads = 1.1; // Lowest Charge of a Pad
+  static constexpr double minChargeOfClusterPerCathode = 2 * minChargeOfPads; // Lowest Charge of a Pad
+  // static constexpr double minChargeOfClusterPerCathode = 1.1; // Lowest Charge of a Group
+  // Run3
+  // static constexpr double minChargeOfClusterPerCathode = 20.0; // Lowest Charge of a Group
   //
   // Algorithm limitations
   //
   // Limit of pad number  to perform the fitting
   static constexpr int nbrOfPadsLimitForTheFitting = 100;
   //
+  static constexpr int useSpline = 0;
   // Logs
   //
   enum VerboseMode {
@@ -44,11 +51,11 @@ struct ClusterConfig {
     detail = 0x2, ///< Describes in detail
     debug = 0x3   ///< Ful details
   };
-  static constexpr VerboseMode fittingLog = no;
+  static constexpr VerboseMode fittingLog = info;
   static constexpr VerboseMode processingLog = info; // Global
   static constexpr VerboseMode padMappingLog = no;
   static constexpr VerboseMode groupsLog = no;
-  static constexpr VerboseMode EMLocalMaxLog = no;
+  static constexpr VerboseMode EMLocalMaxLog = info;
   static constexpr VerboseMode inspectModelLog = no;
   static constexpr VerboseMode laplacianLocalMaxLog = no;
   //
@@ -63,6 +70,7 @@ struct ClusterConfig {
   //
   static constexpr bool groupsCheck = true;
   static constexpr bool padMappingCheck = true;
+  static constexpr bool mathiesonCheck = true;
   // TODO ???
   // Check, Stat
 };
