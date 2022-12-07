@@ -228,7 +228,7 @@ class Run2PreCluster:
 
     return
 
-  def readOnePreCluster(self, verbose=False):
+  def readOnePreCluster(self, verbose=True):
     # New PreCluster
     # Read header
     # Int_t trackInfo[] = { -1, event, -1, -1, 0, nbrOfTracks };

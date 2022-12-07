@@ -23,6 +23,10 @@ import Util.IORun2 as IO
 import Util.IOTracks as IOTracks
 import Analyses.analyseToolKit as aTK
 
+# Nbr of ROF(ev) processed
+global iProcessed
+iProcessed = 0
+
 RecoTracks = []
 
 sqrt2 = math.sqrt( 2.0 )
@@ -135,8 +139,8 @@ def getHitsInTracks( ev, DEId ):
           y.append( Y[h])
     return (len(x), x, y )
 
-def processPreCluster( pc, display=False, displayBefore=False ):
-
+def processPreCluster( pc, display=False, displayBefore=False, firstIt=False):
+  global iProcessed
   # Current Reco
   (id, pads, hits ) = pc
   ( bc, orbit, iROF, DEId, nbrOfPads) = id
@@ -144,7 +148,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   ( xi, yi, dxi, dyi, chi, saturated, cathi, adc ) = pads
   (nHits, xr, yr, errX, errY, uid, startPadIdx, nPadIdx) = hits
   print("[python] ###")
-  print("[python] ### New Pre Cluster bc=", bc,", orbit=", orbit, ", iROF=", iROF)
+  print("[python] ### New Pre Cluster bc=", bc,", orbit=", orbit, ", iROF=", iROF, "iProcessed", iProcessed)
   print("[python] ###")
   # Print cluster info
   print("[python] # DEIds", DEId)
@@ -183,6 +187,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   if (xi.size <= 1) :
     print("[python] # Skip, only one pad", xi.size)     
     return
+  iProcessed += 1
   # print("# Calibrated pads", np.sum( preClusters.padCalibrated[ev][pc]))
   # xyDxy
   xyDxy = tUtil.padToXYdXY( xi, yi, dxi, dyi)
@@ -198,6 +203,7 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   saturated = saturated[idx]
   adc = adc[idx]
   """
+  nPads = xi.size
   x0  = xi[cathi==0]
   y0  = yi[cathi==0]
   dx0 = dxi[cathi==0]
@@ -211,12 +217,13 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   twoCath = True
   if (x0.size ==0) or (x1.size ==0):
     twoCath = False
-  
+  """ 
   if xr.size >= 1 :
     wr = np.ones( xr.size ) * 1.0/xr.size
     thetaRecoi = tUtil.asTheta( wr, xr, yr)
     thetaRecof = PCWrap.fitMathieson( xyDxy, chi, cathi, saturated, chId, thetaRecoi)
     tUtil.printTheta("[python] Reco thetaRecof", thetaRecof) 
+  """
   if displayBefore:
     fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(10, 7) )
 
@@ -282,15 +289,13 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   # recoTracks = getHitsInTracks( orbit , DEId)
   # display = True
   diffNbrOfSeeds = (xr.size != nbrHits)
-  if chId > 5:
-      selected = True
-  else : selected = False
+  
   
    # Compute the max of the Reco and EM seeds/hits
   maxDxMinREM, maxDyMinREM  = (0.0, 0.0 )
   if nbrHits != 0 :
     maxDxMinREM, maxDyMinREM = aTK.minDxDy( muX, muY, xr, yr)
-  
+  resultsDiffer = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
   selected = True if nbrHits > 10 else False
   selected = diffNbrOfSeeds and chId > 8
   selected = diffNbrOfSeeds 
@@ -300,6 +305,14 @@ def processPreCluster( pc, display=False, displayBefore=False ):
   selected = (xr.size > nbrHits)
   selected = True
   selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
+  selected = (chId > 8)
+  selected = (chId > 4) and (nbrOfPads> 50)
+  xmin0 = 0; ymin1=0;
+  if (dx0.size > 0) :
+    xmin0 = np.min(dx0)
+  if (dy1.size > 0) :
+    ymin1 = np.min(dy1)
+  selected =  ((xmin0 > 2.4) or (ymin1 > 2.4)) and (nPads > 6) and resultsDiffer
   #f
   if display and selected:
     nFigRow = 2; nFigCol = 4
@@ -382,8 +395,12 @@ def processPreCluster( pc, display=False, displayBefore=False ):
     # EM Final
     thetaEMFinal = PCWrap.collectThetaEMFinal()
     #
+    if firstIt :
+      lastIt = 2
+    else:
+      lastIt = 7        
     pEnd = 0
-    for p in range(7, -1, -1):
+    for p in range(lastIt, -1, -1):
       (nPix, xyDxyPix, qPix) = PCWrap.collectPixels(p)
       if nPix != 0: pEnd = p; break
     
@@ -488,9 +505,17 @@ if __name__ == "__main__":
   pcWrap = PCWrap.setupPyCWrapper()
   pcWrap.o2_mch_initMathieson()
   
-  # Read MC data
-  reco = IO.Run2PreCluster(fileName="../Run2Data/recoRun2-100.dat")
+  # Read Run2 data
+  # reco = IO.Run2PreCluster(fileName="../Run2Data/recoRun2-100.dat")
+  # Run3 (1)
   # reco = IO.Run2PreCluster(fileName="../Run3Data/orig-pp-july-22-r3.dat")
+  # Run3 (2)
+  # reco = IO.Run2PreCluster(fileName="../Run3Data/orig-pp-HL-aug-22-r3-ev2.dat")
+  # Run3 (3)
+  # reco = IO.Run2PreCluster(fileName="../Run3Data/orig-pp-oct-22-r3.dat")
+  # reco = IO.Run2PreCluster(fileName="../Run3Data/dumpRun3HL-tf25.bug.dat")
+  reco = IO.Run2PreCluster(fileName="../Run3Data/dumpRun3HL-tf5.bug.dat")
+  
   """
   for pc in reco:
     (id, pads, hits ) = pc
@@ -505,11 +530,14 @@ if __name__ == "__main__":
   # RecoTracks = IOTracks.Tracks("/home/grasseau/Alice/MCHClustering/src/Run2Data/TracksReco.dat")
   # RecoTracks.read()
   
-  if 1:    
+  if 0:    
     # All
     for pc in reco:
-      # processPreCluster ( pc, display=True, displayBefore=False )
-      processPreCluster ( pc, display=True, displayBefore=False )
+      processPreCluster ( pc, display=False, displayBefore=False )
+      # processPreCluster ( pc, display=True, displayBefore=False, firstIt = True )
+      (id, pads, hits ) = pc
+      (bc, orbit, irof, _, _) = id
+      print(id)
   elif 0:
     # pc = reco.readPreCluster( 0, 0, 44)
     pc = reco.readPreCluster( 0, 7, 319)
@@ -578,7 +606,46 @@ if __name__ == "__main__":
     for ev in evts:
       pc = reco.readPreCluster( 0, ev[0], ev[1] )
       processPreCluster ( pc, display=False, displayBefore=False )
-      
+  elif 1:
+    # Long treatement Run3
+    #
+    evts = [ (5,74), (9,939), (18,655), (38,1152), (39,1149), (46,1007), (65,546), (80,755), (87,833) ]
+    """
+    st=3 nPads=89 => dt=338.435000, nSeeds=35 --- Index=124031 preId=42574 orbit=371790402 bc=643
+    st=4 nPads=82 => dt=84.674700, nSeeds=19 --- Index=475 preId=475 orbit=371737857 bc=597
+    st=4 nPads=82 => dt=199.849000, nSeeds=26 --- Index=8579 preId=8579 orbit=371737869 bc=1935
+    st=4 nPads=82 => dt=174.064000, nSeeds=33 --- Index=109344 preId=27887 orbit=371790378 bc=3322
+    st=5 nPads=62 => dt=164.855000, nSeeds=26 --- Index=115302 preId=33845 orbit=371790388 bc=3147
+    st=5 nPads=64 => dt=5.849040, nSeeds=2 --- Index=38472 preId=38472 orbit=371737912 bc=1657
+    st=5 nPads=64 => dt=10.063200, nSeeds=25 --- Index=39065 preId=39065 orbit=371737913 bc=949
+    st=5 nPads=64 => dt=85.695300, nSeeds=20 --- Index=54971 preId=54971 orbit=371737941 bc=518
+    st=5 nPads=64 => dt=62.437600, nSeeds=21 --- Index=67419 preId=67419 orbit=371737960 bc=3106
+    """
+    evts = [ (371790402, 643), (371737857,597), (371737869,1935), (371790378,3322), 
+      (371790388,3147), (371737912,1657), (371737913,949), (371737941,518), (371737960,3106)]
+    # Bug  [GEM] PreCluster BC=1370, orbit = 371738582, iPreCluster,  = 60649
+    # evts = [(371738582,1370)]
+    # [GEM] PreCluster BC=3555, orbit = 371738001, iPreCluster,  = 11604
+    evts = [(371738001,3555)]
+    
+    sEvts = np.array(evts)
+    print("sEvts", sEvts.shape)
+    input("next")
+    
+    for pc in reco:
+      (id, pads, hits ) = pc
+      (bc, orbit, irof, _, _) = id
+      idx = np.where( sEvts[:,0] == orbit)[0]
+      print("idx ",idx)
+      for k in idx:
+        if (bc==sEvts[k, 1]) and (irof==11604):
+          print("Event: orbit={} bc={}".format(sEvts[k,0], sEvts[k,1]))
+          processPreCluster ( pc, display=True, displayBefore=False )
+      """
+      if (orbit==371790402 ) and (bc==643):
+        print(id)
+        processPreCluster ( pc, display=True, displayBefore=False )
+      """
   else:
     for i in range(100):
       pc = reco.randomReadPreCluster()

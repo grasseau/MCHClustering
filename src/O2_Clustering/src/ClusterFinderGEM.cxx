@@ -74,7 +74,7 @@ ClusterFinderGEM::ClusterFinderGEM()
   mMathiesons[1].setSqrtKy3AndDeriveKy2Ky4(0.7642);
   // GG
   // init Mathieson
-  o2::mch::initMathieson();
+  o2::mch::initMathieson( ClusterConfig::useSpline, 0);
   nPads = 0;
   xyDxy = nullptr;
   cathode = nullptr;
@@ -84,6 +84,8 @@ ClusterFinderGEM::ClusterFinderGEM()
   currentBC = 0xFFFFFFFF;
   currentOrbit = 0xFFFFFFFF;
   currentPreClusterID = 0;
+  statStream.open(statFileName, std::fstream::out);
+  statStream << "# iPrecluster bunchCrossing   orbit  nPads  nClusters  DEId  duration (in ms)" << std::endl;
 }
 
 //_________________________________________________________________________________________________
@@ -265,6 +267,13 @@ void ClusterFinderGEM::dumpClusterResults(ClusterDump* dumpFile, const std::vect
 }
 
 //_________________________________________________________________________________________________
+//void ClusterFinderGEM::saveStatistics(ClusterDump* dumpFile, gsl::span<const Digit> digits, const std::vector<Cluster>& clusters, size_t startIdx, uint16_t bunchCrossing, uint32_t orbit, uint32_t iPreCluster)
+void ClusterFinderGEM::saveStatistics( uint32_t orbit, uint16_t bunchCrossing, uint32_t iPreCluster, uint16_t nPads, uint16_t nbrClusters, uint16_t DEId, double duration)
+{
+   statStream << iPreCluster << " " << bunchCrossing << " " << orbit << " "
+        << nPads << " " << nbrClusters << " " << DEId << " " << duration << std::endl;
+}
+//_________________________________________________________________________________________________
 void ClusterFinderGEM::fillGEMInputData(gsl::span<const Digit>& digits, uint16_t bunchCrossing, uint32_t orbit, uint32_t iPreCluster)
 {
   /// reset the precluster with the pads converted from the input digits
@@ -305,7 +314,7 @@ void ClusterFinderGEM::fillGEMInputData(gsl::span<const Digit>& digits, uint16_t
     if (charge <= 0.) {
       throw std::runtime_error("The precluster contains a digit with charge <= 0");
     }
-    std::cout << x << ", " << y << ", " << dx << ", " << dy << ", " << charge  << ", " << isSaturated << std::endl;
+    // std::cout << x << ", " << y << ", " << dx << ", " << dy << ", " << charge  << ", " << isSaturated << std::endl;
     mPreCluster->addPad(x, y, dx, dy, charge, isSaturated, plane, iDigit, PadOriginal::kZero);
     // GG
     // Initialisation for GEM processing
@@ -460,10 +469,12 @@ void ClusterFinderGEM::findClusters(gsl::span<const Digit> digits,
         });
         setClusterResolution(mClusters[mClusters.size() - 1]);
         // Debug
-        int  iNewCluster = mClusters.size() -1;
+        int iNewCluster = mClusters.size() - 1;
+        /*
         std::cout << "iNewCluster=" << iNewCluster << ", DEId=" << digits[0].getDetID()
                  << ", x" <<  mClusters[iNewCluster].x << ", y" <<  mClusters[iNewCluster].y << ", z" <<  mClusters[iNewCluster].z
                 << "uid=" << mClusters[iNewCluster].uid << std::endl;
+        */
       }
     }
   }

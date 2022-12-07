@@ -2,10 +2,12 @@ set -x
 
 rm *.o
 
-OPT="-O2 -g"
-OPT="-O0 -g"
+
 OPT="-O3 -g -pg"
 OPT="-O0 -g -Wunused-function"
+OPT="-O3 -g"
+OPT="-O2 -g"
+OPT="-O0 -g"
 
 g++ -c -fPIC $OPT -Iinclude -Isrc src/PadsPEM.cxx
 g++ -c -fPIC $OPT -Iinclude -Isrc src/InspectModel.cxx 

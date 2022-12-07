@@ -246,7 +246,8 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   
   # Compute the max of the Reco and EM seeds/hits
   maxDxMinReco, maxDyMinReco = aTK.minDxDy( muX, muY, preClusters.rClusterX[ev][pc], preClusters.rClusterY[ev][pc])
-  
+  diffNbrOfSeeds = (nRecoSeeds != nbrHits)
+  resultsDiffer = (diffNbrOfSeeds) or (maxDxMinReco > 0.07) or (maxDyMinReco > 0.07)
   drawPlot = display and (match > 0.33) 
   drawPlot = display and (match > 0.33)  and ( np.sum( saturated) > 0 )
   drawPlot = display and (match > 0.33)  and ( ratioTP < 0.8 )
@@ -272,7 +273,15 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
   drawPlot = display  and not twoCath
   drawPlot = display and (nRecoSeeds != nbrHits) 
   drawPlot = display 
-  drawPlot = display and (maxDxMinReco > 0.07 or maxDyMinReco > 0.07) 
+  drawPlot = display and ((nRecoSeeds != nbrHits) or (maxDxMinReco > 0.07) or (maxDyMinReco > 0.07)) 
+  drawPlot = display and ((chId > 4) and (nPads > 50))
+  dxmin0 = 0; dymin1=0;
+  if (dx0.size > 0) :
+    dxmin0 = np.min(dx0)
+  if (dy1.size > 0) :
+    dymin1 = np.min(dy1)
+  drawPlot = display and ((dxmin0 > 2.4) or (dymin1 > 2.4)) and resultsDiffer
+  
   #
   """
   if (padCathGrpMax != thetaMaxGrp):
@@ -376,7 +385,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(p)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
-      uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
+      uPlt.setLUTScale( np.min(qPix0), np.max(qPix0) ) 
       uPlt.drawPads( fig, ax[1,0], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
     # uPlt.drawPoints( ax[0,2],  xPix0, yPix0, color='green', pattern='o')
     # uPlt.drawMCHitsInFrame( ax[1,0], frame, mcObj, ev, DEIds )
@@ -388,7 +397,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(p)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
-      uPlt.setLUTScale( 0.0, np.max(qPix0) )
+      uPlt.setLUTScale( np.min(qPix0), np.max(qPix0) )
       uPlt.drawPads( fig, ax[1,1], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
     # uPlt.drawMCHitsInFrame( ax[1,1], frame, mcObj, ev, DEIds )
     uPlt.drawModelComponents( ax[1,1], thetaf, color="black", pattern='x', markersize=4 )
@@ -399,7 +408,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(p)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
-      uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
+      uPlt.setLUTScale( np.min(qPix0), np.max(qPix0) ) 
       uPlt.drawPads( fig, ax[1,2], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0 )
     # uPlt.drawMCHitsInFrame( ax[1,2], frame, mcObj, ev, DEIds )
     uPlt.drawModelComponents( ax[1,2], thetaf, color="black", pattern='x', markersize=4 )
@@ -410,7 +419,7 @@ def inspectPreCluster( preClusters, ev, pc, mcObj, display=True, displayBefore=F
     (nPix0, xyDxyPix0, qPix0) = PCWrap.collectPixels(p)
     if (nPix0 > 0):
       (xPix0, yPix0, dxPix0, dyPix0) = dUtil.asXYdXdY( xyDxyPix0)
-      uPlt.setLUTScale( 0.0, np.max(qPix0) ) 
+      uPlt.setLUTScale( np.min(qPix0), np.max(qPix0) ) 
       uPlt.drawPads( fig, ax[1,3], xPix0, yPix0, dxPix0, dyPix0, qPix0, doLimits=False, alpha=1.0)
     # uPlt.drawMCHitsInFrame( ax[1,3], frame, mcObj, ev, DEIds )
     uPlt.drawModelComponents( ax[1,3], thetaf, color="black", pattern='x', markersize=4 )
@@ -600,6 +609,10 @@ if __name__ == "__main__":
     """
     # evList = [ (3,64), (5,259), (21,3) , (35,10), (39,17), (39,56), (44,7), (45,38), (45,187), (45,216)]
     evList = [ (3,64), (21,3),  (44,7), (45,187), (45,216)]
+    # Pb spline & integration Cij computation
+    evList = [ (1,103)]
+    # Refinement (Ev 5 is good)
+    evList = [(0,250), (0,254), (0,263), (0,285), (0,286), (1,48), (1,57), (2,6), (1,16), (2,47), (3,25), (3,64), (3,39), (4,6), (4,20), (5,96)]
     for evpc in evList :   
       inspectPreCluster( recoData, evpc[0], evpc[1], mcData, display=True, displayBefore=False)
   elif 0:

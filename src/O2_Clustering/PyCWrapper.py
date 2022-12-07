@@ -132,6 +132,7 @@ def setupPyCWrapper():
                                     array_1d_double   # residual
                                 ]
   """
+  """
   extCLib.fitMathiesonMag.resType = None
   extCLib.fitMathiesonMag.argtypes = [ 
                                     array_1d_double,  # xyAndDxy
@@ -144,6 +145,7 @@ def setupPyCWrapper():
                                     array_1d_double,  # thetaf
                                     array_1d_double,  # Khi2
                                 ]
+  """
   #
   # Setup Pad Processing functions
   #

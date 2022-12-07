@@ -240,9 +240,6 @@ def processPreCluster( pc, display=False, displayBefore=False,  ):
   # recoTracks = getHitsInTracks( orbit , DEId)
   # display = True
   diffNbrOfSeeds = (xr.size != nbrHits)
-  if chId > 5:
-      selected = True
-  else : selected = False
   
    # Compute the max of the Reco and EM seeds/hits
   maxDxMinREM, maxDyMinREM  = (0.0, 0.0 )
@@ -258,6 +255,8 @@ def processPreCluster( pc, display=False, displayBefore=False,  ):
   selected = (xr.size > nbrHits)
   selected = (diffNbrOfSeeds) or (maxDxMinREM > 0.07) or (maxDyMinREM > 0.07)
   selected = True
+  selected = (chId > 4) and (nbrOfPads > 50)
+  
   #f
   if display and selected:
     nFigRow = 2; nFigCol = 4

@@ -166,10 +166,6 @@ void ClusterFinderOriginal::findClusters(gsl::span<const Digit> digits)
         mClusters[iNewCluster].firstDigit = iFirstNewDigit;
         mClusters[iNewCluster].nDigits = nNewDigits;
         setClusterResolution(mClusters[iNewCluster]);
-        std::cout << "iNewCluster=" << iNewCluster << ", DEId=" << digits[0].getDetID()
-                 << ", x" <<  mClusters[iNewCluster].x << ", y" <<  mClusters[iNewCluster].y << ", z" <<  mClusters[iNewCluster].z
-                << "uid=" << mClusters[iNewCluster].uid << std::endl;
-
       }
     }
   }
@@ -222,7 +218,7 @@ void ClusterFinderOriginal::resetPreCluster(gsl::span<const Digit>& digits)
     if (charge <= 0.) {
       throw std::runtime_error("The precluster contains a digit with charge <= 0");
     }
-    std::cout << x << ", " << y << ", " << dx << ", " << dy << ", " << charge  << ", " << isSaturated << std::endl;
+
     mPreCluster->addPad(x, y, dx, dy, charge, isSaturated, plane, iDigit, PadOriginal::kZero);
   }
 }

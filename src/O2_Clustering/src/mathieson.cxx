@@ -12,6 +12,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
+#include <map>
+#include <limits>
 
 #include "mathUtil.h"
 #include "mathieson.h"
@@ -192,32 +194,40 @@ void splineMathiesonPrimitive( const double *x, int N, int axe, int chamberId, d
   double *c = splineCoef[mathiesonType][axe]->c;
   double *d = splineCoef[mathiesonType][axe]->d;
   double dx = splineXYStep;
-  // ??? int N = nSampling;
+  // printf("dx=%f nSplineSampling=%d\n", dx, nSplineSampling);
   double signX[N];
   // x without sign
   double uX[N];
   for (int i=0; i<N; i++) {
       signX[i] = (x[i] >=0) ? 1: -1;
-      uX[i] = x[i] * x[i];
+      uX[i] = signX[i] * x[i];
+      /*
+      if( uX[i] > (2.0 * splineXYLimit)) {
+        // x >> 0, f(x) = 0.0
+        signX[i] = 0.0;
+        uX[i] = 0.5;
+      }
+      */
   }
-  // print("???  x / self.dx", x / self.dx)
 
   double cst = 1.0 / dx;
   // Get indexes in the sample function
   int idx;
   double h;
   for (int i=0; i<N; i++) {
-    int k = int( uX[i] * cst + dx*0.1 );
-    if ( k < nSplineSampling) {
-      idx = k;
-      h = uX[idx] - k*dx;
+    //int k = int( uX[i] * cst + dx*0.1 );
+    // if ( k < nSplineSampling) {
+    if (uX[i] < splineXYLimit) {
+      idx = int( uX[i] * cst + dx*0.1 );
+      h = uX[i] - idx*dx;
     } else {
       idx = nSplineSampling-1;
       h = 0;
     }
     mPrimitive[i] = signX[i] * (a[idx] + h*( b[idx] + h*( c[idx] + h *(d[idx]))));
+    // printf("x[i]=%f, signX[i]=%f uX[i]=%f idx=%d, h=%f, prim=%f, splineXYLimit=%f\n", x[i], signX[i], uX[i], idx, h, mPrimitive[i], splineXYLimit );
   }
-  //    print ("uX ",  uX)
+  //print ("uX ",  uX)
   //    print ("h ",  h)
   //    print ("f(x0) ",  a[idx])
   //    print ("df|dx0",  h*( b[idx] + h*( c[idx] + h *(d[idx]))))
@@ -267,6 +277,14 @@ void compute1DMathieson(const double* xy, int N,
   }
   return;
 }
+void compute1DPadIntegrals(const double* xyInf, const double* xySup, int N,
+                           double xy0, int axe, int chamberId, double* integrals)
+{
+  double zInf[N], zSup[N];
+  vectorAddScalar(xyInf, -xy0, N, zInf);
+  vectorAddScalar(xySup, -xy0, N, zSup);
+  compute1DPadIntegrals(zInf, zSup, N, axe, chamberId, integrals);
+}
 
 void compute1DPadIntegrals(const double* xyInf, const double* xySup, int N,
                            int axe, int chamberId, double* Integrals)
@@ -299,31 +317,236 @@ void compute1DPadIntegrals(const double* xyInf, const double* xySup, int N,
   return;
 }
 
+int compressSameValues( const double *x1, const double *x2, int *map1, int *map2, int N, double *xCompress)
+{
+  // map1[0..N-1]: i in [0..N-1] -> integral index for x1 [0..nCompressed-1]
+  // map2[0..N-1]: the same for x2
+  // xCompress[0..nCompressed]: values of x1 & x2 compressed (unique values)
+  // The xCompress values will be used to compute the primitive
+  // The map1/2 will be used to find the corresponding index in the xCompress or primitive arrays
+  // Return nCompressed
+
+  // Transform to integer to avoid comparison on close x values
+  const double *x[2] = {x1, x2 };
+  int *xCode = new int[2*N];
+  for (int i = 0; i < N; i++) {
+    for (int b=0; b < 2; b++) {
+      // Calculate the indexes in the 1D charge integral
+      // Error on pad position > 10-3 cm
+      xCode[i+b*N] = (int)(x[b][i] * 1000 + 0.5);
+    }
+  }
+  // Sort the code
+  int sIdx[2*N];
+  for (int k = 0; k < 2*N; k++) {
+    sIdx[k] = k;
+  }
+  std::sort(sIdx, &sIdx[2*N], [=](int a, int b) {
+    return (xCode[a] < xCode[b]);
+  });
+
+  // printf("sort  xCode[sIdx[0]]=%d xCode[sIdx[2*N-1]]=%d\n", xCode[sIdx[0]], xCode[sIdx[2*N-1]]);
+  // vectorPrintInt("xCode",xCode, 2*N);
+  // vectorPrintInt("sIdx",sIdx, 2*N);
+
+  // Renumber and compress
+  int nCompress = 0;
+  int prevCode = std::numeric_limits<int>::max();
+
+  // Map1
+  for (int i = 0; i < 2*N; i++) {
+    int idx = sIdx[i];
+    if ( xCode[idx] != prevCode ) {
+      if ( idx < N ) {
+        // Store the compress value in map1
+        xCompress[nCompress] = x1[idx];
+        map1[idx] = nCompress;
+        // printf("i=%d sIdx[i]=%d nCompress=%d idx=%d map1[idx]=%d\n", i, idx, nCompress, idx, map1[idx]);
+      } else {
+        // Store the compress value in map2
+        xCompress[nCompress] = x2[idx-N];
+        map2[idx-N] = nCompress;
+        // printf("i=%d sIdx[i]=%d nCompress=%d idx-N=%d map2[idx]=%d\n", i, idx, nCompress,  idx-N, map2[idx-N]);
+      }
+      nCompress++;
+    } else {
+      // the code is the same (same values)
+      if ( idx < N ) {
+        map1[idx] = nCompress-1;
+        // printf("identical i=%d sIdx[i]=%d nCompress-1=%d idx=%d\n", i, idx, nCompress-1, idx);
+      } else {
+        map2[idx-N] = nCompress-1;
+        // printf("identical i=%d sIdx[i]=%d nCompress-1=%d idx=%d\n", i, idx, nCompress-1, idx-N);
+      }
+    }
+    prevCode = xCode[idx];
+  }
+  // printf(" compress nCompress/N=%d/%d \n", nCompress, N);
+  // vectorPrint("x1", x1, N);
+  // vectorPrintInt("map1",map1, N);
+  // vectorPrint("x2", x2, N);
+  // vectorPrintInt("map2",map2, N);
+  // vectorPrint("xCompress", xCompress, nCompress);
+  delete [] xCode;
+  return nCompress;
+}
+
+CompressedPads_t *compressPads( const double* xInf, const double* xSup,
+                   const double* yInf, const double* ySup, int N)
+{
+  CompressedPads_t *compressedPads = new CompressedPads_t;
+  // On x axe
+  compressedPads->xCompressed = new double[2*N];
+  compressedPads->mapXInf = new int[N];
+  compressedPads->mapXSup = new int[N];
+  compressedPads->nXc = compressSameValues( xInf, xSup, compressedPads->mapXInf, compressedPads->mapXSup, N, compressedPads->xCompressed);
+  compressedPads->yCompressed = new double[2*N];
+  compressedPads->mapYInf = new int[N];
+  compressedPads->mapYSup = new int[N];
+  compressedPads->nYc = compressSameValues( yInf, ySup, compressedPads->mapYInf, compressedPads->mapYSup, N, compressedPads->yCompressed);
+  return compressedPads;
+}
+
+void deleteCompressedPads( CompressedPads_t *compressedPads )
+{
+  delete [] compressedPads->mapXInf;
+  delete [] compressedPads->mapXSup;
+  delete [] compressedPads->mapYInf;
+  delete [] compressedPads->mapYSup;
+  delete [] compressedPads->xCompressed;
+  delete [] compressedPads->yCompressed;
+}
+
+void computeCompressed2DPadIntegrals(
+/* const double* xInf, const double* xSup,
+                           const double* yInf, const double* ySup,
+*/
+                           CompressedPads_t *compressedPads, double xShift, double yShift, int N,
+                           int chamberId, double Integrals[])
+{
+
+  int nXc = compressedPads->nXc;
+  int nYc = compressedPads->nYc;
+  // Compute the integrals on Compressed pads
+  double xy[N];
+  double xPrimitives[nXc];
+  double yPrimitives[nYc];
+  // X axe
+  int axe = 0;
+  // x Translation (seed location)
+  vectorAddScalar( compressedPads->xCompressed, -xShift, nXc, xy);
+  // Primitives on compressed pads
+  mathiesonPrimitive( xy, nXc, axe, chamberId, xPrimitives );
+  // Y axe
+  axe = 1;
+  // x Translation (seed location)
+  vectorAddScalar( compressedPads->yCompressed, -yShift, nYc, xy);
+  // Primitives on compressed pads
+  mathiesonPrimitive( xy, nYc, axe, chamberId, yPrimitives );
+
+  // Compute all the integrals
+  int *mapXInf = compressedPads->mapXInf;
+  int *mapXSup = compressedPads->mapXSup;
+  int *mapYInf = compressedPads->mapYInf;
+  int *mapYSup = compressedPads->mapYSup;
+  for (int i = 0; i < N; i++) {
+    Integrals[i] = (xPrimitives[mapXSup[i]] - xPrimitives[mapXInf[i]])
+                 * (yPrimitives[mapYSup[i]] - yPrimitives[mapYInf[i]]);
+    // printf(" i=%d mapXInf=%d mapXSup=%d mapYInf=%d mapYSup=%d xyIntegrals=%f, %f \n", i,
+    //        mapXInf[i], mapXSup[i], mapYInf[i], mapYSup[i], xPrimitives[mapXSup[i]] - xPrimitives[mapXInf[i]],
+    //        yPrimitives[mapYSup[i]] - yPrimitives[mapYInf[i]]);
+  }
+
+  // vectorPrint("xPrimitives", xPrimitives, nXc);
+  // vectorPrint("yPrimitives", yPrimitives, nYc);
+}
+
 void compute2DPadIntegrals(const double* xInf, const double* xSup,
                            const double* yInf, const double* ySup, int N,
                            int chamberId, double Integrals[])
 {
-  // vectorPrint("xInf ", xInf, N);
-  // vectorPrint("xSup ", xSup, N);
+  if (1) {
+  int mapXInf[N], mapXSup[N];
+  int mapYInf[N], mapYSup[N];
+  double xy[2*N];
+  // Primitives on x axe
+  int nXc = compressSameValues( xInf, xSup, mapXInf, mapXSup, N, xy);
+  // vectorPrint("x map", xy, nXc);
+  int axe = 0;
+  double xPrimitives[nXc];
+  mathiesonPrimitive( xy, nXc, axe, chamberId, xPrimitives );
+  // Primitives on y axe
+  int nYc = compressSameValues( yInf, ySup, mapYInf, mapYSup, N, xy);
+  // vectorPrint("y map", xy, nYc);
+  double yPrimitives[nYc];
+  axe = 1;
+  mathiesonPrimitive( xy, nYc, axe, chamberId, yPrimitives );
+
+  for (int i = 0; i < N; i++) {
+    Integrals[i] = (xPrimitives[mapXSup[i]] - xPrimitives[mapXInf[i]])
+                 * (yPrimitives[mapYSup[i]] - yPrimitives[mapYInf[i]]);
+    // printf(" i=%d mapXInf=%d mapXSup=%d mapYInf=%d mapYSup=%d xyIntegrals=%f, %f \n", i,
+    //        mapXInf[i], mapXSup[i], mapYInf[i], mapYSup[i], xPrimitives[mapXSup[i]] - xPrimitives[mapXInf[i]],
+    //        yPrimitives[mapYSup[i]] - yPrimitives[mapYInf[i]]);
+  }
+
+  // vectorPrint("xPrimitives", xPrimitives, nXc);
+  // vectorPrint("yPrimitives", yPrimitives, nYc);
+
+  } else {
 
   if( useSpline ) {
+    double lBoundPrim[N], uBoundPrim[N], xIntegrals[N], yIntegrals[N];
     int axe = 0;
-    double lBoundPrim[N], uBoundPrim[N], xIntegrals[N];
+    // mathiesonPrimitive(xInf, N, axe, chamberId, lBoundPrim);
     splineMathiesonPrimitive( xInf, N, axe, chamberId, lBoundPrim );
-    vectorPrint("lBound spline ", lBoundPrim, N);
-    mathiesonPrimitive(xInf, N, axe, chamberId, lBoundPrim);
-    vectorPrint("lBound analytics ", lBoundPrim, N);
+    // mathiesonPrimitive(xSup, N, axe, chamberId, uBoundPrim);
     splineMathiesonPrimitive( xSup, N, axe, chamberId, uBoundPrim );
     vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, xIntegrals);
-    vectorPrint("xIntegrals ", xIntegrals, N);
+    // vectorPrint("xIntegrals analytics ", xIntegrals, N);
+    for(int i=0; i<N; i++) {
+        if ( xIntegrals[i] < 0.0) {
+          printf("??? %d x (%f %f) lInt=%f uInt%f xInt=%f\n", i, xInf[i], xSup[i], lBoundPrim, uBoundPrim, xIntegrals[i]);
+          throw std::out_of_range(
+            "[findLocalMaxWithPEM] ????");
+        }
+    }
+    axe = 1;
+    // mathiesonPrimitive(yInf, N, axe, chamberId, lBoundPrim);
+    splineMathiesonPrimitive( yInf, N, axe, chamberId, lBoundPrim );
+    // mathiesonPrimitive(ySup, N, axe, chamberId, uBoundPrim);
+    splineMathiesonPrimitive( ySup, N, axe, chamberId, uBoundPrim );
+    vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, yIntegrals);
+    // vectorPrint("yIntegrals analytics ", yIntegrals, N);
+    vectorMultVector( xIntegrals, yIntegrals, N, Integrals);
+    // Invald ????
+
+    for(int i=0; i<N; i++) {
+        if ( yIntegrals[i] < 0.0) {
+          printf("??? %d y (%f %f) lInt=%f uInt%f yInt=%f\n", i, yInf[i], ySup[i], lBoundPrim, uBoundPrim, yIntegrals[i]);
+          throw std::out_of_range(
+            "[findLocalMaxWithPEM] ????");
+        }
+    }    // vectorPrint("Integrals analytics", Integrals, N);
+
+    /* ??????????????????????
+    axe = 0;
+    splineMathiesonPrimitive( xInf, N, axe, chamberId, lBoundPrim );
+    // vectorPrint("x lBoundPrim spline ", lBoundPrim, N);
+    splineMathiesonPrimitive( xSup, N, axe, chamberId, uBoundPrim );
+    vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, xIntegrals);
+    // vectorPrint("xIntegrals spline", xIntegrals, N);
     axe = 1;
     splineMathiesonPrimitive( yInf, N, axe, chamberId, lBoundPrim );
     splineMathiesonPrimitive( ySup, N, axe, chamberId, uBoundPrim );
-    vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, Integrals);
-    vectorPrint("yIntegrals ", Integrals, N);
-    //
-    vectorMultVector( xIntegrals, Integrals, N, Integrals);
-    vectorPrint("Integrals ", Integrals, N);
+    vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, yIntegrals);
+
+    // vectorPrint("yIntegrals spline", yIntegrals, N);
+    */
+
+    vectorMultVector( xIntegrals, yIntegrals, N, Integrals);
+    // vectorPrint("Integrals spline", Integrals, N);
+
   } else {
     // Returning array: Charge Integral on all the pads
     //
@@ -355,11 +578,17 @@ void compute2DPadIntegrals(const double* xInf, const double* xSup,
       vSup = curSqrtK3y * tanh(cst2y * ySup[i]);
       //
       Integrals[i] = cst4 * (atan(uSup) - atan(uInf)) * (atan(vSup) - atan(vInf));
+      // printf(" Ix=%10.6g Iy=%10.6g\n", 2*curK4x * (atan(uSup) - atan(uInf)),  2*curK4y * (atan(vSup) - atan(vInf)));
       // printf(" xyInfSup %2d  [%10.6g, %10.6g] x [%10.6g, %10.6g]-> %10.6g * %10.6g = %10.6g\n",
       // i, xInf[i], xSup[i], yInf[i], ySup[i], Integrals[i], 2.0 * curK4x*(atan(uSup) - atan(uInf)), 2.0 * curK4y*(atan(vSup) - atan(vInf)) ) ;
     }
     // printf(" I[0..%3ld] = %f, %f, ... %f\n", N-1, Integrals[0], Integrals[1],
     // Integrals[N-1]);
+  }
+  }
+  // CHECK
+  if (ClusterConfig::mathiesonCheck) {
+    checkIntegrals(xInf, xSup, yInf, ySup, Integrals, chamberId, N);
   }
 }
 
@@ -398,6 +627,44 @@ void compute2DMathiesonMixturePadIntegrals(const double* xyInfSup0,
   }
 }
 
+bool checkIntegrals( const double *xInf, const double *xSup, const double *yInf, const double *ySup,
+        const double *integralsToCheck, int chId, int N )
+{
+  double lBoundPrim[N], uBoundPrim[N];
+  double xIntegrals[N], yIntegrals[N], Integrals[N];
+  // ??? find the reason for high value
+  double precision=5.e-5;
+  int axe = 0;
+  mathiesonPrimitive(xInf, N, axe, chId, lBoundPrim);
+  mathiesonPrimitive(xSup, N, axe, chId, uBoundPrim);
+  vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, xIntegrals);
+  /*
+  for (int i=0; i < N; i++) {
+    if ( xIntegrals[i] >= 0.0) {
+      printf("i=%d xInf=%f xSup=%f, uBoundPrim=%f lBoundPrim=%f\n", i,
+              xInf[i], xSup[i], uBoundPrim[i], lBoundPrim[i]);
+    }
+  }
+  */
+  axe = 1;
+  mathiesonPrimitive(yInf, N, axe, chId, lBoundPrim);
+  mathiesonPrimitive(ySup, N, axe, chId, uBoundPrim);
+  vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, yIntegrals);
+  // vectorPrint("yIntegrals analytics ", yIntegrals, N);
+  vectorMultVector( xIntegrals, yIntegrals, N, Integrals);
+  bool ok = true;
+  for (int i=0; i < N; i++) {
+    if ( std::fabs(integralsToCheck[i] - Integrals[i]) > precision) {
+      printf("i=%d xInf=%f xSup=%f, yInf=%f ySup=%f, reference=%f check value=%f\n", i,
+              xInf[i], xSup[i], yInf[i], ySup[i], Integrals[i], integralsToCheck[i]);
+      ok=false;
+      throw std::out_of_range("[checkIntegral] bad integral value");
+    }
+  }
+
+  return ok;
+}
+
 void computeFastCij(const Pads& pads, const Pads& pixel, double Cij[])
 {
   // Compute the Charge Integral Cij of pads (j index), considering the
@@ -406,7 +673,101 @@ void computeFastCij(const Pads& pads, const Pads& pixel, double Cij[])
   // to reduce the computation cost
   // CI(x) is store in PadIntegralX
   // CI(y) is store in PadIntegralY
-  // A subsampling of CI(x_i + k*minDx) (or CI(y_i + l*minDY)) is used
+  // A sub-sampling of CI(x_i + k*minDx) (or CI(y_i + l*minDY)) is used
+  // by taking the mininimun of pads.dx(pads.dy) to discretize the x/y space
+  //
+  // CI(x)/CI(y) are computed if they are requested.
+  //
+  // Returning array: Charge Integral on all the pads Cij[]
+
+  if ((pads.mode != Pads::xyInfSupMode) || (pixel.mode != Pads::xydxdyMode)) {
+    printf(
+      "[computeFastCij] exception: bad representation (mode) of pads in "
+      "computeCij (padMode=%d, pixelMode=%d)\n",
+      pads.mode, pixel.mode);
+    throw std::overflow_error("Bad mode");
+    return;
+  }
+  int N = pads.getNbrOfPads();
+  int K = pixel.getNbrOfPads();
+  // Pads
+  int chId = pads.getChamberId();
+  const double* xInf0 = pads.getXInf();
+  const double* yInf0 = pads.getYInf();
+  const double* xSup0 = pads.getXSup();
+  const double* ySup0 = pads.getYSup();
+  // Pixels
+  const double* muX = pixel.getX();
+  const double* muY = pixel.getY();
+
+  double zInf[N];
+  double zSup[N];
+  int axe;
+
+  // Loop on Pixels
+  std::map<int,double* > xMap;
+  std::map<int,double* > yMap;
+  for (int k = 0; k < K; k++) {
+    // Calculate the indexes in the 1D charge integral
+    // Error on pad position > 10-3 cm
+    int xCode = (int)(muX[k] * 1000 + 0.5);
+    int yCode = (int)(muY[k] * 1000 + 0.5);
+    if ( xMap.find( xCode ) == xMap.end()) {
+      // Not yet computed
+      vectorAddScalar(xInf0, -muX[k], N, zInf);
+      vectorAddScalar(xSup0, -muX[k], N, zSup);
+      axe = 0;
+      double *xIntegrals = new double[N];
+      compute1DPadIntegrals(zInf, zSup, N, axe, chId, xIntegrals);
+      xMap[xCode] = xIntegrals;
+    }
+    if ( yMap.find( yCode ) == yMap.end()) {
+      // Not yet computed
+      vectorAddScalar(yInf0, -muY[k], N, zInf);
+      vectorAddScalar(ySup0, -muY[k], N, zSup);
+      axe = 1;
+      double* yIntegrals = new double[N];
+      compute1DPadIntegrals(zInf, zSup, N, axe, chId, yIntegrals);
+      yMap[yCode] = yIntegrals;
+    }
+    // Compute IC(xy) = IC(x) * IC(y)
+    vectorMultVector( xMap[xCode], yMap[yCode], N, &Cij[N * k]);
+    //
+    // Check
+    if (ClusterConfig::mathiesonCheck) {
+      double xInf[N], xSup[N];
+      double yInf[N], ySup[N];
+      double lBoundPrim[N], uBoundPrim[N];
+      double xIntegrals[N], yIntegrals[N], Integrals[N];
+      // printf("pad xyPad[0]= %f %f \n", (xSup0[0] - xInf0[0])*0.5, (ySup0[0] - yInf0[0])*0.5);
+      // printf("pad xyPad[0]= %f %f \n", xSup0[0], ySup0[0]);
+      // printf("pad xyPix[0]= %f %f \n", muX[k], muY[k]);
+      vectorAddScalar(xInf0, -muX[k], N, xInf);
+      vectorAddScalar(xSup0, -muX[k], N, xSup);
+      vectorAddScalar(yInf0, -muY[k], N, yInf);
+      vectorAddScalar(ySup0, -muY[k], N, ySup);
+      checkIntegrals( xInf, xSup, yInf, ySup, &Cij[N*k], chId, N);
+    }
+  }
+  // Free map
+  for (auto it = xMap.begin(); it != xMap.end(); ++it) {
+    delete [] it->second;
+  }
+  for (auto it = yMap.begin(); it != yMap.end(); ++it) {
+    delete [] it->second;
+  }
+}
+
+
+void computeFastCijV0(const Pads& pads, const Pads& pixel, double Cij[])
+{
+  // Compute the Charge Integral Cij of pads (j index), considering the
+  // center of the Mathieson fct on a pixel (i index)
+  // Use the fact that the charge integral CI(x,y) = CI(x) * CI(y)
+  // to reduce the computation cost
+  // CI(x) is store in PadIntegralX
+  // CI(y) is store in PadIntegralY
+  // A sub-sampling of CI(x_i + k*minDx) (or CI(y_i + l*minDY)) is used
   // by taking the mininimun of pads.dx(pads.dy) to discretize the x/y space
   //
   // CI(x)/CI(y) are computed if they are requested.
@@ -437,8 +798,8 @@ void computeFastCij(const Pads& pads, const Pads& pixel, double Cij[])
   double xPixMax = vectorMax(muX, K);
   double yPixMin = vectorMin(muY, K);
   double yPixMax = vectorMax(muY, K);
-  double dxMinPix = 2 * vectorMin(pixel.getDX(), K);
-  double dyMinPix = 2 * vectorMin(pixel.getDY(), K);
+  double dxMinPix = vectorMin(pixel.getDX(), K);
+  double dyMinPix = vectorMin(pixel.getDY(), K);
   // Sampling of PadIntegralX/PadIntegralY
   int nXPixels = (int)((xPixMax - xPixMin) / dxMinPix + 0.5) + 1;
   int nYPixels = (int)((yPixMax - yPixMin) / dyMinPix + 0.5) + 1;
@@ -497,6 +858,34 @@ void computeFastCij(const Pads& pads, const Pads& pixel, double Cij[])
     }
     // Compute IC(xy) = IC(x) * IC(y)
     vectorMultVector(&PadIntegralX[xIdx * N + 0], &PadIntegralY[yIdx * N + 0], N, &Cij[N * k]);
+
+    double xInf[N], xSup[N];
+    double yInf[N], ySup[N];
+    double lBoundPrim[N], uBoundPrim[N];
+    double xIntegrals[N], yIntegrals[N], Integrals[N];
+
+    vectorAddScalar(xInf0, -muX[k], N, xInf);
+    vectorAddScalar(xSup0, -muX[k], N, xSup);
+    vectorAddScalar(yInf0, -muY[k], N, yInf);
+    vectorAddScalar(ySup0, -muY[k], N, ySup);
+    double integral;
+    int axe = 0;
+    mathiesonPrimitive(xInf, N, axe, chId, lBoundPrim);
+    mathiesonPrimitive(xSup, N, axe, chId, uBoundPrim);
+    vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, xIntegrals);
+    axe = 1;
+    mathiesonPrimitive(yInf, N, axe, chId, lBoundPrim);
+    mathiesonPrimitive(ySup, N, axe, chId, uBoundPrim);
+    vectorAddVector( uBoundPrim, -1.0, lBoundPrim, N, yIntegrals);
+    // vectorPrint("yIntegrals analytics ", yIntegrals, N);
+    vectorMultVector( xIntegrals, yIntegrals, N, Integrals);
+    for (int i=0; i < N; i++) {
+      // compute2DPadIntegrals(xInf[i], xSup, yInf, ySup, 1, chId, &integral);
+      if ( std::fabs(Cij[N * k+i] - Integrals[i]) > 1.0e-6) {
+        printf("i(pixel)=%d j(pad)=%d cij=%f xInt=%f yInt=%f fastcij=%f xFast=%f yFast=%f\n", k, i,
+                Integrals[i], xIntegrals[i], yIntegrals[i], Cij[N * k+i], PadIntegralX[xIdx*N+ i], PadIntegralY[yIdx*N + i]);
+      }
+    }
   }
   delete[] PadIntegralX;
   delete[] PadIntegralY;
@@ -534,7 +923,6 @@ void computeCij(const Pads& pads, const Pads& pixel, double Cij[])
   double xSup[N];
   double ySup[N];
 
-  printf("  k  i   xInf   xSup   yInf   ySup    Cij\n");
   for (int k = 0; k < K; k++) {
     vectorAddScalar(xInf0, -muX[k], N, xInf);
     vectorAddScalar(xSup0, -muX[k], N, xSup);
@@ -545,6 +933,47 @@ void computeCij(const Pads& pads, const Pads& pixel, double Cij[])
     // vectorSum( &Cij[N*k], N) );
   }
 }
+
+void checkCij( const Pads &pads, const Pads &pixels, const double *checkCij, int mode)
+{
+  // Mode : 0 (nothing), 1 (info), 2 (detail), -1 (exception)
+  int nPads = pads.getNbrOfPads();
+  int nPixels = pixels.getNbrOfPads();
+  double *Cij = new double[nPads*nPixels];
+  double *diffCij = new double[nPads*nPixels];
+  double precision = 2.0e-5;
+  computeCij( pads, pixels, Cij);
+  vectorAddVector( Cij, -1, checkCij, nPads*nPixels, diffCij);
+  vectorAbs( diffCij, nPads*nPixels, diffCij);
+  double minDiff = vectorMin(diffCij, nPads*nPixels);
+  double maxDiff = vectorMax(diffCij, nPads*nPixels);
+  int argMax = vectorArgMax(diffCij, nPads*nPixels);
+  // printf("\n\n nPads, nPixels %d %d\n", nPads, nPixels);
+  int iIdx = argMax / nPads;
+  int jIdx = argMax % nPads;
+  if ((maxDiff > precision) && (mode != 0)) {
+    printf("\n\n[checkCij] min/max(checkCij-Cij)=(%f, %f) argmin/max=(i=%d, j=%d)\n",
+            minDiff, maxDiff, iIdx, jIdx);
+    printf("\n checkCij=%f differ from  Cij=%f\n", checkCij[iIdx*nPads+jIdx], Cij[iIdx*nPads+jIdx]);
+  }
+
+  if ((maxDiff > precision) && (mode > 1)) {
+    for( int k=0; k< nPixels; k++) {
+      for( int l=0; l< nPads; l++) {
+        if (diffCij[k*nPads+l] > precision) {
+          printf("pad=%d pixel=%d checkCij=%f Cij=%f diff=%f\n", l, k, checkCij[k*nPads+l], Cij[k*nPads+l], diffCij[k*nPads+l]);
+        }
+      }
+    }
+    // printf("findLocalMaxWithPEM: WARNING maxDiff(Cij)=%f\n", maxDiff);
+  }
+  if((maxDiff > precision) && (mode ==-1)) {
+    throw std::out_of_range("[checkCij] bad Cij value");
+  }
+  delete [] Cij;
+  delete [] diffCij;
+}
+
 // theta
 double* getVarX(double* theta, int K) { return &theta[0 * K]; };
 double* getVarY(double* theta, int K) { return &theta[1 * K]; };
@@ -787,11 +1216,25 @@ void printXYdXY(const char* str, const double* xyDxy, int NMax, int N,
   }
 }
 
+
 } // namespace mch
 } // namespace o2
 
 // C Wrapper
-void o2_mch_initMathieson() { o2::mch::initMathieson( o2::mch::ClusterConfig::useSpline, 0); }
+void o2_mch_initMathieson()
+{
+  o2::mch::initMathieson( o2::mch::ClusterConfig::useSpline, 0);
+  int N=4;
+  double xInf[N] = {-0.1, -0.2, -0.3, -0.5};
+  double yInf[N] = {-0.1, -0.2, -0.3, -0.5};
+  double xSup[N], ySup[N], integrals[N];
+  o2::mch::vectorAddScalar( xInf, 0.5, N, xSup);
+  o2::mch::vectorAddScalar( yInf, 0.5, N, ySup);
+
+  o2::mch::compute2DPadIntegrals(xInf, xSup, yInf, ySup, N, 2,
+                                 integrals);
+  o2::mch::vectorPrint("Integral", integrals, N);
+}
 
 void o2_mch_compute2DPadIntegrals(const double* xInf, const double* xSup,
                                   const double* yInf, const double* ySup, int N,

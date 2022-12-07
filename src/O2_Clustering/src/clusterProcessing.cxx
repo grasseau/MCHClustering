@@ -122,6 +122,7 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
   cleanClusterResults();
   // if (INSPECTMODEL) {
   cleanInspectModel();
+  InspectModelChrono( 0, false);
   //}
 
   const double* xyDxyi;
@@ -136,21 +137,32 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
   Mask_t* saturated__;
   Mask_t noiseMask[nPads];
   int nNewPads = 0;
+  double qCutOff = 0.0;
 
   // Pad filter when there are a too large number of pads
-  if (nPads > 800) {
+  if (nPads > ClusterConfig::nbrPadLimit) {
     // Remove noisy event
     if (ClusterConfig::processingLog >= ClusterConfig::info) {
-      printf("WARNING: remove noisy pads nPads=%d, <z>=%f, min/max z=%f,%f\n",
+      printf("WARNING: remove noisy pads nPads=%d, <q>=%8.1f, min/max q=%8.1f, %8.1f\n",
              nPads, vectorSum(zi_, nPads) / nPads, vectorMin(zi_, nPads),
              vectorMax(zi_, nPads));
     }
-    // Select pads which q > 2.0
-    vectorBuildMaskGreater(zi_, 2.0, nPads, noiseMask);
-    nNewPads = vectorSumShort(noiseMask, nPads);
+    // Select pads which q > qCutOff
+    double ratioStep = ClusterConfig::ratioStepForLargeCluster;
+    double ratio = 1.;
+    double qMax = vectorMax(zi_, nPads);
+    int nPadsTest = nPads;
+
+    while (nPadsTest > ClusterConfig::nbrPadLimit) {
+      ratio -= ratioStep;
+      qCutOff = ratio  * qMax;
+      vectorBuildMaskGreater(zi_, qCutOff, nPads, noiseMask);
+      nPadsTest = vectorSumShort(noiseMask, nPads);
+    }
+    nNewPads = nPadsTest;
     if (ClusterConfig::processingLog >= ClusterConfig::info) {
-      printf("WARNING: remove noisy pads qCutOff=2.0, nbr of kept Pads=%d/%d\n",
-             nNewPads, nPads);
+      printf("WARNING: remove noisy pads qCutOff=%8.1f, nbr of kept Pads=%d/%d\n",
+             qCutOff, nNewPads, nPads);
     }
     xyDxyi__ = new double[nNewPads * 4];
     zi__ = new double[nNewPads];
@@ -220,6 +232,7 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
   // Find local maxima (seeds)
   //
   for (int g = 1; g <= nGroups; g++) {
+    InspectModelChrono( 1, false);
     //
     //  Exctract the current group
     //
@@ -239,13 +252,17 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
     } else {
       subCluster = new ClusterPEM(cluster, g);
     }
+
+    // To do something ???
     double meanCharge = 0.5 * (subCluster->getTotalCharge(0) + subCluster->getTotalCharge(1));
 
     if (ClusterConfig::processingLog >= ClusterConfig::info) {
-      printf("[clusterProcessing] charge-0= %8.2f charge-1= %8.2f\n", subCluster->getTotalCharge(0), subCluster->getTotalCharge(1));
+      printf("[clusterProcessing] charge= (%7.0f %2.0f) nPads=(%d, %d)\n",
+              subCluster->getTotalCharge(0), subCluster->getTotalCharge(1),
+              subCluster->getNbrOfPads(0), subCluster->getNbrOfPads(1));
     }
-    int nbrOfPadsInTheGroup =
-      subCluster->getNbrOfPads(0) + subCluster->getNbrOfPads(1);
+    int nbrOfPadsInTheGroup = subCluster->getNbrOfPads();
+
     // Allocation of possible nbr of seeds
     // (.i.e the nbr of Pads)
     double thetaL[nbrOfPadsInTheGroup * 5];
@@ -295,6 +312,8 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
         // Save the seed founds by the EM algorithm
         saveThetaEMInGroupList(thetaEM, kEM);
       }
+      InspectModelChrono( 1, true);
+
       //
       //
       //
@@ -302,6 +321,8 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
       // is well separated at the 2 planes level (cath0, cath1)
       // If not the EM result is kept
       //
+      InspectModelChrono( 2, false);
+
       DataBlock_t newSeeds = subCluster->fit(thetaEM, kEM);
       finalK = newSeeds.first;
       nbrOfHits += finalK;
@@ -312,6 +333,7 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
       if (ClusterConfig::inspectModel >= ClusterConfig::active) {
         saveThetaFitInGroupList(newSeeds.second, newSeeds.first);
       }
+      InspectModelChrono( 2, true);
     } else {
       // No EM seeds
       finalK = kEM;
@@ -335,6 +357,8 @@ int clusterProcess(const double* xyDxyi_, const Mask_t* cathi_,
   if (ClusterConfig::inspectModel >= ClusterConfig::active) {
     finalizeInspectModel();
   }
+  InspectModelChrono( 0, true);
+  InspectModelChrono( -1, true);
 
   if (nNewPads) {
     delete[] xyDxyi__;

@@ -1,0 +1,33 @@
+
+1 - rafinement - reference
+reco chId= 1 TP/FP/FN 989 79 165
+em   chId= 1 TP/FP/FN 1056 40 326
+reco chId= 2 TP/FP/FN 969 50 158
+em   chId= 2 TP/FP/FN 1096 49 229
+reco chId= 3 TP/FP/FN 1117 52 63
+em   chId= 3 TP/FP/FN 1127 39 48
+reco chId= 4 TP/FP/FN 1008 61 41
+em   chId= 4 TP/FP/FN 1015 48 34
+reco chId= 5 TP/FP/FN 565 33 9
+em   chId= 5 TP/FP/FN 562 23 11
+reco chId= 6 TP/FP/FN 557 12 3
+em   chId= 6 TP/FP/FN 557 10 3
+reco chId= 7 TP/FP/FN 604 5 9
+em   chId= 7 TP/FP/FN 605 6 9
+reco chId= 8 TP/FP/FN 613 10 10
+em   chId= 8 TP/FP/FN 610 6 12
+reco chId= 9 TP/FP/FN 577 1 7
+em   chId= 9 TP/FP/FN 576 0 8
+reco chId= 10 TP/FP/FN 595 3 8
+em   chId= 10 TP/FP/FN 592 0 11
+reco all 10 TP/FP/FN 7594 306 473
+em   all 10 TP/FP/FN 7796 221 691
+Reco TP/FP/FN
+[0, 989, 969, 1117, 1008, 565, 557, 604, 613, 577, 595]
+[0, 79, 50, 52, 61, 33, 12, 5, 10, 1, 3]
+[0, 165, 158, 63, 41, 9, 3, 9, 10, 7, 8]
+EM TP/FP/FN
+[0, 1056, 1096, 1127, 1015, 562, 557, 605, 610, 576, 592]
+[0, 40, 49, 39, 48, 23, 10, 6, 6, 0, 0]
+[0, 326, 229, 48, 34, 11, 3, 9, 12, 8, 11]
+

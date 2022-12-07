@@ -52,12 +52,18 @@ class Mathieson:
     self.K4x = self.K1x / self.K2x / self.sqrtK3x
     self.K4y = self.K1y / self.K2y / self.sqrtK3y
     #
+    self.curK1x = self.K1x[mType]
+    self.curK1y = self.K1y[mType]
+    
     self.curK4x = self.K4x[mType]
     self.curK4y = self.K4y[mType]
     self.curK2x = self.K2x[mType]
     self.curK2y = self.K2y[mType]
+
     self.curSqrtK3x = self.sqrtK3x[mType]
     self.curSqrtK3y = self.sqrtK3y[mType]
+    self.curK3x = self.curSqrtK3x * self.curSqrtK3x
+    self.curK3y = self.curSqrtK3y * self.curSqrtK3y
     self.Pitch = np.array([ Mathieson.pitch1_2, Mathieson.pitch3_10 ])
     self.curPitch = self.Pitch[mType]
     self.curInvPitch = 1.0 / self.curPitch
@@ -73,14 +79,41 @@ class Mathieson:
     I = 2.0 * self.curK4x * ( np.arctan( uSup ) - np.arctan( uInf ) ) 
     return I
 
-  def computeAtanTanh( self, x):
+  def mathieson( self, x, axe=0):
     # Coef type defined with mType in construxtor
     # x/u
-    u = self.curSqrtK3x * np.tanh( self.curK2x * self.curInvPitch * x )
-    # uSup = self.curSqrtK3x * np.tanh( self.curK2x * self.curInvPitch * xSup )
-    
+    if axe == 0:
+      # X axe
+      u = np.tanh( self.curK2x * self.curInvPitch * x )
+      num = 1.0 - u*u
+      den = 1. + self.curK3x * u*u
+      mathieson = self.curK1x * num / den
+ 
+    else :
+      # Y axe
+      u = np.tanh( self.curK2y * self.curInvPitch * x )
+      num = 1.0 - u*u
+      den = 1. + self.curK3y * u*u
+      mathieson = self.curK1y * num / den 
+    return mathieson
+
+  def computeAtanTanh( self, x, axe=0):
+    # Coef type defined with mType in construxtor
+    # x/u
+    if axe == 0:
+      # X axe
+      # uSup = self.curSqrtK3x * np.tanh( self.curK2x * self.curInvPitch * xSup )
+      u = self.curSqrtK3x * np.tanh( self.curK2x * self.curInvPitch * x )
+      prim = 2.0 * self.curK4x * (np.arctan( u ))
+    else :
+      # Y axe
+      u = self.curSqrtK3y * np.tanh( self.curK2y * self.curInvPitch * x )
+      prim = 2.0 * self.curK4y * (np.arctan( u ))
     # I = 2.0 * self.curK4x * ( np.arctan( uSup ) - np.arctan( uInf ) ) 
-    return 2.0 * self.curK4x * (np.arctan( u ))
+    return prim
+
+  def primitive( self, x, axe=0):
+    return self.computeAtanTanh(x, axe)
 
   def computeMathieson2DIntegral( self, xInf, xSup, yInf, ySup ):
     # Coef type defined with mType in construxtor
